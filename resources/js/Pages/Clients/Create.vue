@@ -2,6 +2,9 @@
 import { useForm } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 
+
+const org = (usePage().props.tenant as any)?.slug || route().params.organization
+
 const form = useForm({
   company_name: '', primary_contact_name: '', primary_contact_email: '',
   primary_contact_phone: '', industry: '', niche: '', website: '', address: '',
@@ -9,7 +12,7 @@ const form = useForm({
 })
 
 function submit() {
-  form.post(route('clients.store', { organization: route().params.organization }))
+  form.post(route('clients.store', { organization: org }))
 
 }
 </script>

@@ -3,7 +3,7 @@ import { useForm, usePage } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 
 const props = defineProps<{ client: any }>()
-const form = useForm({ ...props.client })
+const org = (usePage().props.tenant as any)?.slug || route().params.organization
 
 function submit() {
   form.put(route('clients.update', {

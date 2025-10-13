@@ -14,55 +14,43 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientsController extends Controller
 {
-    protected function org(): Organization
+    public function index(Organization $organization, Request $request)
     {
-        /** @var Organization */
-        return App::get('tenant');
-    }
+        $this->authorize('viewAny', [Client::class, $organization]);
 
-    public function index(Request $request)
-    {
-        $org  = $this->org();
-        $user = $request->user();
-
-        $query = Client::query()
-            ->forOrg($org)
-            ->visibleTo($user, $org)
-            ->search($request->string('q')->toString());
-
-        // CSV export (query param: ?export=csv)
-        if ($request->boolean('export') || $request->get('export') === 'csv') {
-            return $this->exportCsv($query);
-        }
-
-        $clients = $query->orderBy('company_name')->paginate(15)->withQueryString();
+        $q = Client::query()
+            ->forOrg($organization)
+            ->visibleTo($request->user(), $organization)
+            ->search($request->string('q'));
 
         return Inertia::render('Clients/Index', [
-            'tenant'  => $org->only(['id','slug','name']),
-            'filters' => ['q' => $request->get('q')],
-            'clients' => $clients,
+            'tenant'  => $organization->only(['id','slug','name']),
+            'items'   => $q->orderBy('company_name')->paginate(15)->withQueryString(),
+            'filters' => ['q' => (string) $request->string('q')],
         ]);
     }
 
-    public function create()
+    public function create(Organization $organization)
     {
+        $this->authorize('create', [Client::class, $organization]);
+
         return Inertia::render('Clients/Create', [
-            'tenant' => $this->org()->only(['id','slug','name']),
+            'tenant' => $organization->only(['id','slug','name']),
         ]);
     }
 
-    public function store(StoreClientRequest $request)
+    public function store(Organization $organization, Request $request)
     {
-        $org = $this->org();
-        $this->authorize('create', [Client::class, $org]);
+        $this->authorize('create', [Client::class, $organization]);
 
         $data = $request->validated();
-        $data['organization_id'] = $org->id;
+        $data['organization_id'] = $organization->id;
 
-        Client::create($data);
+        $client = Client::create($data);
 
-        return redirect()->route('clients.index', $org->slug)
-            ->with('flash', ['success' => 'Client created.']);
+        return redirect()
+            ->route('clients.index', $organization)
+            ->with('flash.success', 'Client created.');
     }
 
     public function show(Organization $organization, Client $client)
@@ -77,34 +65,45 @@ class ClientsController extends Controller
 }
 
     public function edit(Organization $organization, Client $client)
-{
-    $this->authorize('update', $client);
+    {
+        // ✅ block cross-tenant access
+        abort_if($client->organization_id !== $organization->id, 404);
 
-    return Inertia::render('Clients/Edit', [
-        'tenant' => $organization->only(['id','name','slug']),
-        'client' => $client,
-    ]);
-}
+        $this->authorize('update', $client);
 
-public function update(Organization $organization, Client $client, Request $req)
-{
-    $org = $this->org();
-    $this->authorize('update', [$client, $org]);
+        return Inertia::render('Clients/Edit', [
+            'tenant' => $organization->only(['id','slug','name']),
+            'client' => $client,
+        ]);
+    }
 
-    $client->update($request->validated());
 
-    return redirect()->route('clients.index', $org->slug)
-        ->with('flash', ['success' => 'Client updated.']);
-}
+
+    public function update(Organization $organization, Client $client, Request $request)
+    {
+        abort_if($client->organization_id !== $organization->id, 404);
+        $this->authorize('update', $client);
+
+        $client->update($request->validated());
+
+        $client->update($data);
+
+        return redirect()
+            ->route('clients.index', $organization)
+            ->with('flash.success', 'Client updated.');
+    }
 
 public function destroy(Organization $organization, Client $client)
-{
-    $org = $this->org();
-    $this->authorize('delete', [$client, $org]);
+    {
+        abort_if($client->organization_id !== $organization->id, 404);
+        $this->authorize('delete', $client);
 
-    $client->delete();
-    return back()->with('flash', ['success' => 'Client deleted.']);
-}
+        $client->delete();
+
+        return redirect()
+            ->route('clients.index', $organization)
+            ->with('flash.success', 'Client deleted.');
+    }
 
     public function import(ImportClientsRequest $request)
     {

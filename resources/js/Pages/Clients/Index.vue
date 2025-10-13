@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Link, useForm, usePage } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { route } from 'ziggy-js'
 
 const page = usePage()
-const q = ref<string>((page.props as any).filters?.q || '')
+const org = (page.props.tenant as any)?.slug || route().params.organization
 
 function search() {
   window.location.href = route('clients.index', { organization: (route() as any).params.organization, q: q.value })
@@ -46,9 +46,9 @@ function exportCsv() {
             <td class="px-4 py-3">{{ c.status || '—' }}</td>
             <td class="px-4 py-3 text-right">
               <Link
-  :href="route('clients.edit', { organization: route().params.organization, client: row.id })">
-  Edit
-</Link>
+    :href="route('clients.edit', { organization: org, client: row.id })"
+    class="text-indigo-400 hover:text-indigo-300"
+  >
 
 
             </td>

@@ -10,6 +10,8 @@ class Organization extends Model
 {
     use HasFactory;
 
+    protected $fillable = ['name','slug','plan','settings'];
+
     // If not already present, bind orgs by slug instead of id
     public function getRouteKeyName(): string
     {
@@ -19,7 +21,7 @@ class Organization extends Model
     // ✅ Needed for scoped bindings: /org/{organization}/clients/{client}
     public function clients(): HasMany
     {
-        return $this->hasMany(\App\Models\Client::class);
+        return $this->hasMany(Client::class);
     }
 
     // (Optional, but handy elsewhere)
