@@ -4,80 +4,85 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Organization;
-use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Client extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'organization_id',
-        'company_name','industry','niche',
-        'primary_contact_name','primary_contact_email','primary_contact_phone',
-        'website','address','tags',
-        'fronter','closer',
-        'assigned_account_manager_id',
-        'google_business_profile_status',
-        'google_business_profile_access_status',
-        'client_activation_status',
-        'notes_by_cst','notes_by_sales','notes_by_tech',
+        'company_name',
+        'business_name',
+        'email',
+        'phone_1',
+        'phone_2',
+        'price',
+        'gmb_status',
+        'project_activation_status',
+        'activation_date',
+        'account_manager_id',
+        'fronter',
+        'closer',
+        'niche',
+        'services_notes',
+        'yelp_link',
+        'project_scope',
+        'business_address',
+        'business_address_status',
+        'cst_notes',
+        'special_notes',
+        'gmb_access_status',
         'status',
-        // legacy fields kept compatible; harmless if present
-        'name','business_name','email','phone_1','phone_2','price','gmb_status','gmb_access_status','project_activation_status',
+        'search_vector',
     ];
 
     protected $casts = [
+        'project_scope' => 'array',
+        'activation_date' => 'date',
         'fronter' => 'array',
         'closer'  => 'array',
-        'tags'    => 'array',
     ];
 
     public function organization() { return $this->belongsTo(Organization::class); }
-    public function accountManager() { return $this->belongsTo(User::class, 'assigned_account_manager_id'); }
+    public function accountManager() { return $this->belongsTo(User::class, 'account_manager_id'); }
     public function projects() { return $this->hasMany(Project::class); }
+    public function tasks() { return $this->hasManyThrough(Task::class, Project::class); }
 
-    // Tenant filter
+    /** Tenant filter */
     public function scopeForOrg(Builder $q, Organization $org): Builder
-    {   return $q->where('organization_id', $org->id); }
+    {
+        return $q->where('organization_id', $org->id);
+    }
 
-    // Dashboard visibility rule (spec): closer/fronter/AM/PM/assignee
+    /** Visibility rule:
+     * - Admin/HR/DepartmentHead: all clients in org
+     * - Others: client.account_manager_id = me OR user has tasks on any project for this client
+     */
     public function scopeVisibleTo(Builder $q, User $user, Organization $org): Builder
     {
-        // Admins & DepartmentHeads in this org see all clients
-        if ($user->hasRole(['Admin','DepartmentHead'], $org)) {
+        if ($user->hasRole(['Admin','HR','DepartmentHead'], $org)) {
             return $q->forOrg($org);
         }
 
         return $q->forOrg($org)->where(function ($qq) use ($user) {
-            $qq->whereJsonContains('fronter', $user->id)
-               ->orWhereJsonContains('closer', $user->id)
-               ->orWhere('assigned_account_manager_id', $user->id)
-               ->orWhereExists(function ($pm) use ($user) {
-                   $pm->from('projects')
-                      ->whereColumn('projects.client_id', 'clients.id')
-                      ->where('projects.project_manager_id', $user->id);
-               })
-               ->orWhereExists(function ($assn) use ($user) {
-                   $assn->from('projects')
-                        ->whereColumn('projects.client_id', 'clients.id')
-                        ->whereExists(function ($tq) use ($user) {
-                            $tq->from('tasks')
-                               ->whereColumn('tasks.project_id', 'projects.id')
-                               ->whereJsonContains('assignees', $user->id);
-                        });
+            $qq->where('account_manager_id', $user->id)
+               ->orWhereHas('projects.tasks', function ($tq) use ($user) {
+                   $tq->whereJsonContains('assignees', $user->id);
                });
         });
     }
 
-    // Search helper
+    /** Basic search across popular fields */
     public function scopeSearch(Builder $q, ?string $term): Builder
     {
         if (!$term) return $q;
         $like = '%'.strtolower($term).'%';
         return $q->where(function ($qq) use ($like) {
             $qq->whereRaw('LOWER(company_name) LIKE ?', [$like])
-               ->orWhereRaw('LOWER(primary_contact_email) LIKE ?', [$like])
-               ->orWhereRaw('LOWER(primary_contact_name) LIKE ?', [$like])
-               ->orWhereRaw('LOWER(primary_contact_phone) LIKE ?', [$like]);
+               ->orWhereRaw('LOWER(business_name) LIKE ?', [$like])
+               ->orWhereRaw('LOWER(email) LIKE ?', [$like])
+               ->orWhereRaw('LOWER(phone_1) LIKE ?', [$like]);
         });
     }
 }
