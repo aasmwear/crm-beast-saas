@@ -15,13 +15,14 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'resources/js'),
 
-      // ✅ Force Ziggy to ESM builds (fixes “default not exported” in prod build)
-      'ziggy-js': 'ziggy-js/dist/index.m.js',
-      'ziggy': path.resolve(__dirname, 'vendor/tightenco/ziggy/dist/index.esm.js'),
+      // ✅ Force BOTH to known-good Composer vendor ESM builds (present in your repo)
+      //  - route() helper:
+      'ziggy-js': path.resolve(__dirname, 'vendor/tightenco/ziggy/dist/index.esm.js'),
+      //  - Vue plugin:
+      'ziggy': path.resolve(__dirname, 'vendor/tightenco/ziggy/dist/vue.es.js'),
     },
   },
   optimizeDeps: {
-    // helps Vite pre-bundle Ziggy properly in dev too
     include: ['ziggy-js'],
   },
   server: {
