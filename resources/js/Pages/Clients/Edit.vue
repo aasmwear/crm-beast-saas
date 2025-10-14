@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useForm, usePage, Link } from '@inertiajs/vue3'
-import route from 'ziggy-js'
+import { inject } from 'vue'
+const route = inject('route') as typeof import('ziggy-js')['default']
 import { computed } from 'vue'
 
 const props = defineProps<{ client: any }>()

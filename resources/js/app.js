@@ -2,9 +2,7 @@ import './bootstrap';
 import '../css/app.css';
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
-import { ZiggyVue } from 'ziggy';
-// Cast the glob so TS is happy when we index it.
+import route from 'ziggy-js';
 const pages = import.meta.glob('./Pages/**/*.vue', { eager: true });
 createInertiaApp({
     resolve: (name) => {
@@ -14,12 +12,11 @@ createInertiaApp({
         return mod.default ?? mod;
     },
     setup({ el, App, props, plugin }) {
-        const app = createApp({ render: () => h(App, props) })
-            .use(plugin)
-            .use(ZiggyVue, window.Ziggy ?? undefined); // NOTE: uppercase Ziggy
+        const app = createApp({ render: () => h(App, props) }).use(plugin);
+        // Optional: expose in templates as `route(...)`
         app.config.globalProperties.route = route;
         app.mount(el);
         return app;
     },
-    progress: { color: '#8B7CFF' },
+    progress: { color: '#16a34a' },
 });

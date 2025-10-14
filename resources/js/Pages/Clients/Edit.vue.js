@@ -1,6 +1,7 @@
 /// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { useForm, usePage, Link } from '@inertiajs/vue3';
-import route from 'ziggy-js';
+import { inject } from 'vue';
+const route = inject('route');
 import { computed } from 'vue';
 const props = defineProps();
 const page = usePage();

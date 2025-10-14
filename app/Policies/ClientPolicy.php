@@ -5,39 +5,43 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class ClientPolicy
 {
-    // Everyone must be in org; Admin/DepartmentHead manage; others restricted
-    public function viewAny(User $user, Organization $org): bool
+    // Helper: does the user belong to this org?
+    protected function inOrg(User $user, Organization $org): bool
     {
-        return true;
+        return DB::table('organization_user')
+            ->where('user_id', $user->id)
+            ->where('organization_id', $org->id)
+            ->exists();
     }
 
-    public function view(User $user, Client $client, Organization $org): bool
+    // viewAny is called as: authorize('viewAny', [Client::class, $organization])
+    public function viewAny(User $user, Organization $organization): bool
     {
-        if ($user->hasRole(['Admin','DepartmentHead'], $org)) return true;
-
-        // reuse visibility rule
-        return Client::query()->forOrg($org)->visibleTo($user, $org)->whereKey($client->id)->exists();
+        return $this->inOrg($user, $organization);
     }
 
-    public function create(User $user, Organization $org): bool
+    // All other checks use the actual client record (scoped binding protects cross-org access)
+    public function view(User $user, Client $client): bool
     {
-        return $user->hasRole(['Admin','DepartmentHead','Manager','ProjectManager'], $org);
+        return $this->inOrg($user, $client->organization);
     }
 
-    public function update(User $user, Client $client, Organization $org): bool
+    public function create(User $user, Organization $organization): bool
     {
-        if ($user->hasRole(['Admin','DepartmentHead'], $org)) return true;
-
-        // AM or PM on a project may edit notes/status
-        return $client->assigned_account_manager_id === $user->id
-            || $client->projects()->where('project_manager_id', $user->id)->exists();
+        return $this->inOrg($user, $organization);
     }
 
-    public function delete(User $user, Client $client, Organization $org): bool
+    public function update(User $user, Client $client): bool
     {
-        return $user->hasRole(['Admin','DepartmentHead'], $org);
+        return $this->inOrg($user, $client->organization);
+    }
+
+    public function delete(User $user, Client $client): bool
+    {
+        return $this->inOrg($user, $client->organization);
     }
 }

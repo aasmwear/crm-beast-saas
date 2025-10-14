@@ -12,7 +12,7 @@
     "paths": {
       "@/*": ["resources/js/*"]
     },
-    "types": ["vite/client"]
+    "types": [],
   },
   "include": ["resources/**/*.ts", "resources/**/*.tsx", "resources/**/*.vue", "resources/**/*.d.ts"],
   "exclude": ["node_modules"]

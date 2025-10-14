@@ -170,18 +170,20 @@ Route::middleware('auth')->group(function () {
 });
 
 // Tenant-scoped Clients (use scoped bindings to avoid cross-org leaks)
+        // Tenant-scoped Clients (use scoped bindings to avoid cross-org leaks)
 Route::middleware(['auth','resolveTenant'])
     ->scopeBindings()
-    ->prefix('org/{organization}')
+    ->prefix('org/{organization:slug}')
     ->group(function () {
-        Route::get('/clients',                [ClientsController::class, 'index'])->name('clients.index');
-        Route::get('/clients/create',         [ClientsController::class, 'create'])->name('clients.create');
-        Route::post('/clients',               [ClientsController::class, 'store'])->name('clients.store');
-        Route::get('/clients/{client}',       [ClientsController::class, 'show'])->name('clients.show');
-        Route::get('/clients/{client}/edit',  [ClientsController::class, 'edit'])->name('clients.edit');
-        Route::put('/clients/{client}',       [ClientsController::class, 'update'])->name('clients.update');
-        Route::delete('/clients/{client}',    [ClientsController::class, 'destroy'])->name('clients.destroy');
+        Route::get('/clients',               [\App\Http\Controllers\ClientsController::class, 'index'])->name('clients.index');
+        Route::get('/clients/create',        [\App\Http\Controllers\ClientsController::class, 'create'])->name('clients.create');
+        Route::post('/clients',              [\App\Http\Controllers\ClientsController::class, 'store'])->name('clients.store');
+        Route::get('/clients/{client}',      [\App\Http\Controllers\ClientsController::class, 'show'])->name('clients.show');
+        Route::get('/clients/{client}/edit', [\App\Http\Controllers\ClientsController::class, 'edit'])->name('clients.edit');
+        Route::put('/clients/{client}',      [\App\Http\Controllers\ClientsController::class, 'update'])->name('clients.update');
+        Route::delete('/clients/{client}',   [\App\Http\Controllers\ClientsController::class, 'destroy'])->name('clients.destroy');
     });
+
 
 
 

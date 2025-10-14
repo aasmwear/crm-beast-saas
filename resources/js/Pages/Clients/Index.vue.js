@@ -1,6 +1,7 @@
 /// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { Link, router } from '@inertiajs/vue3';
-import route from 'ziggy-js';
+import { inject } from 'vue';
+const route = inject('route');
 import { computed, ref } from 'vue';
 const props = defineProps();
 const org = computed(() => props.tenant?.slug || route().params.organization);

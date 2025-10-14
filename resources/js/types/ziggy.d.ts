@@ -1,6 +1,6 @@
-declare module 'ziggy-js' {
-  import type { Plugin } from 'vue'
-  export const ZiggyVue: Plugin
-  const route: any
-  export default route
+import type routeFn from 'ziggy-js'
+declare module 'vue' {
+  interface ComponentCustomProperties {
+    route: typeof routeFn
+  }
 }

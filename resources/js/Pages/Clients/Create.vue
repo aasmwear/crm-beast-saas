@@ -1,70 +1,78 @@
 <script setup lang="ts">
-import { useForm, usePage, Link } from '@inertiajs/vue3'
+import { useForm, Link } from '@inertiajs/vue3'
 import route from 'ziggy-js'
-import { computed } from 'vue'
-
-const page = usePage()
-const org = computed(
-  () => (page.props.tenant as any)?.slug || (route() as any).params.organization
-)
 
 const form = useForm({
   company_name: '',
-  email: '',
-  phone_1: '',
-  status: '',
   niche: '',
+  status: 'active',
 })
 
-// 👉 keep TS simple for templates
-const errors = computed<Record<string, string>>(
-  () => ((form as any).errors || {}) as Record<string, string>
-)
-
 function submit() {
-  form.post(route('clients.store', { organization: org.value }))
+  form.post(
+    route('clients.store', { organization: route().params.organization }),
+    { preserveScroll: true }
+  )
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-2xl space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">New Client</h1>
-      <Link :href="route('clients.index', { organization: org })" class="text-neutral-300 hover:underline">Back</Link>
-    </div>
+  <div class="p-6 max-w-3xl mx-auto">
+    <h1 class="text-2xl font-semibold mb-6">Create Client</h1>
 
-    <form @submit.prevent="submit" class="space-y-4">
+    <form @submit.prevent="submit" class="space-y-6">
       <div>
-        <label class="block text-sm mb-1">Company Name</label>
-        <input v-model="form.company_name" class="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2" />
-        <div v-if="errors.company_name" class="text-red-400 text-sm mt-1">{{ errors.company_name }}</div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm mb-1">Email</label>
-          <input v-model="form.email" class="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2" />
-          <div v-if="errors.email" class="text-red-400 text-sm mt-1">{{ errors.email }}</div>
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Phone</label>
-          <input v-model="form.phone_1" class="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2" />
+        <label class="block text-sm font-medium mb-1">Company name</label>
+        <input
+          v-model="form.company_name"
+          class="w-full rounded border px-3 py-2"
+          type="text"
+          autocomplete="off"
+        />
+        <div v-if="form.errors.company_name" class="text-red-500 text-sm mt-1">
+          {{ form.errors.company_name }}
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm mb-1">Status</label>
-          <input v-model="form.status" class="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2" />
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Niche</label>
-          <input v-model="form.niche" class="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2" />
+      <div>
+        <label class="block text-sm font-medium mb-1">Niche</label>
+        <input
+          v-model="form.niche"
+          class="w-full rounded border px-3 py-2"
+          type="text"
+          autocomplete="off"
+        />
+        <div v-if="form.errors.niche" class="text-red-500 text-sm mt-1">
+          {{ form.errors.niche }}
         </div>
       </div>
 
-      <div class="pt-2">
-        <button :disabled="form.processing" class="rounded-md bg-emerald-600 px-4 py-2">Save</button>
+      <div>
+        <label class="block text-sm font-medium mb-1">Status</label>
+        <select v-model="form.status" class="w-full rounded border px-3 py-2">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <div v-if="form.errors.status" class="text-red-500 text-sm mt-1">
+          {{ form.errors.status }}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button
+          type="submit"
+          class="px-4 py-2 rounded bg-indigo-600 text-white disabled:opacity-50"
+          :disabled="form.processing"
+        >
+          Save
+        </button>
+
+        <Link
+          :href="route('clients.index', { organization: route().params.organization })"
+          class="text-gray-500 hover:text-gray-700"
+        >
+          Cancel
+        </Link>
       </div>
     </form>
   </div>

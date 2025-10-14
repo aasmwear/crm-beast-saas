@@ -13,15 +13,34 @@ class ClientsController extends Controller
     {
         $this->authorize('viewAny', [Client::class, $organization]);
 
+        $search = (string) $request->query('search', '');
+
         $q = Client::query()
-            ->forOrg($organization)
-            ->visibleTo($request->user(), $organization)
-            ->search($request->string('q'));
+            ->where('organization_id', $organization->id);
+
+        if ($search !== '') {
+            // PostgreSQL friendly ILIKE if you want; LIKE works too.
+            $q->where(function ($w) use ($search) {
+                $w->where('company_name', 'ILIKE', "%{$search}%")
+                  ->orWhere('niche', 'ILIKE', "%{$search}%")
+                  ->orWhere('status', 'ILIKE', "%{$search}%");
+            });
+        }
+
+        $clients = $q->orderBy('company_name')
+            ->paginate(15)
+            ->withQueryString()
+            ->through(fn ($c) => [
+                'id'            => $c->id,
+                'company_name'  => $c->company_name,
+                'niche'         => $c->niche,
+                'status'        => $c->status,
+            ]);
 
         return Inertia::render('Clients/Index', [
             'tenant'  => $organization->only(['id','slug','name']),
-            'items'   => $q->orderBy('company_name')->paginate(15)->withQueryString(),
-            'filters' => ['q' => (string) $request->string('q')],
+            'filters' => ['search' => $search],
+            'clients' => $clients,
         ]);
     }
 
@@ -39,25 +58,31 @@ class ClientsController extends Controller
         $this->authorize('create', [Client::class, $organization]);
 
         $data = $request->validate([
-            'company_name' => ['required','string','max:255'],
-            'email'        => ['nullable','email'],
-            'phone_1'      => ['nullable','string','max:50'],
-            'status'       => ['nullable','string','max:50'],
-            'niche'        => ['nullable','string','max:100'],
+            'company_name' => 'required|string|max:255',
+            'niche'        => 'nullable|string|max:255',
+            'status'       => 'nullable|string|max:50',
         ]);
 
         $data['organization_id'] = $organization->id;
 
-        Client::create($data);
+        $client = Client::create($data);
 
-        return redirect()
-            ->route('clients.index', $organization)
-            ->with('flash.success', 'Client created.');
+        return to_route('clients.index', ['organization' => $organization->slug])
+            ->with('success', 'Client created.');
+    }
+
+    public function show(Organization $organization, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        return Inertia::render('Clients/Show', [
+            'tenant' => $organization->only(['id','slug','name']),
+            'client' => $client,
+        ]);
     }
 
     public function edit(Organization $organization, Client $client)
     {
-        abort_if($client->organization_id !== $organization->id, 404);
         $this->authorize('update', $client);
 
         return Inertia::render('Clients/Edit', [
@@ -68,48 +93,26 @@ class ClientsController extends Controller
 
     public function update(Organization $organization, Client $client, Request $request)
     {
-        abort_if($client->organization_id !== $organization->id, 404);
         $this->authorize('update', $client);
 
         $data = $request->validate([
-            'company_name' => ['required','string','max:255'],
-            'email'        => ['nullable','email'],
-            'phone_1'      => ['nullable','string','max:50'],
-            'status'       => ['nullable','string','max:50'],
-            'niche'        => ['nullable','string','max:100'],
+            'company_name' => 'required|string|max:255',
+            'niche'        => 'nullable|string|max:255',
+            'status'       => 'nullable|string|max:50',
         ]);
 
         $client->update($data);
 
-        return redirect()
-            ->route('clients.index', $organization)
-            ->with('flash.success', 'Client updated.');
-    }
-
-    public function show(Organization $organization, Client $client)
-    {
-        abort_if($client->organization_id !== $organization->id, 404);
-        $this->authorize('view', $client);
-
-        return Inertia::render('Clients/Show', [
-            'tenant' => $organization->only(['id','slug','name']),
-            'client' => $client,
-        ]);
+        return to_route('clients.index', ['organization' => $organization->slug])
+            ->with('success', 'Client updated.');
     }
 
     public function destroy(Organization $organization, Client $client)
     {
-        abort_if($client->organization_id !== $organization->id, 404);
         $this->authorize('delete', $client);
 
         $client->delete();
 
-        return redirect()
-            ->route('clients.index', $organization)
-            ->with('flash.success', 'Client deleted.');
+        return back()->with('success', 'Client deleted.');
     }
-
-    // Optional: CSV stubs (hook up later)
-    public function export(Organization $organization) {}
-    public function import(Organization $organization, Request $request) {}
 }
