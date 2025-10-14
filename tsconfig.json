@@ -13,6 +13,7 @@
       "@/*": ["resources/js/*"]
     },
     "types": [],
+    "typeRoots": ["./node_modules/@types", "./resources/js/types"]
   },
   "include": ["resources/**/*.ts", "resources/**/*.tsx", "resources/**/*.vue", "resources/**/*.d.ts"],
   "exclude": ["node_modules"]

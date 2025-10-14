@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { route } from 'ziggy-js'
+import route from '@ziggy'
 
 
 import Checkbox from '@/Components/Checkbox.vue';

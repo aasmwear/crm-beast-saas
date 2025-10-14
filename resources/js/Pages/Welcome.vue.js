@@ -1,7 +1,6 @@
-/// <reference types="../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { route } from 'ziggy-js';
+import { route } from '@ziggy';
 const page = usePage();
 const canLogin = computed(() => !!page.props.auth?.user);
 const __VLS_props = defineProps();

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useForm, Link } from '@inertiajs/vue3'
-import route from 'ziggy-js'
+import route from '@ziggy'
 
 const form = useForm({
   company_name: '',

@@ -1,6 +1,6 @@
 /// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { useForm, Link } from '@inertiajs/vue3';
-import route from 'ziggy-js';
+import route from '@ziggy';
 const form = useForm({
     company_name: '',
     niche: '',

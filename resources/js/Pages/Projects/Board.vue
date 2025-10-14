@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { route } from 'ziggy-js'
+import { route } from '@ziggy'
 
 import { ref, computed } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
