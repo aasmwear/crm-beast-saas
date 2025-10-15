@@ -17,13 +17,25 @@ class ClientsController extends Controller
     {
         $this->authorize('viewAny', [Client::class, $organization]);
 
-        $q = trim((string) $request->query('q', ''));
+        // Read filters/search from querystring
+        $status = trim((string) $request->query('status', ''));   // 'active' | 'inactive' | ''
+        $industry = trim((string) $request->query('industry', '')); // free text
+        $q = trim((string) $request->query('q', ''));        // free text
+
+        // Escape % and _ for LIKE/ILIKE patterns
+        $escapeLike = static fn (string $s): string => '%'.str_replace(['%', '_'], ['\\%', '\\_'], $s).'%';
 
         $clients = Client::query()
             ->where('organization_id', $organization->id)
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($w) use ($q) {
-                    $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $q).'%';
+            ->when($status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->when($industry !== '', function ($query) use ($industry, $escapeLike) {
+                $query->where('industry', 'ILIKE', $escapeLike($industry));
+            })
+            ->when($q !== '', function ($query) use ($q, $escapeLike) {
+                $like = $escapeLike($q);
+                $query->where(function ($w) use ($like) {
                     $w->where('company_name', 'ILIKE', $like)
                         ->orWhere('industry', 'ILIKE', $like)
                         ->orWhere('niche', 'ILIKE', $like)
@@ -31,13 +43,23 @@ class ClientsController extends Controller
                 });
             })
             ->orderBy('company_name')
-            ->select(['id', 'company_name', 'niche', 'status'])
-            ->paginate(15)
-            ->withQueryString();
+            ->select([
+                'id',
+                'company_name',
+                'industry',
+                'niche',
+                'status',
+            ])
+            ->paginate(10)           // 10 per page (acceptance)
+            ->withQueryString();     // keep filters/search in links
 
         return Inertia::render('Clients/Index', [
             'clients' => $clients,
-            'filters' => ['q' => $q],
+            'filters' => [
+                'status' => $status !== '' ? $status : null,
+                'industry' => $industry !== '' ? $industry : null,
+                'q' => $q !== '' ? $q : null,
+            ],
         ]);
     }
 
