@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import route from '@ziggy'
+import { route } from '@ziggy'
 
 
 import GuestLayout from '@/Layouts/GuestLayout.vue';

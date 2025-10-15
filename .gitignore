@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ignore accidental compiled SFCs
+resources/js/**/*.vue.js

@@ -1,6 +1,13 @@
-import type routeFn from '@ziggy'
-declare module 'vue' {
-  interface ComponentCustomProperties {
-    route: typeof routeFn
-  }
+declare module '@ziggy' {
+  import type { Plugin } from 'vue'
+
+  // Matches vendor/tightenco/ziggy/dist/index.esm.js (named exports)
+  export function route(
+    name?: string,
+    params?: Record<string, unknown> | unknown[],
+    absolute?: boolean,
+    config?: unknown
+  ): any
+
+  export const ZiggyVue: Plugin
 }

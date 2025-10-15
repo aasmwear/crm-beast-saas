@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Client;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<\App\Models\Client> */
 class ClientFactory extends Factory
 {
     protected $model = Client::class;
@@ -14,12 +15,12 @@ class ClientFactory extends Factory
         return [
             'organization_id' => null, // set in seeder
             'company_name' => $this->faker->company(),
-            'industry' => $this->faker->randomElement(['Tech','Home Services','Legal','Health']),
-            'niche' => $this->faker->randomElement(['Plumbing','HVAC','Roofing','SaaS']),
+            'industry' => $this->faker->randomElement(['SEO', 'PPC', 'SMM']),
+            'niche' => $this->faker->word(),
             'primary_contact_name' => $this->faker->name(),
-            'primary_contact_email' => $this->faker->unique()->safeEmail(),
+            'primary_contact_email' => $this->faker->safeEmail(),
             'primary_contact_phone' => $this->faker->phoneNumber(),
-            'website' => $this->faker->domainName(),
+            'website' => $this->faker->url(),
             'address' => $this->faker->address(),
             'tags' => [],
             'fronter' => [],

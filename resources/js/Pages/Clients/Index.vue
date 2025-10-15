@@ -1,80 +1,100 @@
 <script setup lang="ts">
-import { Link, useForm, usePage, router } from '@inertiajs/vue3'
-import { inject } from 'vue'
-const route = inject('route') as typeof import('ziggy-js')['default']
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { Link, router } from '@inertiajs/vue3'
+import { route } from '@ziggy'
 
-type Paged<T> = {
-  data: T[]
-  links: { url: string | null; label: string; active: boolean }[]
+type Client = {
+  id: number
+  company_name: string
+  niche: string | null
+  industry: string | null
+  status: string | null
 }
 
 const props = defineProps<{
-  tenant: { id: number; slug: string; name: string }
-  items: Paged<any>
-  filters: { q?: string }
+  clients: Client[]
+  filters?: { q?: string }
 }>()
 
-const org = computed(() => props.tenant?.slug || (route() as any).params.organization)
+const org = computed(() => (route as any)().params.organization as string)
 const q = ref(props.filters?.q ?? '')
 
-function doSearch() {
-  router.get(route('clients.index', { organization: org.value }), { q: q.value }, { preserveState: true, replace: true })
-}
+// live search (debounced-ish but simple)
+let t: number | undefined
+watch(q, (val) => {
+  clearTimeout(t)
+  t = window.setTimeout(() => {
+    router.get(
+      route('clients.index', { organization: org.value }),
+      { q: val },
+      { preserveState: true, replace: true },
+    )
+  }, 300)
+})
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">Clients</h1>
-      <div class="flex gap-2">
-        <input
-          v-model="q"
-          @keyup.enter="doSearch"
-          placeholder="Search…"
-          class="rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm focus:outline-none"
-        />
-        <button @click="doSearch" class="rounded-md bg-indigo-600 px-3 py-2 text-sm">Search</button>
-        <Link :href="route('clients.create', { organization: org })" class="rounded-md bg-emerald-600 px-3 py-2 text-sm">New</Link>
-      </div>
+  <div class="max-w-6xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-semibold text-slate-100">Clients</h1>
+      <Link
+        :href="route('clients.create', { organization: org })"
+        class="px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white"
+      >
+        New
+      </Link>
     </div>
 
-    <div class="rounded-xl bg-neutral-900 border border-neutral-800">
-      <table class="w-full text-sm">
-        <thead class="text-neutral-400">
+    <div class="mb-4">
+      <input
+        v-model="q"
+        type="search"
+        placeholder="Search company, industry, niche…"
+        class="w-full sm:w-96 rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+      />
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-slate-800">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-900 text-slate-400">
           <tr>
-            <th class="text-left p-3">Company</th>
-            <th class="text-left p-3">Email</th>
-            <th class="text-left p-3">Status</th>
-            <th class="text-right p-3">Actions</th>
+            <th class="px-4 py-3 w-[40%]">Company</th>
+            <th class="px-4 py-3">Niche</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="row in props.items.data" :key="row.id" class="border-t border-neutral-800">
-            <td class="p-3">{{ row.company_name }}</td>
-            <td class="p-3">{{ row.email }}</td>
-            <td class="p-3">{{ row.status || '—' }}</td>
-            <td class="p-3 text-right">
-              <Link :href="route('clients.show', { organization: org, client: row.id })" class="text-sky-400 hover:underline mr-3">View</Link>
-              <Link :href="route('clients.edit', { organization: org, client: row.id })" class="text-indigo-400 hover:underline">Edit</Link>
+        <tbody class="divide-y divide-slate-800">
+          <tr v-for="c in props.clients" :key="c.id" class="bg-slate-950/40 hover:bg-slate-900/40">
+            <td class="px-4 py-3 text-slate-200">
+              {{ c.company_name }}
+            </td>
+            <td class="px-4 py-3 text-slate-300">
+              {{ c.niche ?? '—' }}
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
+                {{ c.status ?? '—' }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <Link
+                :href="route('clients.show', { organization: org, client: c.id })"
+                class="text-indigo-400 hover:text-indigo-300 mr-3"
+              >View</Link>
+              <Link
+                :href="route('clients.edit', { organization: org, client: c.id })"
+                class="text-indigo-400 hover:text-indigo-300"
+              >Edit</Link>
             </td>
           </tr>
-          <tr v-if="!props.items.data.length">
-            <td colspan="4" class="p-6 text-center text-neutral-400">No clients yet.</td>
+          <tr v-if="!props.clients || props.clients.length === 0">
+            <td class="px-4 py-6 text-center text-slate-400" colspan="4">
+              No clients found.
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <nav class="flex gap-1">
-      <Link
-        v-for="l in props.items.links"
-        :key="l.label + l.url"
-        :href="l.url || '#'"
-        :class="['px-3 py-1 rounded-md text-sm', l.active ? 'bg-neutral-700' : 'bg-neutral-800 hover:bg-neutral-700']"
-        v-html="l.label"
-        preserve-state
-      />
-    </nav>
   </div>
 </template>

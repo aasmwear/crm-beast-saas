@@ -9,15 +9,26 @@ class TaskPolicy
 {
     public function update(User $user, Task $task): bool
     {
-        $orgId = $task->organization_id;
+        if (! $this->sameTenant((int) $task->organization_id)) {
+            return false;
+        }
 
-        if ($user->hasRole(['Admin','ProjectManager','Manager'], $orgId)) return true;
+        // Normalize assignees (casted to array in model) to int[]
+        $assignees = array_map('intval', (array) $task->assignees);
 
-        return \in_array($user->id, $task->assignees ?? []);
+        return in_array((int) $user->id, $assignees, true) || $this->isAdmin($user);
     }
 
-    public function create(User $user, int $orgId): bool
+    private function sameTenant(int $orgId): bool
     {
-        return $user->hasRole(['Admin','ProjectManager','Manager'], $orgId);
+        /** @var \App\Models\Organization|null $tenant */
+        $tenant = app()->bound('tenant') ? app('tenant') : null;
+
+        return $tenant !== null && (int) $tenant->id === $orgId;
+    }
+
+    private function isAdmin(User $user): bool
+    {
+        return (bool) $user->hasRole('admin');
     }
 }

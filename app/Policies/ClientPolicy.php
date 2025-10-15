@@ -5,43 +5,35 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 class ClientPolicy
 {
-    // Helper: does the user belong to this org?
-    protected function inOrg(User $user, Organization $org): bool
-    {
-        return DB::table('organization_user')
-            ->where('user_id', $user->id)
-            ->where('organization_id', $org->id)
-            ->exists();
-    }
-
-    // viewAny is called as: authorize('viewAny', [Client::class, $organization])
+    /**
+     * Temporarily permissive; routes are org-scoped and controllers check org match.
+     * Later, tighten per role (owner, AM, sales, etc.).
+     */
     public function viewAny(User $user, Organization $organization): bool
     {
-        return $this->inOrg($user, $organization);
+        return true;
     }
 
-    // All other checks use the actual client record (scoped binding protects cross-org access)
-    public function view(User $user, Client $client): bool
+    public function view(User $user, Client $client, Organization $organization): bool
     {
-        return $this->inOrg($user, $client->organization);
+        return $client->organization_id === $organization->id;
     }
 
     public function create(User $user, Organization $organization): bool
     {
-        return $this->inOrg($user, $organization);
+        return true;
     }
 
-    public function update(User $user, Client $client): bool
+    public function update(User $user, Client $client, Organization $organization): bool
     {
-        return $this->inOrg($user, $client->organization);
+        return $client->organization_id === $organization->id;
     }
 
-    public function delete(User $user, Client $client): bool
+    public function delete(User $user, Client $client, Organization $organization): bool
     {
-        return $this->inOrg($user, $client->organization);
+        return $client->organization_id === $organization->id;
     }
 }

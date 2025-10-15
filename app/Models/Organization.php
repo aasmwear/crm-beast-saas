@@ -4,36 +4,58 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @phpstan-use \Illuminate\Database\Eloquent\Factories\HasFactory<\Database\Factories\OrganizationFactory>
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $slug
+ */
 class Organization extends Model
 {
+    /** @use HasFactory<\Database\Factories\OrganizationFactory> */
     use HasFactory;
 
-    protected $fillable = [
-        'name',
-        'slug',
-        'plan',
-        'settings',
-    ];
+    protected $guarded = [];
 
     /**
-     * Tell Laravel to use the slug in URLs/route model binding.
+     * @return HasMany<\App\Models\Client, \App\Models\Organization>
      */
-    public function getRouteKeyName(): string
+    public function clients(): HasMany
     {
-        return 'slug';
+        /** @var HasMany<\App\Models\Client, \App\Models\Organization> $rel */
+        $rel = $this->hasMany(Client::class);
+
+        return $rel;
     }
 
-    // --- Relationships used around the app ---
-    public function clients()
+    /**
+     * @return HasMany<\App\Models\Project, \App\Models\Organization>
+     */
+    public function projects(): HasMany
     {
-        return $this->hasMany(Client::class);
+        /** @var HasMany<\App\Models\Project, \App\Models\Organization> $rel */
+        $rel = $this->hasMany(Project::class);
+
+        return $rel;
     }
 
-    public function projects()
+    /**
+     * @return BelongsToMany<\App\Models\User, \App\Models\Organization, \Illuminate\Database\Eloquent\Relations\Pivot, 'pivot'>
+     */
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(Project::class);
+        /** @var BelongsToMany<\App\Models\User, \App\Models\Organization, \Illuminate\Database\Eloquent\Relations\Pivot, 'pivot'> $rel */
+        $rel = $this->belongsToMany(User::class)->withTimestamps();
+
+        return $rel;
     }
 
-    // add others as you grow (tasks, users, etc.)
+    protected static function newFactory(): \Database\Factories\OrganizationFactory
+    {
+        return \Database\Factories\OrganizationFactory::new();
+    }
 }

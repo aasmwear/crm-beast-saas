@@ -5,10 +5,11 @@ namespace App\Http\Middleware;
 use App\Models\Organization;
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class ResolveTenant
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         // Accept either {org} or {organization} from routes
         $param = $request->route('org') ?? $request->route('organization');
@@ -16,6 +17,7 @@ class ResolveTenant
         // If it's already an Organization model, use it
         if ($param instanceof Organization) {
             app()->instance('tenant', $param);
+
             return $next($request);
         }
 

@@ -25,7 +25,7 @@ async function move(task: Task, to: string) {
   const old = task.status
   task.status = to as Task['status']
   try {
-    await fetch(route('tasks.move', { org: tenant.value.slug, task: task.id }), {
+    await fetch(route('tasks.move', { organization: tenant.value.slug, task: task.id }), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({ status: to }),
