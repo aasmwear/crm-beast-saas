@@ -25,3 +25,7 @@ Thumbs.db
 
 # ignore accidental compiled SFCs
 resources/js/**/*.vue.js
+
+# local bundles / scratch
+*.zip
+crm-beast-working.zip
