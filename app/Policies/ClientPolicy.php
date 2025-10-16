@@ -8,36 +8,32 @@ use App\Models\User;
 
 class ClientPolicy
 {
-    // Everyone must be in org; Admin/DepartmentHead manage; others restricted
-    public function viewAny(User $user, Organization $org): bool
+    /**
+     * Temporarily permissive; routes are org-scoped and controllers check org match.
+     * Later, tighten per role (owner, AM, sales, etc.).
+     */
+    public function viewAny(User $user, Organization $organization): bool
     {
         return true;
     }
 
-    public function view(User $user, Client $client, Organization $org): bool
+    public function view(User $user, Client $client, Organization $organization): bool
     {
-        if ($user->hasRole(['Admin','DepartmentHead'], $org)) return true;
-
-        // reuse visibility rule
-        return Client::query()->forOrg($org)->visibleTo($user, $org)->whereKey($client->id)->exists();
+        return $client->organization_id === $organization->id;
     }
 
-    public function create(User $user, Organization $org): bool
+    public function create(User $user, Organization $organization): bool
     {
-        return $user->hasRole(['Admin','DepartmentHead','Manager','ProjectManager'], $org);
+        return true;
     }
 
-    public function update(User $user, Client $client, Organization $org): bool
+    public function update(User $user, Client $client, Organization $organization): bool
     {
-        if ($user->hasRole(['Admin','DepartmentHead'], $org)) return true;
-
-        // AM or PM on a project may edit notes/status
-        return $client->assigned_account_manager_id === $user->id
-            || $client->projects()->where('project_manager_id', $user->id)->exists();
+        return $client->organization_id === $organization->id;
     }
 
-    public function delete(User $user, Client $client, Organization $org): bool
+    public function delete(User $user, Client $client, Organization $organization): bool
     {
-        return $user->hasRole(['Admin','DepartmentHead'], $org);
+        return $client->organization_id === $organization->id;
     }
 }

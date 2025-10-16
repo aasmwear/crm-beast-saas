@@ -1,31 +1,35 @@
 <?php
-// app/Http/Middleware/ResolveTenant.php
+
 namespace App\Http\Middleware;
 
+use App\Models\Organization;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
-use App\Models\Organization;
+use Symfony\Component\HttpFoundation\Response;
 
 class ResolveTenant
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
-        $slug = $request->route('org') ?? $request->route('organization');
+        // Accept either {org} or {organization} from routes
+        $param = $request->route('org') ?? $request->route('organization');
 
-        if (is_object($slug) && method_exists($slug, '__toString')) {
-            $slug = (string) $slug;
+        // If it's already an Organization model, use it
+        if ($param instanceof Organization) {
+            app()->instance('tenant', $param);
+
+            return $next($request);
         }
 
-        $org = Organization::where('slug', $slug)->first();
-        abort_unless($org, 404, 'Organization not found.');
+        // Otherwise treat as slug (string) and resolve
+        if (is_string($param) && $param !== '') {
+            $org = Organization::where('slug', $param)->first();
+            if ($org) {
+                app()->instance('tenant', $org);
 
-        // bind to container
-        App::instance('tenant', $org);
-
-        // normalize {organization} param for routes that expect a model
-        if ($request->route('organization') && !($request->route('organization') instanceof Organization)) {
-            $request->route()->setParameter('organization', $org);
+                // normalize the bound param so downstream code can type-hint Organization
+                $request->route()->setParameter('organization', $org);
+            }
         }
 
         return $next($request);

@@ -1,5 +1,5 @@
 /// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { route } from 'ziggy-js';
+import { route } from '@ziggy';
 import { ref, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 const page = usePage();
@@ -15,7 +15,7 @@ async function move(task, to) {
     const old = task.status;
     task.status = to;
     try {
-        await fetch(route('tasks.move', { org: tenant.value.slug, task: task.id }), {
+        await fetch(route('tasks.move', { organization: tenant.value.slug, task: task.id }), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ status: to }),

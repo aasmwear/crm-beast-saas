@@ -1,34 +1,91 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3'
-import { route } from 'ziggy-js'
+import { useForm, Link } from '@inertiajs/vue3'
+import { route } from '@ziggy'
+import { computed } from 'vue'
+
+const org = computed(() => (route as any)().params.organization as string)
 
 const form = useForm({
-  company_name: '', primary_contact_name: '', primary_contact_email: '',
-  primary_contact_phone: '', industry: '', niche: '', website: '', address: '',
-  status: ''
+  company_name: '',
+  niche: '',
+  industry: '',
+  website: '',
+  primary_contact_name: '',
+  primary_contact_email: '',
+  primary_contact_phone: '',
+  address: '',
+  status: 'active',
 })
 
 function submit() {
-  form.post(route('clients.store', { organization: route().params.organization }))
-
+  form.post(route('clients.store', { organization: org.value }))
 }
 </script>
 
 <template>
-  <div class="p-6 text-white">
-    <h1 class="text-2xl font-semibold mb-4">Create Client</h1>
-    <div class="grid gap-4 md:grid-cols-2">
-      <input v-model="form.company_name" placeholder="Company name" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.primary_contact_email" placeholder="Primary email" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.primary_contact_name" placeholder="Primary contact name" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.primary_contact_phone" placeholder="Phone" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.industry" placeholder="Industry" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.niche" placeholder="Niche" class="rounded bg-black/40 px-3 py-2" />
-      <input v-model="form.website" placeholder="Website (https://…)" class="rounded bg-black/40 px-3 py-2 md:col-span-2" />
-      <input v-model="form.address" placeholder="Address" class="rounded bg-black/40 px-3 py-2 md:col-span-2" />
-    </div>
-    <div class="mt-6">
-      <button @click="submit" class="rounded-xl bg-green-600 px-4 py-2">Save</button>
-    </div>
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-semibold text-slate-100 mb-6">New Client</h1>
+
+    <form @submit.prevent="submit" class="space-y-5">
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Company name *</label>
+        <input v-model="form.company_name" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+        <div v-if="form.errors.company_name" class="text-red-400 text-sm mt-1">{{ form.errors.company_name }}</div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Niche</label>
+          <input v-model="form.niche" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+          <div v-if="form.errors.niche" class="text-red-400 text-sm mt-1">{{ form.errors.niche }}</div>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Industry</label>
+          <input v-model="form.industry" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+          <div v-if="form.errors.industry" class="text-red-400 text-sm mt-1">{{ form.errors.industry }}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Website</label>
+          <input v-model="form.website" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+          <div v-if="form.errors.website" class="text-red-400 text-sm mt-1">{{ form.errors.website }}</div>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Status</label>
+          <select v-model="form.status" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100">
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <div v-if="form.errors.status" class="text-red-400 text-sm mt-1">{{ form.errors.status }}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Contact name</label>
+          <input v-model="form.primary_contact_name" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Contact email</label>
+          <input v-model="form.primary_contact_email" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1">Contact phone</label>
+          <input v-model="form.primary_contact_phone" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Address</label>
+        <textarea v-model="form.address" rows="3" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100"></textarea>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button :disabled="form.processing" class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50">Save</button>
+        <Link :href="route('clients.index', { organization: org })" class="text-slate-400 hover:text-slate-300">Cancel</Link>
+      </div>
+    </form>
   </div>
 </template>

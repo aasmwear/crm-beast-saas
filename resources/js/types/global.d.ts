@@ -1,8 +1,7 @@
-import { route as ziggyRoute } from 'ziggy-js'
+import 'vue'
 
-declare module 'vue' {
+declare module '@vue/runtime-core' {
   interface ComponentCustomProperties {
-    route: typeof ziggyRoute
+    route: (name?: string, params?: any, absolute?: boolean, config?: any) => any
   }
 }
-export {}

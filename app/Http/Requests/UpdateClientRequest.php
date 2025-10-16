@@ -2,12 +2,23 @@
 
 namespace App\Http\Requests;
 
-class UpdateClientRequest extends StoreClientRequest
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateClientRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return true; // controller/policy handles auth
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
-        $rules = parent::rules();
-        $rules['company_name'][0] = 'sometimes';
-        return $rules;
+        return [
+            'company_name' => ['sometimes', 'string', 'max:160'],
+            'primary_contact_email' => ['sometimes', 'email'],
+        ];
     }
 }

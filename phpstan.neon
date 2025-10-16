@@ -1,0 +1,9 @@
+parameters:
+  level: 6
+  paths:
+    - app
+    - routes
+    - database
+  reportUnmatchedIgnoredErrors: false
+
+

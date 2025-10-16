@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { route } from '@ziggy'
 import { computed } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import NavLink from '@/Components/NavLink.vue'
@@ -16,14 +17,14 @@ const tenant = computed(() => page.props.tenant)
         <div class="flex h-16 items-center justify-between">
           <!-- Brand -->
           <div class="flex items-center gap-3">
-            <Link :href="route('dashboard', { org: tenant?.slug })" class="text-slate-100 font-semibold">
+            <Link :href="route('tenant.dashboard', { org: tenant?.slug })" class="text-slate-100 font-semibold">
               CRM Beast
             </Link>
 
             <!-- Top tabs -->
             <div class="hidden md:flex items-center gap-3 ml-6">
               <NavLink
-                :href="route('dashboard', { org: tenant?.slug })"
+                :href="route('tenant.dashboard', { org: tenant?.slug })"
                 :active="route().current('dashboard')"
               >
                 Overview
@@ -38,7 +39,7 @@ const tenant = computed(() => page.props.tenant)
 
               <!-- Placeholder tabs (we’ll wire later) -->
               <NavLink :href="'#'" :active="false">Teams</NavLink>
-              <Link :href="route('clients.index', route().params.organization)" class="...">Clients</Link>
+              <Link :href="route('clients.index', { organization: route().params.organization })" class="...">Clients</Link>
               <NavLink :href="'#'" :active="false">Reports</NavLink>
             </div>
           </div>
@@ -56,7 +57,7 @@ const tenant = computed(() => page.props.tenant)
       <div class="md:hidden border-t border-white/10">
         <div class="px-2 py-3 space-y-1">
           <ResponsiveNavLink
-            :href="route('dashboard', { org: tenant?.slug })"
+            :href="route('tenant.dashboard', { org: tenant?.slug })"
             :active="route().current('dashboard')"
           >Overview</ResponsiveNavLink>
 

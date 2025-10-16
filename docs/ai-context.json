@@ -1,0 +1,38 @@
+
+{
+  "product": "SaaS CRM for digital marketing agencies",
+  "tenancy": {"routeParam":"organization","binding":"{organization:slug}","strategy":"single-db"},
+  "stack": {
+    "php":"8.3",
+    "laravel":"12.x",
+    "node":"20",
+    "vite":"7",
+    "vue":"3",
+    "typescript": true,
+    "inertia": true,
+    "ziggyImport": "import { route } from '@ziggy'"
+  },
+  "db": {"engine":"postgres"},
+  "decisions": {
+    "clients.accountManagerColumn":"assigned_account_manager_id",
+    "search.ilikeEscaped": true,
+    "policies.required": true
+  },
+  "modules": {
+    "clients":{"basic": true, "productReadyPct": 45},
+    "projectsTasks":{"basic": true, "productReadyPct": 40},
+    "billing":{"installed": true, "configured": false}
+  },
+  "qaCommands": [
+    "./vendor/bin/sail php artisan optimize:clear",
+    "npm run typecheck",
+    "npm run build",
+    "vendor/bin/pint --test",
+    "php -d xdebug.mode=off vendor/bin/phpstan analyse --memory-limit=1G"
+  ],
+  "next": [
+    "Clients: pagination + delete + filters",
+    "Policies: tighten for Projects/Tasks",
+    "Billing: connect Stripe test keys"
+  ]
+}

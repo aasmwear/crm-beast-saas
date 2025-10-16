@@ -4,173 +4,181 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
-use App\Http\Requests\ImportClientsRequest;
-use App\Models\Organization;
 use App\Models\Client;
+use App\Models\Organization;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Inertia\Inertia;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Inertia\Response;
 
 class ClientsController extends Controller
 {
-    protected function org(): Organization
+    public function index(Request $request, Organization $organization): Response
     {
-        /** @var Organization */
-        return App::get('tenant');
-    }
+        $this->authorize('viewAny', [Client::class, $organization]);
 
-    public function index(Request $request)
-    {
-        $org  = $this->org();
-        $user = $request->user();
+        // Read filters/search from querystring
+        $status = trim((string) $request->query('status', ''));   // 'active' | 'inactive' | ''
+        $industry = trim((string) $request->query('industry', '')); // free text
+        $q = trim((string) $request->query('q', ''));        // free text
 
-        $query = Client::query()
-            ->forOrg($org)
-            ->visibleTo($user, $org)
-            ->search($request->string('q')->toString());
+        // Escape % and _ for LIKE/ILIKE patterns
+        $escapeLike = static fn (string $s): string => '%'.str_replace(['%', '_'], ['\\%', '\\_'], $s).'%';
 
-        // CSV export (query param: ?export=csv)
-        if ($request->boolean('export') || $request->get('export') === 'csv') {
-            return $this->exportCsv($query);
-        }
-
-        $clients = $query->orderBy('company_name')->paginate(15)->withQueryString();
+        $clients = Client::query()
+            ->where('organization_id', $organization->id)
+            ->when($status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->when($industry !== '', function ($query) use ($industry, $escapeLike) {
+                $query->where('industry', 'ILIKE', $escapeLike($industry));
+            })
+            ->when($q !== '', function ($query) use ($q, $escapeLike) {
+                $like = $escapeLike($q);
+                $query->where(function ($w) use ($like) {
+                    $w->where('company_name', 'ILIKE', $like)
+                        ->orWhere('industry', 'ILIKE', $like)
+                        ->orWhere('niche', 'ILIKE', $like)
+                        ->orWhere('primary_contact_name', 'ILIKE', $like);
+                });
+            })
+            ->orderBy('company_name')
+            ->select([
+                'id',
+                'company_name',
+                'industry',
+                'niche',
+                'status',
+            ])
+            ->paginate(10)           // 10 per page (acceptance)
+            ->withQueryString();     // keep filters/search in links
 
         return Inertia::render('Clients/Index', [
-            'tenant'  => $org->only(['id','slug','name']),
-            'filters' => ['q' => $request->get('q')],
             'clients' => $clients,
+            'filters' => [
+                'status' => $status !== '' ? $status : null,
+                'industry' => $industry !== '' ? $industry : null,
+                'q' => $q !== '' ? $q : null,
+            ],
         ]);
     }
 
-    public function create()
+    public function create(Organization $organization): Response
     {
-        return Inertia::render('Clients/Create', [
-            'tenant' => $this->org()->only(['id','slug','name']),
-        ]);
+        $this->authorize('create', [Client::class, $organization]);
+
+        return Inertia::render('Clients/Create', []);
     }
 
-    public function store(StoreClientRequest $request)
+    public function store(StoreClientRequest $request, Organization $organization): RedirectResponse
     {
-        $org = $this->org();
-        $this->authorize('create', [Client::class, $org]);
+        $this->authorize('create', [Client::class, $organization]);
 
         $data = $request->validated();
-        $data['organization_id'] = $org->id;
+        $data['organization_id'] = $organization->id;
 
-        Client::create($data);
+        /** @var \App\Models\Client $client */
+        $client = Client::query()->create($data);
 
-        return redirect()->route('clients.index', $org->slug)
-            ->with('flash', ['success' => 'Client created.']);
+        return redirect()
+            ->route('clients.show', [
+                'organization' => $organization->slug,
+                'client' => $client->id,
+            ])
+            ->with('success', 'Client created.');
     }
 
-    public function show(Organization $organization, Client $client)
-{
-    $org = $this->org();
-    $this->authorize('view', [$client, $org]);
-
-    return Inertia::render('Clients/Show', [
-        'tenant' => $org->only(['id','slug','name']),
-        'client' => $client,
-    ]);
-}
-
-    public function edit(Organization $organization, Client $client)
-{
-    $this->authorize('update', $client);
-
-    return Inertia::render('Clients/Edit', [
-        'tenant' => $organization->only(['id','name','slug']),
-        'client' => $client,
-    ]);
-}
-
-public function update(Organization $organization, Client $client, Request $req)
-{
-    $org = $this->org();
-    $this->authorize('update', [$client, $org]);
-
-    $client->update($request->validated());
-
-    return redirect()->route('clients.index', $org->slug)
-        ->with('flash', ['success' => 'Client updated.']);
-}
-
-public function destroy(Organization $organization, Client $client)
-{
-    $org = $this->org();
-    $this->authorize('delete', [$client, $org]);
-
-    $client->delete();
-    return back()->with('flash', ['success' => 'Client deleted.']);
-}
-
-    public function import(ImportClientsRequest $request)
+    public function show(Organization $organization, Client $client): Response
     {
-        $org = $this->org();
-        $this->authorize('create', [Client::class, $org]);
+        $this->authorize('view', [$client, $organization]);
+        abort_unless($client->organization_id === $organization->id, 404);
 
-        $file = $request->file('file')->getRealPath();
-        $fh   = fopen($file, 'r');
-
-        $header = fgetcsv($fh) ?: [];
-        $map = collect($header)->mapWithKeys(fn($h, $i) => [strtolower(trim($h)) => $i]);
-
-        $required = ['company_name'];
-        foreach ($required as $f) if (!isset($map[$f])) {
-            return back()->with('flash', ['error' => "Missing column: $f"]);
-        }
-
-        $count = 0;
-        while (($row = fgetcsv($fh)) !== false) {
-            $data = [
-                'organization_id' => $org->id,
-                'company_name' => $row[$map['company_name']] ?? null,
-                'primary_contact_email' => $row[$map['primary_contact_email']] ?? null,
-                'primary_contact_name'  => $row[$map['primary_contact_name']] ?? null,
-                'primary_contact_phone' => $row[$map['primary_contact_phone']] ?? null,
-                'niche'   => $row[$map['niche']] ?? null,
-                'industry'=> $row[$map['industry']] ?? null,
-                'website' => $row[$map['website']] ?? null,
-                'address' => $row[$map['address']] ?? null,
-                'status'  => $row[$map['status']] ?? null,
-            ];
-
-            if (!$data['company_name']) continue;
-
-            Client::updateOrCreate(
-                ['organization_id' => $org->id, 'company_name' => $data['company_name']],
-                $data
-            );
-            $count++;
-        }
-        fclose($fh);
-
-        return back()->with('flash', ['success' => "Imported {$count} clients."]);
+        return Inertia::render('Clients/Show', [
+            'client' => $client->only([
+                'id',
+                'company_name',
+                'industry',
+                'niche',
+                'primary_contact_name',
+                'primary_contact_email',
+                'primary_contact_phone',
+                'website',
+                'address',
+                'tags',
+                'fronter',
+                'closer',
+                'assigned_account_manager_id',
+                'google_business_profile_status',
+                'google_business_profile_access_status',
+                'client_activation_status',
+                'status',
+                'notes_by_cst',
+                'notes_by_sales',
+                'notes_by_tech',
+                'created_at',
+                'updated_at',
+            ]),
+        ]);
     }
 
-    protected function exportCsv($query): StreamedResponse
+    public function edit(Organization $organization, Client $client): Response
     {
-        $filename = 'clients_export_'.now()->format('Ymd_His').'.csv';
-        $headers  = [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
-        $cols = [
-            'company_name','industry','niche','primary_contact_name','primary_contact_email',
-            'primary_contact_phone','website','address','status'
-        ];
+        $this->authorize('update', [$client, $organization]);
+        abort_unless($client->organization_id === $organization->id, 404);
 
-        return response()->stream(function () use ($query, $cols) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, $cols);
-            $query->orderBy('company_name')->chunk(500, function ($chunk) use ($out, $cols) {
-                foreach ($chunk as $c) {
-                    fputcsv($out, array_map(fn($k)=> data_get($c, $k), $cols));
-                }
-            });
-            fclose($out);
-        }, 200, $headers);
+        return Inertia::render('Clients/Edit', [
+            'client' => $client->only([
+                'id',
+                'company_name',
+                'industry',
+                'niche',
+                'primary_contact_name',
+                'primary_contact_email',
+                'primary_contact_phone',
+                'website',
+                'address',
+                'tags',
+                'fronter',
+                'closer',
+                'assigned_account_manager_id',
+                'google_business_profile_status',
+                'google_business_profile_access_status',
+                'client_activation_status',
+                'status',
+                'notes_by_cst',
+                'notes_by_sales',
+                'notes_by_tech',
+            ]),
+        ]);
+    }
+
+    public function update(UpdateClientRequest $request, Organization $organization, Client $client): RedirectResponse
+    {
+        $this->authorize('update', [$client, $organization]);
+        abort_unless($client->organization_id === $organization->id, 404);
+
+        $data = $request->validated();
+        unset($data['organization_id']); // never allow org reassignment
+
+        $client->update($data);
+
+        return redirect()
+            ->route('clients.show', [
+                'organization' => $organization->slug,
+                'client' => $client->id,
+            ])
+            ->with('success', 'Client updated.');
+    }
+
+    public function destroy(Organization $organization, Client $client): RedirectResponse
+    {
+        $this->authorize('delete', [$client, $organization]);
+        abort_unless($client->organization_id === $organization->id, 404);
+
+        $client->delete();
+
+        return redirect()
+            ->route('clients.index', ['organization' => $organization->slug])
+            ->with('success', 'Client deleted.');
     }
 }
