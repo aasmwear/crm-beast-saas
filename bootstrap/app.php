@@ -10,13 +10,18 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function ($middleware) {
-        // Register your middleware aliases here
+    ->withMiddleware(function (Middleware $middleware) {
+        // Register route middleware aliases here (Laravel 11 style)
         $middleware->alias([
             'resolveTenant' => \App\Http\Middleware\ResolveTenant::class,
+            'superAdmin' => \App\Http\Middleware\SuperAdmin::class,
+            'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
         ]);
+
+        // If you ever want to append to 'web' or 'api' stacks:
+        // $middleware->web(append: [/* ... */]);
+        // $middleware->api(append: [/* ... */]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
-    })
-    ->create();
+    })->create();

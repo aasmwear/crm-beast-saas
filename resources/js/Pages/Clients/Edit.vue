@@ -1,104 +1,391 @@
 <script setup lang="ts">
-import { useForm, Link } from '@inertiajs/vue3'
-import { route } from '@ziggy'
 import { computed } from 'vue'
+import { useForm, usePage, Link } from '@inertiajs/vue3'
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
-type Client = {
+defineOptions({ layout: AuthenticatedLayout })
+
+type ClientResource = {
   id: number
   company_name: string
-  niche: string | null
   industry: string | null
+  niche: string | null
   website: string | null
   primary_contact_name: string | null
   primary_contact_email: string | null
   primary_contact_phone: string | null
   address: string | null
+
+  google_business_profile_status: string | null
+  google_business_profile_access_status: string | null
+
+  client_activation_status: string | null
   status: string | null
+
+  notes_by_sales: string | null
+  notes_by_cst: string | null
+  notes_by_tech: string | null
 }
 
-const props = defineProps<{ client: Client }>()
-const org = computed(() => (route as any)().params.organization as string)
+type ClientForm = ClientResource
 
-const form = useForm({
-  company_name: props.client.company_name ?? '',
-  niche: props.client.niche ?? '',
-  industry: props.client.industry ?? '',
-  website: props.client.website ?? '',
-  primary_contact_name: props.client.primary_contact_name ?? '',
-  primary_contact_email: props.client.primary_contact_email ?? '',
-  primary_contact_phone: props.client.primary_contact_phone ?? '',
-  address: props.client.address ?? '',
-  status: props.client.status ?? 'active',
+type PageProps = {
+  tenant?: { slug: string }
+  organization?: { slug: string }
+}
+
+// ---------- Route & props ----------
+const routeGlobal = (window as any).route
+const r = (name: string, params: any = {}, absolute = false, config?: any) =>
+  routeGlobal ? routeGlobal(name, params, absolute, config) : '#'
+
+const page = usePage<PageProps>()
+
+const props = defineProps<{
+  organizationSlug: string
+  client: ClientResource
+}>()
+
+const client = props.client
+
+const org = computed(() => {
+  if (props.organizationSlug) return props.organizationSlug
+  const p = page.props
+  return p.tenant?.slug ?? p.organization?.slug ?? 'acme'
 })
 
-function submit() {
-  form.put(route('clients.update', { organization: org.value, client: props.client.id }))
+// ---------- Form ----------
+const form = useForm<ClientForm>({
+  id: client.id,
+  company_name: client.company_name ?? '',
+  industry: client.industry ?? null,
+  niche: client.niche ?? null,
+  website: client.website ?? null,
+  primary_contact_name: client.primary_contact_name ?? null,
+  primary_contact_email: client.primary_contact_email ?? null,
+  primary_contact_phone: client.primary_contact_phone ?? null,
+  address: client.address ?? null,
+
+  google_business_profile_status:
+    client.google_business_profile_status ?? null,
+  google_business_profile_access_status:
+    client.google_business_profile_access_status ?? null,
+
+  client_activation_status: client.client_activation_status ?? 'lead',
+  status: client.status ?? 'lead',
+
+  notes_by_sales: client.notes_by_sales ?? null,
+  notes_by_cst: client.notes_by_cst ?? null,
+  notes_by_tech: client.notes_by_tech ?? null,
+})
+
+const submit = () => {
+  form.put(
+    r('clients.update', {
+      organization: org.value,
+      client: client.id,
+    }),
+  )
 }
+
+// ---------- UI helpers ----------
+const inputClass =
+  'w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition'
+
+const textareaClass =
+  'w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition'
+
+const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
+
+const statusOptions = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'churned', label: 'Churned' },
+]
+
+const activationOptions = [
+  { value: 'lead', label: 'Lead (not started)' },
+  { value: 'onboarding', label: 'Onboarding' },
+  { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'churned', label: 'Churned / Lost' },
+]
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto px-4 py-6">
-    <h1 class="text-2xl font-semibold text-slate-100 mb-6">Edit Client</h1>
-
-    <form @submit.prevent="submit" class="space-y-5">
-      <div>
-        <label class="block text-sm text-slate-300 mb-1">Company name *</label>
-        <input v-model="form.company_name" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-        <div v-if="form.errors.company_name" class="text-red-400 text-sm mt-1">{{ form.errors.company_name }}</div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div class="space-y-6">
+    <!-- Hero -->
+    <section class="hero-slab">
+      <div class="flex items-center justify-between gap-4">
         <div>
-          <label class="block text-sm text-slate-300 mb-1">Niche</label>
-          <input v-model="form.niche" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-          <div v-if="form.errors.niche" class="text-red-400 text-sm mt-1">{{ form.errors.niche }}</div>
+          <div class="text-xs text-white/60">
+            Organization • {{ org.toUpperCase() }}
+          </div>
+          <h1 class="mt-1 text-3xl font-semibold tracking-tight">
+            Edit Client
+          </h1>
+          <p class="mt-1 text-white/60">
+            Update details for
+            <span class="font-semibold">{{ client.company_name }}</span>.
+          </p>
         </div>
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Industry</label>
-          <input v-model="form.industry" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-          <div v-if="form.errors.industry" class="text-red-400 text-sm mt-1">{{ form.errors.industry }}</div>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Website</label>
-          <input v-model="form.website" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-          <div v-if="form.errors.website" class="text-red-400 text-sm mt-1">{{ form.errors.website }}</div>
-        </div>
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Status</label>
-          <select v-model="form.status" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100">
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
-          </select>
-          <div v-if="form.errors.status" class="text-red-400 text-sm mt-1">{{ form.errors.status }}</div>
+        <div class="flex items-center gap-2">
+          <Link
+            :href="r('clients.index', { organization: org })"
+            class="btn-capsule text-xs"
+          >
+            Back to Clients
+          </Link>
         </div>
       </div>
+    </section>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Contact name</label>
-          <input v-model="form.primary_contact_name" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-        </div>
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Contact email</label>
-          <input v-model="form.primary_contact_email" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
-        </div>
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Contact phone</label>
-          <input v-model="form.primary_contact_phone" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100" />
+    <!-- Form -->
+    <form @submit.prevent="submit" class="card-neo p-6 space-y-8">
+      <!-- Basic info -->
+      <div class="space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Basic information
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label :class="labelClass">Company name *</label>
+            <input
+              v-model="form.company_name"
+              :class="inputClass"
+              required
+            />
+            <div
+              v-if="form.errors.company_name"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.company_name }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Website</label>
+            <input v-model="form.website" :class="inputClass" />
+            <div
+              v-if="form.errors.website"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.website }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Industry</label>
+            <input v-model="form.industry" :class="inputClass" />
+            <div
+              v-if="form.errors.industry"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.industry }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Niche</label>
+            <input v-model="form.niche" :class="inputClass" />
+            <div v-if="form.errors.niche" class="mt-1 text-sm text-red-400">
+              {{ form.errors.niche }}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div>
-        <label class="block text-sm text-slate-300 mb-1">Address</label>
-        <textarea v-model="form.address" rows="3" class="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100"></textarea>
+      <!-- Contact -->
+      <div class="border-t border-white/10 pt-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Primary contact
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label :class="labelClass">Contact name</label>
+            <input v-model="form.primary_contact_name" :class="inputClass" />
+            <div
+              v-if="form.errors.primary_contact_name"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.primary_contact_name }}
+            </div>
+          </div>
+          <div>
+            <label :class="labelClass">Contact email</label>
+            <input
+              v-model="form.primary_contact_email"
+              :class="inputClass"
+              type="email"
+            />
+            <div
+              v-if="form.errors.primary_contact_email"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.primary_contact_email }}
+            </div>
+          </div>
+          <div>
+            <label :class="labelClass">Contact phone</label>
+            <input v-model="form.primary_contact_phone" :class="inputClass" />
+            <div
+              v-if="form.errors.primary_contact_phone"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.primary_contact_phone }}
+            </div>
+          </div>
+          <div>
+            <label :class="labelClass">Address</label>
+            <textarea
+              v-model="form.address"
+              rows="3"
+              :class="textareaClass"
+            ></textarea>
+            <div v-if="form.errors.address" class="mt-1 text-sm text-red-400">
+              {{ form.errors.address }}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="flex items-center gap-3">
-        <button :disabled="form.processing" class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50">Update</button>
-        <Link :href="route('clients.index', { organization: org })" class="text-slate-400 hover:text-slate-300">Cancel</Link>
+      <!-- Status & GBP -->
+      <div class="border-t border-white/10 pt-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Status & GBP
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label :class="labelClass">Client activation status</label>
+            <select
+              v-model="form.client_activation_status"
+              :class="inputClass"
+            >
+              <option
+                v-for="opt in activationOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+            <div
+              v-if="form.errors.client_activation_status"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.client_activation_status }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Pipeline status</label>
+            <select v-model="form.status" :class="inputClass">
+              <option
+                v-for="opt in statusOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+            <div v-if="form.errors.status" class="mt-1 text-sm text-red-400">
+              {{ form.errors.status }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">GBP status</label>
+            <input
+              v-model="form.google_business_profile_status"
+              :class="inputClass"
+            />
+            <div
+              v-if="form.errors.google_business_profile_status"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.google_business_profile_status }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">GBP access status</label>
+            <input
+              v-model="form.google_business_profile_access_status"
+              :class="inputClass"
+            />
+            <div
+              v-if="form.errors.google_business_profile_access_status"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.google_business_profile_access_status }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="border-t border-white/10 pt-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Internal notes
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label :class="labelClass">Sales notes</label>
+            <textarea
+              v-model="form.notes_by_sales"
+              rows="4"
+              :class="textareaClass"
+            ></textarea>
+            <div
+              v-if="form.errors.notes_by_sales"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.notes_by_sales }}
+            </div>
+          </div>
+          <div>
+            <label :class="labelClass">CST notes</label>
+            <textarea
+              v-model="form.notes_by_cst"
+              rows="4"
+              :class="textareaClass"
+            ></textarea>
+            <div
+              v-if="form.errors.notes_by_cst"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.notes_by_cst }}
+            </div>
+          </div>
+          <div>
+            <label :class="labelClass">Tech notes</label>
+            <textarea
+              v-model="form.notes_by_tech"
+              rows="4"
+              :class="textareaClass"
+            ></textarea>
+            <div
+              v-if="form.errors.notes_by_tech"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.notes_by_tech }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="pt-4 flex justify-end">
+        <button
+          type="submit"
+          class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90"
+          :disabled="form.processing"
+        >
+          {{ form.processing ? 'Saving…' : 'Update client' }}
+        </button>
       </div>
     </form>
   </div>

@@ -5,32 +5,30 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ConfirmablePasswordController extends Controller
 {
     /**
-     * Handle the incoming password confirmation.
+     * Show the confirm password page.
+     */
+    public function show(): Response
+    {
+        return Inertia::render('Auth/ConfirmPassword');
+    }
+
+    /**
+     * Confirm the user's password.
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'password' => ['required', 'string'],
+        $request->validate([
+            'password' => ['required', 'current_password'],
         ]);
-
-        $plain = (string) ($validated['password'] ?? '');
-
-        /** @var \App\Models\User $user */
-        $user = $request->user();
-
-        if (! Hash::check($plain, (string) $user->getAuthPassword())) {
-            return back()->withErrors([
-                'password' => __('The provided password is incorrect.'),
-            ]);
-        }
 
         $request->session()->put('auth.password_confirmed_at', time());
 
-        return redirect()->intended();
+        return redirect()->intended('/profile');
     }
 }

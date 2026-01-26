@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Cashier\Billable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -19,11 +20,15 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int $id
  * @property string $name
  * @property string $email
+ * @property int|null $active_organization_id
+ * @property bool $is_super_admin
+ * @property array<string, mixed>|null $notification_prefs
+ * @property \App\Models\Organization $activeOrganization
  */
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use Billable, HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     protected string $guard_name = 'web';
 
@@ -32,6 +37,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'department_id',
+        'active_organization_id',
+        'notification_prefs',
     ];
 
     protected $hidden = [
@@ -41,7 +48,24 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'notification_prefs' => 'array',
+        'is_super_admin' => 'boolean',
     ];
+
+    // --------------------------------------------------------------------------
+    // RELATIONSHIPS
+    // --------------------------------------------------------------------------
+
+    /**
+     * @return BelongsTo<\App\Models\Organization, \App\Models\User>
+     */
+    public function activeOrganization(): BelongsTo
+    {
+        /** @var BelongsTo<\App\Models\Organization, \App\Models\User> $rel */
+        $rel = $this->belongsTo(Organization::class, 'active_organization_id');
+
+        return $rel;
+    }
 
     /**
      * @return BelongsToMany<\App\Models\Organization, \App\Models\User, Pivot, 'pivot'>
@@ -50,6 +74,17 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         /** @var BelongsToMany<\App\Models\Organization, \App\Models\User, Pivot, 'pivot'> $rel */
         $rel = $this->belongsToMany(Organization::class, 'organization_user')->withTimestamps();
+
+        return $rel;
+    }
+
+    /**
+     * @return BelongsTo<\App\Models\Organization, \App\Models\User>
+     */
+    public function organization(): BelongsTo
+    {
+        /** @var BelongsTo<\App\Models\Organization, \App\Models\User> $rel */
+        $rel = $this->belongsTo(Organization::class, 'active_organization_id');
 
         return $rel;
     }
@@ -71,13 +106,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function projects(): HasMany
     {
         /** @var HasMany<\App\Models\Project, \App\Models\User> $rel */
-        $rel = $this->hasMany(Project::class, 'project_manager_id');
+        $rel = $this->hasMany(Project::class);
 
         return $rel;
     }
 
-    protected static function newFactory(): \Database\Factories\UserFactory
+    /**
+     * @return HasMany<\App\Models\Task, \App\Models\User>
+     */
+    public function tasks(): HasMany
     {
-        return \Database\Factories\UserFactory::new();
+        /** @var HasMany<\App\Models\Task, \App\Models\User> $rel */
+        $rel = $this->hasMany(Task::class);
+
+        return $rel;
     }
 }

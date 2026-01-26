@@ -1,50 +1,183 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
+ * App\Models\Task
+ *
  * @property int $id
  * @property int $organization_id
  * @property int $project_id
  * @property string $title
- * @property string|null $status
- * @property int|null $order_index
- * @property array<int,int>|null $assignees
+ * @property string|null $description
+ * @property array<int, int>|null $assignees
  * @property \Illuminate\Support\Carbon|null $due_date
+ * @property string|null $priority
+ * @property string|null $status
+ * @property float|null $estimated_hours
+ * @property float|null $logged_hours
+ * @property array<int, mixed>|null $subtasks
+ * @property array<int, mixed>|null $attachments
+ * @property array<int, mixed>|null $comments
+ * @property array<string, mixed>|null $submission
+ * @property string|null $submission_note
+ * @property array<int, mixed>|null $submission_files
+ * @property string|null $review_status
+ * @property int|null $reviewed_by_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read Organization $organization
+ * @property-read Project $project
  *
- * @method static \Illuminate\Database\Eloquent\Builder<\App\Models\Task> query()
+ * @mixin \Eloquent
  */
 class Task extends Model
 {
-    protected $guarded = [];
+    use HasFactory; // @phpstan-ignore-line
+    use SoftDeletes;
 
-    protected $casts = [
-        'assignees' => 'array',
-        'due_date' => 'datetime',
+    /**
+     * The table associated with the model.
+     */
+    protected $table = 'tasks';
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * (No PHPDoc here so we don't override the parent Model::$fillable type.)
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'organization_id',
+        'project_id',
+        'title',
+        'description',
+        'assignees',
+        'due_date',
+        'priority',
+        'status',
+        'estimated_hours',
+        'logged_hours',
+        'subtasks',
+        'attachments',
+        'comments',
+        'submission',
+        'submission_note',
+        'submission_files',
+        'review_status',
+        'reviewed_by_id',
     ];
 
     /**
-     * @return BelongsTo<\App\Models\Project, \App\Models\Task>
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
      */
-    public function project(): BelongsTo
-    {
-        /** @var BelongsTo<\App\Models\Project, \App\Models\Task> $rel */
-        $rel = $this->belongsTo(Project::class);
+    protected $casts = [
+        'assignees' => 'array',
+        'due_date' => 'datetime',
+        'estimated_hours' => 'float',
+        'logged_hours' => 'float',
+        'subtasks' => 'array',
+        'attachments' => 'array',
+        'comments' => 'array',
+        'submission' => 'array',
+        'submission_files' => 'array',
+    ];
 
-        return $rel;
+    /*
+     |--------------------------------------------------------------------------
+     | Relationships
+     |--------------------------------------------------------------------------
+     */
+
+    /**
+     * Get the organization that owns the task.
+     */
+    // @phpstan-ignore-next-line
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     /**
-     * @return BelongsTo<\App\Models\Organization, \App\Models\Task>
+     * Get the project that this task belongs to.
      */
-    public function organization(): BelongsTo
+    // @phpstan-ignore-next-line
+    public function project(): BelongsTo
     {
-        /** @var BelongsTo<\App\Models\Organization, \App\Models\Task> $rel */
-        $rel = $this->belongsTo(Organization::class);
+        return $this->belongsTo(Project::class);
+    }
 
-        return $rel;
+    /**
+     * Reviewer of the task (if any).
+     */
+    // @phpstan-ignore-next-line
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_id');
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | Scopes
+     |--------------------------------------------------------------------------
+     */
+
+    /**
+     * Multi-tenant helper: restrict tasks to a given organization.
+     *
+     * @param  Builder<Task>  $q
+     * @return Builder<Task>
+     */
+    public function scopeForOrg(Builder $q, int $orgId): Builder
+    {
+        return $q->where('organization_id', $orgId);
+    }
+
+    /**
+     * Visibility rule for tasks.
+     *
+     * - Super Admins, Admins and Owners can see **all** tasks in the organization.
+     * - Everyone else only sees tasks where:
+     *   - they are in `assignees`, OR
+     *   - they are `project_manager_id` on the related project, OR
+     *   - they are fronter/closer/account manager on the related client.
+     *
+     * @param  Builder<Task>  $q
+     * @return Builder<Task>
+     */
+    public function scopeVisibleTo(Builder $q, User $user): Builder
+    {
+        if ((bool) ($user->is_super_admin ?? false) || $user->hasAnyRole(['Owner', 'Admin'])) {
+            return $q;
+        }
+
+        $uid = $user->id;
+
+        return $q->where(function (Builder $builder) use ($uid): void {
+            $builder
+                ->whereJsonContains('assignees', $uid)
+                ->orWhereHas('project', static function (Builder $projectQuery) use ($uid): void {
+                    $projectQuery
+                        ->where('project_manager_id', $uid)
+                        ->orWhereHas('client', static function (Builder $clientQuery) use ($uid): void {
+                            $clientQuery
+                                ->whereJsonContains('fronter', $uid)
+                                ->orWhereJsonContains('closer', $uid)
+                                ->orWhere('assigned_account_manager_id', $uid);
+                        });
+                });
+        });
     }
 }

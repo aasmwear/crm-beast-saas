@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,20 +11,47 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * @phpstan-use \Illuminate\Database\Eloquent\Factories\HasFactory<\Database\Factories\ClientFactory>
- *
- * @method static \Database\Factories\ClientFactory factory($count = null, $state = [])
+ * Client model.
  *
  * @property int $id
  * @property int $organization_id
  * @property string $company_name
- * @property-read \App\Models\Organization $organization
+ * @property string|null $industry
+ * @property string|null $niche
+ * @property string|null $primary_contact_name
+ * @property string|null $primary_contact_email
+ * @property string|null $primary_contact_phone
+ * @property string|null $website
+ * @property string|null $address
+ * @property array<int, int>|null $fronter
+ * @property array<int, int>|null $closer
+ * @property array<int, string>|null $tags
+ * @property int|null $assigned_account_manager_id
+ * @property string|null $google_business_profile_status
+ * @property string|null $google_business_profile_access_status
+ * @property string|null $client_activation_status
+ * @property string|null $notes_by_cst
+ * @property string|null $notes_by_sales
+ * @property string|null $notes_by_tech
+ * @property string|null $status
+ *
+ * @method static Builder<Client> query()
+ * @method static ClientFactory factory($count = null, $state = [])
+ *
+ * @mixin \Eloquent
  */
-class Client extends Model
+final class Client extends Model
 {
-    /** @use HasFactory<\Database\Factories\ClientFactory> */
-    use HasFactory, SoftDeletes;
+    /**
+     * @use HasFactory<ClientFactory>
+     */
+    use HasFactory;
 
+    use SoftDeletes;
+
+    /**
+     * @var list<string>
+     */
     protected $fillable = [
         'organization_id',
         'company_name',
@@ -45,9 +73,11 @@ class Client extends Model
         'notes_by_sales',
         'notes_by_tech',
         'status',
-        'search_vector',
     ];
 
+    /**
+     * @var array<string, string>
+     */
     protected $casts = [
         'tags' => 'array',
         'fronter' => 'array',
@@ -55,123 +85,80 @@ class Client extends Model
     ];
 
     /**
-     * @return BelongsTo<\App\Models\Organization, \App\Models\Client>
+     * @return BelongsTo<Organization, Client>
+     *
+     * @phpstan-return BelongsTo<Organization, $this>
      */
     public function organization(): BelongsTo
     {
-        /** @var BelongsTo<\App\Models\Organization, \App\Models\Client> $rel */
-        $rel = $this->belongsTo(Organization::class);
-
-        return $rel;
+        return $this->belongsTo(Organization::class);
     }
 
     /**
-     * @return HasMany<\App\Models\Project, \App\Models\Client>
+     * @return HasMany<Project, Client>
+     *
+     * @phpstan-return HasMany<Project, $this>
      */
     public function projects(): HasMany
     {
-        /** @var HasMany<\App\Models\Project, \App\Models\Client> $rel */
-        $rel = $this->hasMany(Project::class);
-
-        return $rel;
+        return $this->hasMany(Project::class);
     }
 
     /**
-     * @return BelongsTo<\App\Models\User, \App\Models\Client>
-     */
-    public function assignedAccountManager(): BelongsTo
-    {
-        /** @var BelongsTo<\App\Models\User, \App\Models\Client> $rel */
-        $rel = $this->belongsTo(User::class, 'assigned_account_manager_id');
-
-        return $rel;
-    }
-
-    /**
-     * Back-compat alias so older code that calls $client->accountManager still works.
+     * Account manager relation.
      *
-     * @return BelongsTo<\App\Models\User, \App\Models\Client>
+     * @return BelongsTo<User, Client>
+     *
+     * @phpstan-return BelongsTo<User, $this>
      */
     public function accountManager(): BelongsTo
     {
-        /** @var BelongsTo<\App\Models\User, \App\Models\Client> $rel */
-        $rel = $this->belongsTo(User::class, 'assigned_account_manager_id');
-
-        return $rel;
-    }
-
-    public function getAccountManagerIdAttribute(): ?int
-    {
-        return $this->assigned_account_manager_id;
-    }
-
-    public function setAccountManagerIdAttribute(?int $value): void
-    {
-        $this->attributes['assigned_account_manager_id'] = $value;
+        return $this->belongsTo(User::class, 'assigned_account_manager_id');
     }
 
     /**
-     * @param  Builder<\App\Models\Client>  $q
-     * @return Builder<\App\Models\Client>
+     * Scope by organization (multi-tenant helper).
+     *
+     * @param  Builder<Client>  $q
+     * @return Builder<Client>
      */
-    public function scopeForOrg(Builder $q, Organization|int $org): Builder
+    public function scopeForOrg(Builder $q, int $orgId): Builder
     {
-        $orgId = $org instanceof Organization ? $org->id : $org;
-
         return $q->where('organization_id', $orgId);
     }
 
     /**
-     * Visible if:
-     *  - Admin/manager in the org, or
-     *  - Assigned account manager, or
-     *  - Fronter/closer, or
-     *  - Has tasks on any project for this client.
+     * Visibility rule for clients.
      *
-     * @param  Builder<\App\Models\Client>  $q
-     * @return Builder<\App\Models\Client>
+     * - Super Admins, Admins and Owners can see **all** clients in the organization.
+     * - Everyone else only sees clients where:
+     *   - their id appears in `fronter` JSON, or
+     *   - their id appears in `closer` JSON, or
+     *   - `assigned_account_manager_id` = their id, or
+     *   - they are `project_manager_id` on at least one related project.
+     *   - they are assigned to at least one task on any related project.
+     *
+     * @param  Builder<Client>  $q
+     * @return Builder<Client>
      */
-    public function scopeVisibleTo(Builder $q, User $user, Organization $org): Builder
+    public function scopeVisibleTo(Builder $q, User $user): Builder
     {
-        if ($user->hasRole(['Admin', 'HR', 'DepartmentHead'], $org)) {
-            return $q->forOrg($org);
-        }
-
-        return $q->forOrg($org)->where(function ($qq) use ($user) {
-            $qq->where('assigned_account_manager_id', $user->id)
-                ->orWhereJsonContains('fronter', $user->id)
-                ->orWhereJsonContains('closer', $user->id)
-                ->orWhereExists(function ($sub) use ($user) {
-                    $sub->from('projects')
-                        ->join('tasks', 'tasks.project_id', '=', 'projects.id')
-                        ->whereColumn('projects.client_id', 'clients.id')
-                        ->whereJsonContains('tasks.assignees', (string) $user->id);
-                });
-        });
-    }
-
-    /**
-     * @param  Builder<\App\Models\Client>  $q
-     * @return Builder<\App\Models\Client>
-     */
-    public function scopeSearch(Builder $q, ?string $term): Builder
-    {
-        if (! $term) {
+        if ((bool) ($user->is_super_admin ?? false) || $user->hasAnyRole(['Owner', 'Admin'])) {
             return $q;
         }
 
-        $like = '%'.strtolower($term).'%';
+        $uid = $user->id;
 
-        return $q->where(function ($qq) use ($like) {
-            $qq->whereRaw('LOWER(company_name) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(industry) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(primary_contact_email) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(primary_contact_phone) LIKE ?', [$like]);
+        return $q->where(function (Builder $qq) use ($uid): void {
+            $qq->whereJsonContains('fronter', $uid)
+                ->orWhereJsonContains('closer', $uid)
+                ->orWhere('assigned_account_manager_id', $uid)
+                ->orWhereHas('projects', static function (Builder $qp) use ($uid): void {
+                    $qp->where('project_manager_id', $uid);
+                })
+                ->orWhereHas('projects.tasks', static function (Builder $qt) use ($uid): void {
+                    $qt->whereJsonContains('assignees', $uid);
+                });
         });
-    }
-
-    protected static function newFactory(): \Database\Factories\ClientFactory
-    {
-        return \Database\Factories\ClientFactory::new();
     }
 }

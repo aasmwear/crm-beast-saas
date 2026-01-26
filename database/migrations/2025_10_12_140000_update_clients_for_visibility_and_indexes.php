@@ -35,7 +35,16 @@ return new class extends Migration
             if (Schema::hasColumn('clients', 'search_vector')) {
                 $table->dropColumn('search_vector');
             }
-            $table->dropIndex(['project_activation_status']);
+
+            // FIX: Conditionally drop the index to prevent the "index does not exist" error
+            // The default index name for ['project_activation_status'] is often
+            // 'clients_project_activation_status_index', which is what failed before.
+            $indexName = 'clients_project_activation_status_index';
+
+            if (Schema::hasTable('clients') && Schema::hasIndex('clients', $indexName)) {
+                $table->dropIndex($indexName);
+            }
+
             if (Schema::hasColumn('clients', 'account_manager_id')) {
                 $table->dropConstrainedForeignId('account_manager_id');
             }

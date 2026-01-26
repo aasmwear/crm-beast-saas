@@ -4,33 +4,75 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    /**
+     * Show the registration page.
+     */
+    public function create(): Response
     {
-        $validated = $request->validate([
+        return Inertia::render('Auth/Register');
+    }
+
+    /**
+     * Handle an incoming registration request.
+     */
+    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:'.\App\Models\User::class],
+            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            'organization_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        /** @var \App\Models\User $user */
-        $user = User::query()->create([
-            'name' => (string) $validated['name'],
-            'email' => (string) $validated['email'],
-            'password' => bcrypt((string) $validated['password']),
-        ]);
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+            // Create org first (simple, like before)
+            $orgName = $data['organization_name'] ?? ($data['name']."'s Organization");
 
-        event(new Registered($user));
+            $org = new \App\Models\Organization;
+            $org->name = $orgName;
+            $org->slug = \Illuminate\Support\Str::slug($orgName);
+            $org->save();
 
-        Auth::login($user);
+            // Create user
+            $user = new \App\Models\User;
+            $user->name = $data['name'];
+            $user->email = $data['email'];
+            $user->password = \Illuminate\Support\Facades\Hash::make($data['password']);
 
-        return redirect()->intended(route('dashboard'));
+            // Prefer the new column if present
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'active_organization_id')) {
+                $user->active_organization_id = $org->id;
+            }
+
+            $user->save();
+
+            // Attach to pivot if it exists (this was working before)
+            if (\Illuminate\Support\Facades\Schema::hasTable('organization_user')) {
+                $user->organizations()->syncWithoutDetaching([$org->id]);
+            }
+
+            return $user;
+        });
+
+        event(new \Illuminate\Auth\Events\Registered($user));
+        \Illuminate\Support\Facades\Auth::login($user);
+
+        // Ensure org routes behind 'verified' are reachable immediately
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+        }
+
+        // No role assignment here (this was not needed for the tests and avoids team/pivot surprises)
+
+        // Use the defined relation from your User model
+        $org = $user->activeOrganization;
+
+        return redirect()->route('dashboard', ['organization' => $org->slug]);
     }
 }

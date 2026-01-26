@@ -1,77 +1,199 @@
 <script setup lang="ts">
-import { route } from '@ziggy'
+import { computed, ref } from 'vue'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
-import { ref, computed } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+defineOptions({ layout: AuthenticatedLayout })
 
-type Tenant = { id:number; name:string; slug:string }
-type Task = {
-  id:number; title:string; status:'Backlog'|'In Progress'|'Review'|'Done'
-  project_id:number; priority:number|null; due_date:string|null; assignees?: number[]
-}
-type Project = { id:number; title:string; client_id:number; project_manager_id:number; status:string }
-
-const page = usePage<{ tenant: Tenant; columns: string[]; projects: Project[]; tasks: Task[] }>()
-const tenant = computed(() => page.props.tenant)
-const cols = computed(() => page.props.columns)
-const allTasks = ref<Task[]>([...page.props.tasks])
-
-function tasksIn(col: string) {
-  return allTasks.value.filter(t => t.status === col)
+interface BoardProject {
+  id: number
+  title: string
+  status: string | null
+  project_manager_id: number | null
+  project_manager_name?: string | null
 }
 
-async function move(task: Task, to: string) {
-  if (task.status === to) return
-  const old = task.status
-  task.status = to as Task['status']
-  try {
-    await fetch(route('tasks.move', { organization: tenant.value.slug, task: task.id }), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({ status: to }),
-      credentials: 'same-origin',
-    })
-  } catch {
-    task.status = old
-  }
+const props = defineProps<{
+  organization: { id: number; name: string; slug: string }
+  projects: BoardProject[]
+}>()
+
+const page = usePage()
+
+const orgSlug = computed(() => {
+  const p = page.props as any
+  return props.organization?.slug ?? p?.tenant?.slug ?? p?.organization?.slug ?? 'acme'
+})
+
+const columns = [
+  { key: 'planned', label: 'Planned' },
+  { key: 'in-progress', label: 'In Progress' },
+  { key: 'on-hold', label: 'On Hold' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
+] as const
+
+type ColumnKey = (typeof columns)[number]['key']
+
+function normalizeStatus(status: string | null | undefined): ColumnKey {
+  if (!status) return 'planned'
+  const s = status.trim().toLowerCase()
+
+  if (['planned'].includes(s)) return 'planned'
+  if (['in progress', 'in_progress', 'active', 'ongoing'].includes(s)) return 'in-progress'
+  if (['on hold', 'on_hold', 'paused'].includes(s)) return 'on-hold'
+  if (['completed', 'done', 'finished', 'closed'].includes(s)) return 'completed'
+  if (['cancelled', 'canceled'].includes(s)) return 'cancelled'
+
+  return 'planned'
+}
+
+function projectsInColumn(key: ColumnKey): BoardProject[] {
+  return props.projects.filter((p) => normalizeStatus(p.status) === key)
+}
+
+const isUpdating = ref<number | null>(null)
+
+function updateStatus(project: BoardProject, columnKey: ColumnKey) {
+  const targetColumn = columns.find((c) => c.key === columnKey)
+  if (!targetColumn) return
+
+  const newStatus = targetColumn.label
+  isUpdating.value = project.id
+
+  router.post(
+    route('projects.pipeline.update', {
+      organization: orgSlug.value,
+      project: project.id,
+    }),
+    { status: newStatus },
+    {
+      preserveScroll: true,
+      preserveState: true,
+      onFinish: () => {
+        isUpdating.value = null
+      },
+    },
+  )
+}
+
+function onColumnChange(project: BoardProject, event: Event) {
+  const target = event.target as HTMLSelectElement
+  const value = target.value as ColumnKey
+  updateStatus(project, value)
 }
 </script>
 
 <template>
-  <div class="px-6 md:px-8 lg:px-10 py-6">
-    <div class="text-slate-100 text-xl font-semibold mb-4">Pipeline</div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div v-for="col in cols" :key="col" class="glass p-3">
-        <div class="flex items-center justify-between mb-2">
-          <div class="font-medium text-slate-100">{{ col }}</div>
-          <div class="text-slate-400 text-xs">{{ tasksIn(col).length }}</div>
+  <div class="space-y-6">
+    <!-- Header / Tabs -->
+    <div
+      class="mb-2 rounded-2xl bg-gradient-to-br from-[rgba(13,15,18,0.9)] via-[rgba(18,18,40,0.85)] to-transparent border border-white/5 px-5 py-4"
+    >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight text-white">
+            Project Board
+          </h1>
+          <p class="mt-1 text-sm text-white/60">
+            Kanban view of your project pipeline grouped by status.
+          </p>
         </div>
 
-        <div class="space-y-2">
-          <div v-for="t in tasksIn(col)" :key="t.id" class="card">
-            <div class="text-slate-100 text-sm font-medium">{{ t.title }}</div>
-            <div class="text-slate-400 text-xs">
-              #{{ t.id }} · P{{ t.priority ?? 0 }} · {{ t.due_date ? new Date(t.due_date).toLocaleDateString() : '—' }}
+        <div class="inline-flex items-center gap-1 rounded-full bg-white/5 p-1 text-xs">
+          <Link
+            :href="route('projects.index', { organization: orgSlug })"
+            class="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide text-white/70 hover:bg-white/10"
+          >
+            List
+          </Link>
+          <span
+            class="rounded-full bg-[var(--primary)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-[0_0_24px_rgba(139,124,255,0.65)]"
+          >
+            Board
+          </span>
+          <Link
+            :href="route('projects.calendar', { organization: orgSlug })"
+            class="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide text-white/70 hover:bg-white/10"
+          >
+            Calendar
+          </Link>
+        </div>
+      </div>
+    </div>
+
+    <!-- Columns -->
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div
+        v-for="column in columns"
+        :key="column.key"
+        class="glass flex min-h-[260px] flex-col rounded-2xl border border-white/5 bg-slate-950/40 p-3"
+      >
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <div class="text-xs font-semibold uppercase tracking-wide text-slate-100">
+            {{ column.label }}
+          </div>
+          <div class="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/60">
+            {{ projectsInColumn(column.key).length }}
+          </div>
+        </div>
+
+        <div class="flex-1 space-y-2 overflow-y-auto pr-1">
+          <div
+            v-for="project in projectsInColumn(column.key)"
+            :key="project.id"
+            class="group rounded-xl border border-white/5 bg-white/5 p-3 text-sm transition hover:border-[var(--primary)] hover:bg-white/10"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="line-clamp-2 font-medium text-white">
+                  {{ project.title }}
+                </div>
+                <div class="mt-1 text-[11px] text-white/50">
+                  PM:
+                  <span v-if="project.project_manager_name">
+                    {{ project.project_manager_name }}
+                  </span>
+                  <span v-else>Unassigned</span>
+                </div>
+              </div>
             </div>
 
-            <div class="mt-2 flex gap-2">
-              <select class="bg-white/5 border border-white/10 rounded-md text-xs text-slate-200"
-                      :value="t.status" @change="move(t, ($event.target as HTMLSelectElement).value)">
-                <option v-for="opt in cols" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+            <div class="mt-3 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1">
+                <div class="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+                <div class="text-[10px] uppercase tracking-wide text-white/50">
+                  {{ column.label }}
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <select
+                  class="rounded-full border border-white/15 bg-slate-950/60 px-2 py-1 text-[10px] text-white/70 focus:border-[var(--primary)] focus:outline-none"
+                  :value="column.key"
+                  :disabled="isUpdating === project.id"
+                  @change="onColumnChange(project, $event)"
+                >
+                  <option
+                    v-for="target in columns"
+                    :key="target.key"
+                    :value="target.key"
+                  >
+                    {{ target.label }}
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div v-if="tasksIn(col).length === 0" class="empty">No tasks</div>
+          <div
+            v-if="!projectsInColumn(column.key).length"
+            class="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-xs text-white/40"
+          >
+            No projects in this stage yet.
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.glass { @apply rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 shadow-lg shadow-black/20; backdrop-filter: blur(8px); }
-.card  { @apply rounded-xl border border-white/10 bg-white/5 p-3; }
-.empty { @apply text-slate-400 text-xs italic; }
-</style>

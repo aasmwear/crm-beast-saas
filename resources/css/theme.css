@@ -1,104 +1,310 @@
-/* ========== AURORA DARK THEME (drop-in) ========== */
-/* Color tokens */
+/* === CRM Beast — Dark UI tokens + White Rail (LunoX style) === */
+
+/* Base dark palette (kept compatible with your current tokens) */
 :root {
-  --bg: #0b0f1a;
-  --bg-elev: #121a2c;
-  --bg-elev-2: #18233a;
-  --text: #e7ebf4;
-  --muted: #a7b1c2;
-  --brand: #7c5cff;          /* purple */
-  --brand-2: #00d4ff;        /* cyan */
-  --border: rgba(255,255,255,.08);
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger:  #ef4444;
+  color-scheme: dark;
+
+  /* page */
+  /* --background: 13 15 20;          #0D0F14 */
+  --background: 2 0 13;               /* #02000d */
+  --foreground: 232 235 247;
+
+  /* surfaces */
+  --card: 20 22 29;                /* #14171D */
+  --muted: 32 35 44;
+  --muted-foreground: 158 166 186;
+
+  /* accent */
+  --primary: 139 92 246;           /* #8B5CF6 (neon violet) */
+  --primary-foreground: 245 243 255;
+  --ring: 167 139 250;
+
+  /* states */
+  --success: 34 197 94;
+  --warning: 234 179 8;
+  --danger: 244 63 94;
+
+  /* glass */
+  --glass-bg: rgba(17, 19, 26, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.06);
+
+  /* WHITE LEFT RAIL */
+  --rail-bg: #ffffff;
+  --rail-fg: #0F1117;
+  --rail-border: rgba(12, 12, 16, 0.08);
+  --rail-shadow: 0 6px 22px rgba(8, 8, 12, 0.18);
+  --rail-width: 76px;
+
+  /* shadows */
+  --shadow-soft: 0 2px 10px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.35);
 }
 
-/* Background & base text */
-html, body {
+/* Utility shims (same names you already have) */
+.bg-background            { background-color: rgb(var(--background)); }
+.text-foreground          { color: rgb(var(--foreground)); }
+.text-foreground\/80      { color: rgb(var(--foreground) / .8); }
+.bg-card                  { background-color: rgb(var(--card)); }
+.text-muted-foreground    { color: rgb(var(--muted-foreground)); }
+.text-primary             { color: rgb(var(--primary)); }
+.border-glass             { border-color: var(--glass-border); }
+
+/* Glass + gentle glow */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-radius: 1rem;
+  /* box-shadow: 0 18px 50px rgba(109, 76, 255, 0.22); */
+}
+
+/* Hero gradient slab (kept from your file, tuned for stronger depth) */
+.gradient-hero {
+  position: relative;
   background:
-    radial-gradient(1100px 600px at 15% -10%, rgba(124,92,255,.18), transparent),
-    radial-gradient(900px 500px at 95% -10%, rgba(0,212,255,.12), transparent),
-    var(--bg);
-  color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-               Roboto, "Helvetica Neue", Arial, "Noto Sans",
-               "Apple Color Emoji","Segoe UI Emoji";
-  line-height: 1.45;
+    radial-gradient(1100px 520px at 10% -10%, rgba(167,139,250,.28), transparent 60%),
+    radial-gradient(900px 460px at 90% 0%, rgba(59,130,246,.20), transparent 60%),
+    linear-gradient(135deg, #3b2a70 0%, #2e2358 45%, #151a2b 85%, #0f121c 100%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 22px 60px rgba(109,76,255,.22);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.gradient-hero::after{
+  content:"";
+  position:absolute; inset:0;
+  background: radial-gradient(620px 220px at 60% -20%, rgba(255,255,255,.08), transparent 70%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
 }
 
-/* Make everything feel a bit smoother */
-*, *::before, *::after {
-  transition: background-color .2s ease, border-color .2s ease,
-              color .2s ease, box-shadow .2s ease, transform .08s ease;
+/* Capsule buttons (for “New …” chips and action buttons) */
+.chip, .btn-capsule {
+  border-radius: 9999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,.06);
+  padding: .5rem .9rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(109,76,255,.18);
+  transition: transform .12s ease, opacity .2s ease, background-color .2s ease;
+}
+.chip:hover, .btn-capsule:hover { transform: translateY(-1px); opacity: .95; }
+
+/* ===== White left sidebar rail (pixel cues from the reference) ===== */
+.rail {
+  position: fixed;
+  z-index: 50;
+  top: 0; bottom: 0; left: 0;
+  width: var(--rail-width);
+  /* background: rgb(var(--background)); */
+  color: var(--rail-fg);
+  display: none;            /* keep your responsive behavior; you can override to flex */
+}
+@media (min-width: 1024px) { .rail { display: flex; } }
+
+.rail-nav {
+  border-radius: 0rem 0rem 0rem 0rem;
+  padding-top: 2rem;
+  margin-left:0px;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 1.875rem;
+  width: 100%;
 }
 
-/* Headings */
-h1,h2,h3,h4 { color:#fff; letter-spacing:.2px; }
-h1 { font-weight:700; font-size: clamp(24px, 2.2vw, 32px); }
-
-/* Containers / cards (works with Breeze defaults too) */
-.container, .card, .panel,
-.bg-white, .shadow, .shadow-sm, .rounded-md, .rounded-lg {
-  background: linear-gradient(180deg, var(--bg-elev), var(--bg-elev-2)) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: 0 12px 32px rgba(0,0,0,.35) !important;
+/* circular icon buttons on rail */
+.rail-btn {
+  width: 46px; height: 46px;
+  border-radius: 9999px;
+  display: grid; place-items: center;
+  color: #0F1117;
+  /* background: #F2F3F7;
+  border: 1px solid rgba(10,12,18,0.06);
+  box-shadow: 0 8px 18px rgba(9, 10, 16, .08) inset, 0 8px 18px rgba(10, 12, 18, .08); */
+  border: none;
+  box-shadow: none;
+  transition: transform .12s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.rail-btn:hover { transform: translateY(-1px); background:linear-gradient(45deg, #00054e, #3e53ff);color:#fff; }
+.rail-btn.current {
+  background: linear-gradient(45deg, #00054e, #3e53ff); color:#fff;
+  /* box-shadow: 0 0 0 2px rgba(0,0,0,.5) inset, 0 0 0 6px rgba(17,20,28,.08); */
 }
 
-/* Tables (clients list, etc.) */
-table { width:100%; border-collapse: separate; border-spacing: 0 8px; }
-thead th {
-  font-size:.78rem; text-transform:uppercase; letter-spacing:.08em;
-  color: var(--muted);
-  background: transparent;
-  border-bottom: 1px solid var(--border);
-  padding: 14px 16px;
+/* tiny divider */
+.rail-sep {
+  width: 32px; height: 1px; margin: .5rem 0;
+  background: rgba(16, 18, 26, .10);
 }
-tbody tr { background: rgba(255,255,255,.03); }
-tbody tr:hover { background: rgba(255,255,255,.06); }
-tbody td {
-  padding: 14px 16px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+
+/* ===== Top bar (search pill right + bell) ===== */
+.topbar {
+  margin-top: 10px;
+  display:flex; align-items:center; justify-content:flex-end;
+  gap: .75rem;
+  padding: .75rem 1rem;
+  background: linear-gradient(to bottom, rgba(13,15,20,.65), rgba(13,15,20,0));
+  backdrop-filter: blur(10px);
 }
-tbody td:first-child { border-left: 1px solid var(--border); border-top-left-radius: 10px; border-bottom-left-radius:10px; }
-tbody td:last-child  { border-right:1px solid var(--border); border-top-right-radius:10px; border-bottom-right-radius:10px; }
 
-/* Links (keeps brand vibe without being loud) */
-a { color: #b8a8ff; text-decoration: none; }
-a:hover { color: #d5ccff; text-decoration: underline; }
-
-/* Buttons (covers plain <button>, submit, and .btn if you have it) */
-button, .btn, [type="submit"], [role="button"] {
-  background: linear-gradient(180deg, #7c5cff, #6a4bff);
-  color:#fff; border:0; border-radius:12px;
-  padding:10px 14px; font-weight:600;
-  box-shadow: 0 10px 24px rgba(124,92,255,.35);
+.search-pill {
+  display:flex; align-items:center; gap:.5rem;
+  min-width: 280px;
+  height: 40px; padding: 0 .875rem;
+  border-radius: 9999px;
+  border: 2px solid #ffffff2b;
+  background: #ffffff0f;
+  box-shadow: 0 0 6px 0px #a855f736 inset;
 }
-button:hover, .btn:hover, [type="submit"]:hover { filter:brightness(1.07); transform: translateY(-1px); }
-button:active, .btn:active, [type="submit"]:active { transform: translateY(0); }
-
-/* Inputs / selects / textareas */
-input, select, textarea {
-  background:#0f172a; color:var(--text);
-  border:1px solid var(--border); border-radius:10px;
-  padding:10px 12px;
+.search-pill input {
+  outline: none; border: 0; background: transparent; width: 100%;
+  color: rgba(232,235,247,.92);
 }
-input::placeholder, textarea::placeholder { color:#7e8aa3; }
+.search-icon { width:18px; height:18px; opacity:.65; }
 
-/* Pills / badges / statuses (applies if your markup uses these generic classes) */
-.badge, .status, .tag {
-  display:inline-flex; align-items:center; gap:6px;
-  padding:4px 10px; border-radius:999px;
-  font-size:.75rem; line-height:1;
-  background: rgba(124,92,255,.16);
-  color:#cfc4ff; border:1px solid rgba(124,92,255,.35);
+.notif-btn {
+  width: 40px; height: 40px; border-radius: 9999px;
+  display:grid; place-items:center;
+  background: #ffffff0f;
+  border: 2px solid #ffffff2b;
+  box-shadow: 0 0px 15px #ffffff0f inset, 0 0px 0px #ffffff40
 }
-.badge.success, .status.success { background: rgba(34,197,94,.15); color:#c8f7d8; border-color: rgba(34,197,94,.35); }
-.badge.warn, .status.warn { background: rgba(245,158,11,.15); color:#ffe4b5; border-color: rgba(245,158,11,.35); }
-.badge.danger, .status.danger { background: rgba(239,68,68,.15); color:#ffc9c9; border-color: rgba(239,68,68,.35); }
+.notif-dot {
+  position:absolute; top:8px; right:8px;
+  width:8px; height:8px; border-radius:9999px;
+  background: #8b5cf6;
+  box-shadow: 0px 0px 3px 1px #0000007a;
+}
 
-/* Small utilities for spacing/sections (non-breaking if unused) */
-.section-title { color:#fff; font-weight:700; font-size:1.1rem; }
-.subtle { color:var(--muted); }
-.divider { height:1px; background:var(--border); margin:16px 0; opacity:.8; }
+/* ===== Cards / KPIs (soft inner glow, like the mock) ===== */
+.card-neo {
+  border-radius: 18px;
+  background: #0F121C;
+  border: 1px solid rgba(255,255,255,.06);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.04) inset,
+    0 16px 55px rgba(88, 28, 135, .18),
+    0 1px 0 rgba(255,255,255,.06) inset;
+}
+
+/* Donut center label weight */
+.chart-center-label { font-weight: 700; letter-spacing: .2px; }
+
+/* Keep your previous gradient + helpers available to components */
+:root {
+  --gradient-hero:
+    radial-gradient(1000px 600px at 10% -10%, rgba(167,139,250,0.25) 0%, rgba(13,13,19,0) 60%),
+    radial-gradient(800px 500px at 90% 0%, rgba(59,130,246,0.18) 0%, rgba(13,13,19,0) 60%);
+  /* --card-glass: rgba(18,18,26,0.6); */
+  --card-glass: rgba(255, 255, 255, 0.01);
+  --border-glass: rgba(255,255,255,0.06);
+  --primary:#8b5cf6;
+  --ring: rgba(167,139,250,0.55);
+}
+.glass { background: var(--card-glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border:1px solid var(--border-glass); box-shadow: var(--shadow-soft); }
+.glow-ring { box-shadow: 0 0 0 2px rgba(255,255,255,0.03), 0 0 0 8px var(--ring); }
+
+.white-bg{
+  background-color:#ffffff;
+}
+
+.mainlayout-b{
+  border: 1px solid transparent;
+  border-image: linear-gradient(to right, white, #02000d) 1;
+  border-image-slice: 1;
+}
+
+
+
+
+
+
+
+
+
+   /* Main background image/animation etc */
+.bordermainradius{
+  border-radius:1rem 0rem 0rem 1rem;
+  margin-left: 5rem;
+  padding-left: 0rem;
+  position: relative; 
+    overflow: hidden;
+    isolation: isolate;
+  min-height: 99.9vh;
+  border: 1px solid transparent;
+  border-image: linear-gradient(to right, white, #02000d) 1;
+  border-image-slice: 1;
+};
+
+/* 1. Main Container: Ensures positioning and isolation */
+.bg-background-anima {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Must be behind dashboard content */
+    z-index: 1;
+}
+
+/* 2. Base Orb Style (Applies to all three) */
+/* 2. Base Orb Style (Applies to all three) */
+.bg-orb-A, .bg-orb-B, .bg-orb-C {
+    position: absolute;
+    border-radius: 50%;
+    z-index: 0;
+    pointer-events: none;
+    /* CRITICAL FIX: Increase blur radius */
+    filter: blur(250px); /* Increased from 150px to 250px */
+    will-change: transform, opacity;
+}
+
+/* Orb A: Top Left (Increase size and push further off-screen) */
+/* Orb A: Top Left (Increase OPAQUE stop from 0.353 to 0.7) */
+.bg-orb-A {
+    top: -400px;
+    left: -400px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(
+        circle at center,
+        rgba(139, 92, 246, 0.0) 0%,
+        rgba(139, 92, 246, 0.75) 25%, /* High opacity center */
+        transparent 75% /* CRITICAL FIX: Fade to transparent */
+    );
+}
+
+/* Orb B: Bottom Right */
+.bg-orb-B {
+    bottom: -350px;
+    right: -350px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(
+        circle at center,
+        rgba(139, 92, 246, 0.0) 0%,
+        rgba(139, 92, 246, 0.5) 30%,
+        transparent 70% /* CRITICAL FIX: Fade to transparent */
+    );
+}
+
+/* Orb C: Center Right (Increase constant background opacity) */
+.bg-orb-C {
+    top: 50%;
+    right: 0%;
+    transform: translate(50%, -50%); 
+    width: 600px;
+    height: 600px;
+    /* CRITICAL FIX: Increase constant background-color opacity */
+    background-color: rgba(139, 92, 246, 0.3);
+    
+    animation: breathe-glow 20s ease-in-out alternate infinite;
+}
+/* --- Animation Keyframes (Low-Cost) --- */
+
+@keyframes breathe-glow {
+    /* Only animate scale and opacity—the two most performant animation properties */
+    0%   { transform: translate(50%, -50%) scale(1.0); opacity: 0.9; }
+    50%  { transform: translate(50%, -50%) scale(2); opacity: 0.7; }
+    100% { transform: translate(50%, -50%) scale(1.0); opacity: 0.9; }
+}
+/* end backgrounds */

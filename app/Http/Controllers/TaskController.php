@@ -2,173 +2,467 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Tasks\MoveTaskRequest;
-use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
 
-class TaskController extends Controller
+final class TaskController extends Controller
 {
     /**
-     * Create a new task in the given organization & project.
+     * Tasks index with filters + pagination.
+     *
+     * Route: GET /org/{organization:slug}/tasks
+     *
+     * Query filters:
+     * - status: string|null
+     * - mine: bool (1/0)
+     * - project_id: int|null
+     * - due_from: Y-m-d|null
+     * - due_to: Y-m-d|null
+     * - search: string|null
      */
-    public function store(Request $request, Organization $organization): RedirectResponse|JsonResponse
+    public function index(Request $request): Response
     {
-        $this->authorize('create', [Task::class, $organization]);
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
 
-        /**
-         * @phpstan-var array{
-         *   project_id:int,
-         *   title:string,
-         *   status?:string|null,
-         *   assignees?:array<array-key, mixed>|null,
-         *   due_date?:string|\DateTimeInterface|null
-         * } $data
-         */
-        $data = $request->validate([
-            'project_id' => ['required', 'integer'],
-            'title' => ['required', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'assignees' => ['nullable', 'array'],
-            'due_date' => ['nullable', 'date'],
-        ]);
+        $this->authorize('viewAny', Task::class);
 
-        /** @var Project $project */
-        $project = Project::query()
-            ->where('organization_id', $organization->id)
-            ->findOrFail($data['project_id']);
+        /** @var User $user */
+        $user = $request->user();
 
-        /** @var int|null $maxIndex */
-        $maxIndex = DB::table('tasks')
-            ->where('project_id', $project->id)
-            ->max('order_index');
+        $filters = [
+            'status' => $request->query('status'),
+            'mine' => $request->boolean('mine'),
+            'project_id' => $request->query('project_id'),
+            'due_from' => $request->query('due_from'),
+            'due_to' => $request->query('due_to'),
+            'search' => $request->query('search'),
+        ];
 
-        $nextIndex = is_null($maxIndex) ? 0 : $maxIndex + 1;
+        $query = Task::query()
+            ->with(['project:id,organization_id,title'])
+            ->where('organization_id', (int) $org->id)
+            ->visibleTo($user);
 
-        $task = new Task;
-        $task->organization_id = $organization->id;
-        $task->project_id = $project->id;
-        $task->title = $data['title'];
-        $task->status = $data['status'] ?? null;
-        $task->assignees = $data['assignees'] ?? null;
-        // Cast string date to Carbon to satisfy Larastan's typed property expectations
-        $task->due_date = isset($data['due_date']) ? Carbon::parse((string) $data['due_date']) : null;
-        $task->order_index = $nextIndex;
-        $task->save();
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'ok' => true,
-                'task' => $task->only(['id', 'project_id', 'title', 'status', 'order_index']),
-            ]);
+        if (! empty($filters['status'])) {
+            $status = strtolower((string) $filters['status']);
+            $query->whereRaw('lower(status) = ?', [$status]);
         }
 
-        return redirect()
-            ->route('projects.board', ['organization' => $organization->slug])
-            ->with('success', 'Task created.');
+        if ($filters['mine']) {
+            $query->whereJsonContains('assignees', (int) $user->id);
+        }
+
+        if (! empty($filters['project_id'])) {
+            $query->where('project_id', (int) $filters['project_id']);
+        }
+
+        if (! empty($filters['due_from'])) {
+            $query->whereDate('due_date', '>=', $filters['due_from']);
+        }
+
+        if (! empty($filters['due_to'])) {
+            $query->whereDate('due_date', '<=', $filters['due_to']);
+        }
+
+        if (! empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+
+            $query->where(function ($sub) use ($search): void {
+                // Postgres-friendly case-insensitive search
+                $sub->where('title', 'ilike', '%'.$search.'%')
+                    ->orWhere('description', 'ilike', '%'.$search.'%');
+            });
+        }
+
+        $tasks = $query
+            ->orderByDesc('due_date')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $projects = Project::query()
+            ->where('organization_id', (int) $org->id)
+            ->visibleTo($user)
+            ->orderBy('title')
+            ->get(['id', 'title']);
+
+        return Inertia::render('Tasks/Index', [
+            'tasks' => $tasks,
+            'filters' => $filters,
+            'projects' => $projects,
+        ]);
     }
 
     /**
-     * Move (and optionally re-order) a task within/between projects.
+     * Store a newly created task.
      */
-    public function move(MoveTaskRequest $request, Organization $organization, Task $task): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
-        $this->authorize('update', [$task, $organization]);
-        abort_unless($task->organization_id === $organization->id, 404);
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
 
-        /**
-         * @phpstan-var array{
-         *   to_project_id:int,
-         *   before_id?:int|null,
-         *   status?:string|null
-         * } $data
-         */
-        $data = $request->validated();
+        $this->authorize('create', Task::class);
 
-        /** @var Project $targetProject */
-        $targetProject = Project::query()
-            ->where('organization_id', $organization->id)
-            ->findOrFail($data['to_project_id']);
+        $data = $request->validate([
+            'project_id' => 'required|integer',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'assignees' => 'array',
+            'assignees.*' => 'integer',
+            'due_date' => 'nullable|date',
+            'priority' => 'nullable|string|max:20',
+            'status' => 'nullable|string|max:50',
+            'estimated_hours' => 'nullable|numeric',
+        ]);
 
-        /** @var int|null $oldIndex */
-        $oldIndex = $task->order_index ?? null;
+        $data['organization_id'] = (int) $org->id;
 
-        /** @var int|null $targetMax */
-        $targetMax = DB::table('tasks')
-            ->where('project_id', $targetProject->id)
-            ->max('order_index');
+        return DB::transaction(function () use ($data, $org, $request): RedirectResponse {
+            $task = Task::create($data);
 
-        $targetIndex = is_null($targetMax) ? 0 : $targetMax + 1;
+            AuditLogger::log(
+                $org,
+                $request->user(),
+                'created',
+                'task',
+                (int) $task->id,
+                $data,
+            );
 
-        if (! empty($data['before_id'])) {
-            /** @var Task $beforeTask */
-            $beforeTask = Task::query()
-                ->where('organization_id', $organization->id)
-                ->where('project_id', $targetProject->id)
-                ->findOrFail((int) $data['before_id']);
+            return back()->with('success', 'Task created');
+        });
+    }
 
-            /** @var int|null $beforeIdx */
-            $beforeIdx = $beforeTask->order_index ?? 0;
-            $targetIndex = $beforeIdx;
+    /**
+     * Show a single task as JSON (for async detail panels, etc.).
+     */
+    public function show(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('view', $task);
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        if ((int) $task->organization_id !== (int) $org->id) {
+            abort(404);
         }
 
-        DB::transaction(function () use ($task, $organization, $targetProject, $oldIndex, $targetIndex, $data): void {
-            $sameProject = $task->project_id === $targetProject->id;
+        /** @var User $user */
+        $user = $request->user();
 
-            if ($sameProject) {
-                $currentIndex = $oldIndex ?? 0;
+        $task->load([
+            'project:id,organization_id,title',
+            'reviewer:id,name',
+        ]);
 
-                if ($targetIndex > $currentIndex) {
-                    DB::table('tasks')
-                        ->where('project_id', $task->project_id)
-                        ->where('organization_id', $organization->id)
-                        ->whereBetween('order_index', [$currentIndex + 1, $targetIndex])
-                        ->decrement('order_index');
-                } elseif ($targetIndex < $currentIndex) {
-                    DB::table('tasks')
-                        ->where('project_id', $task->project_id)
-                        ->where('organization_id', $organization->id)
-                        ->whereBetween('order_index', [$targetIndex, $currentIndex - 1])
-                        ->increment('order_index');
-                }
+        /**
+         * project_id is required in our schema, so project should be present.
+         * Still, keep it defensive at runtime; but type it for PHPStan.
+         *
+         * @var \App\Models\Project $project
+         */
+        $project = $task->project;
 
-                $task->order_index = $targetIndex;
-                if (array_key_exists('status', $data)) {
-                    $task->status = $data['status'];
-                }
-                $task->save();
-            } else {
-                if (! is_null($oldIndex)) {
-                    DB::table('tasks')
-                        ->where('project_id', $task->project_id)
-                        ->where('organization_id', $organization->id)
-                        ->where('order_index', '>', $oldIndex)
-                        ->decrement('order_index');
-                }
-
-                DB::table('tasks')
-                    ->where('project_id', $targetProject->id)
-                    ->where('organization_id', $organization->id)
-                    ->where('order_index', '>=', $targetIndex)
-                    ->increment('order_index');
-
-                $task->project_id = $targetProject->id;
-                $task->order_index = $targetIndex;
-                if (array_key_exists('status', $data)) {
-                    $task->status = $data['status'];
-                }
-                $task->save();
-            }
-        });
+        /** @var User|null $reviewer */
+        $reviewer = $task->reviewer;
 
         return response()->json([
-            'ok' => true,
-            'task' => $task->only(['id', 'project_id', 'order_index', 'status']),
+            'id' => $task->id,
+            'title' => $task->title,
+            'description' => $task->description,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'due_date' => $task->due_date?->toDateString(),
+            'estimated_hours' => $task->estimated_hours,
+            'logged_hours' => $task->logged_hours,
+
+            'project' => [
+                'id' => $project->id,
+                'title' => $project->title,
+            ],
+
+            'submission' => $task->submission,
+            'submission_note' => $task->submission_note,
+            'submission_files' => $task->submission_files,
+            'review_status' => $task->review_status,
+            'comments' => $task->comments,
+            'reviewed_by_id' => $task->reviewed_by_id,
+
+            'reviewer' => $reviewer
+                ? [
+                    'id' => $reviewer->id,
+                    'name' => $reviewer->name,
+                ]
+                : null,
+
+            // auth middleware guarantees user, so no ternary
+            'can_update' => $user->can('update', $task),
+            'can_submit' => $user->can('submit', $task),
+            'can_review' => $user->can('review', $task),
         ]);
+    }
+
+    /**
+     * Update a task's core fields, submission or review metadata.
+     */
+    public function update(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        if ((int) $task->organization_id !== (int) $org->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'assignees' => 'array',
+            'assignees.*' => 'integer',
+            'due_date' => 'nullable|date',
+            'priority' => 'nullable|string|max:20',
+            'status' => 'nullable|string|max:50',
+            'estimated_hours' => 'nullable|numeric',
+            'logged_hours' => 'nullable|numeric',
+            'submission' => 'array',
+            'submission_note' => 'nullable|string',
+            'submission_files' => 'nullable|array',
+            'review_status' => 'nullable|string|max:50',
+            'comments' => 'nullable|array',
+        ]);
+
+        return DB::transaction(function () use ($task, $data, $org, $request): RedirectResponse {
+            $before = $task->getAttributes();
+
+            $update = [];
+
+            $fields = [
+                'title',
+                'description',
+                'assignees',
+                'due_date',
+                'priority',
+                'status',
+                'estimated_hours',
+                'logged_hours',
+                'submission',
+                'submission_note',
+                'submission_files',
+                'review_status',
+                'comments',
+            ];
+
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $data)) {
+                    $update[$field] = $data[$field];
+                }
+            }
+
+            if ($update === []) {
+                return back()->with('success', 'Task updated');
+            }
+
+            $task->update($update);
+
+            $after = $task->getAttributes();
+
+            AuditLogger::log(
+                $org,
+                $request->user(),
+                'updated',
+                'task',
+                (int) $task->id,
+                [
+                    'before' => $before,
+                    'after' => $after,
+                ],
+            );
+
+            if (array_key_exists('status', $update) && ($before['status'] ?? null) !== ($after['status'] ?? null)) {
+                AuditLogger::log(
+                    $org,
+                    $request->user(),
+                    'status_changed',
+                    'task',
+                    (int) $task->id,
+                    [
+                        'before' => $before['status'] ?? null,
+                        'after' => $after['status'] ?? null,
+                    ],
+                );
+            }
+
+            if (array_key_exists('assignees', $update)) {
+                $beforeAssignees = $before['assignees'] ?? null;
+                $afterAssignees = $after['assignees'] ?? null;
+
+                if ($beforeAssignees !== $afterAssignees) {
+                    AuditLogger::log(
+                        $org,
+                        $request->user(),
+                        'assignees_changed',
+                        'task',
+                        (int) $task->id,
+                        [
+                            'before' => $beforeAssignees,
+                            'after' => $afterAssignees,
+                        ],
+                    );
+                }
+            }
+
+            return back()->with('success', 'Task updated');
+        });
+    }
+
+    /**
+     * Soft-delete a task.
+     */
+    public function destroy(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('delete', $task);
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        if ((int) $task->organization_id !== (int) $org->id) {
+            abort(404);
+        }
+
+        return DB::transaction(function () use ($task, $org, $request): RedirectResponse {
+            $before = $task->getAttributes();
+            $taskId = (int) $task->id;
+
+            $task->delete();
+
+            AuditLogger::log(
+                $org,
+                $request->user(),
+                'deleted',
+                'task',
+                $taskId,
+                $before,
+            );
+
+            return back()->with('success', 'Task deleted');
+        });
+    }
+
+    /**
+     * Submit a task for review.
+     */
+    public function submit(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('submit', $task);
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        if ((int) $task->organization_id !== (int) $org->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'submission' => 'required|array',
+            'submission_note' => 'nullable|string',
+            'submission_files' => 'nullable|array',
+        ]);
+
+        return DB::transaction(function () use ($task, $data, $org, $request): RedirectResponse {
+            $before = $task->getAttributes();
+
+            $update = [
+                'submission' => $data['submission'],
+                'review_status' => 'Pending',
+            ];
+
+            if (array_key_exists('submission_note', $data)) {
+                $update['submission_note'] = $data['submission_note'];
+            }
+
+            if (array_key_exists('submission_files', $data)) {
+                $update['submission_files'] = $data['submission_files'];
+            }
+
+            $task->update($update);
+
+            $after = $task->getAttributes();
+
+            AuditLogger::log(
+                $org,
+                $request->user(),
+                'submitted',
+                'task',
+                (int) $task->id,
+                [
+                    'before' => $before,
+                    'after' => $after,
+                ],
+            );
+
+            return back()->with('success', 'Submitted for review');
+        });
+    }
+
+    /**
+     * Review a submitted task (approve, request changes, reject).
+     */
+    public function review(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('review', $task);
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        if ((int) $task->organization_id !== (int) $org->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'review_status' => 'required|string|in:Approved,Changes Requested,Rejected',
+            'comments' => 'array',
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        return DB::transaction(function () use ($task, $data, $org, $user): RedirectResponse {
+            $before = $task->getAttributes();
+
+            $update = [
+                'review_status' => $data['review_status'],
+                'comments' => $data['comments'] ?? $task->comments,
+                'reviewed_by_id' => $user->id,
+            ];
+
+            $task->update($update);
+
+            $after = $task->getAttributes();
+
+            AuditLogger::log(
+                $org,
+                $user,
+                'reviewed',
+                'task',
+                (int) $task->id,
+                [
+                    'before' => $before,
+                    'after' => $after,
+                ],
+            );
+
+            return back()->with('success', 'Review saved');
+        });
     }
 }

@@ -1,9 +1,15 @@
 <script setup lang="ts">
-defineProps<{ class?: string }>()
+defineProps<{ tight?: boolean; title?: string }>();
 </script>
 
 <template>
-  <div :class="['rounded-3xl border border-[#3A3A42] bg-[#1A1B22]/90 shadow-[0_8px_30px_rgba(0,0,0,.35)]', $props.class]">
+  <section
+    class="glass-card rounded-2xl"
+    :class="tight ? 'p-4' : 'p-6 md:p-8'"
+  >
+    <header v-if="title" class="mb-4 text-sm text-muted-foreground">
+      {{ title }}
+    </header>
     <slot />
-  </div>
+  </section>
 </template>

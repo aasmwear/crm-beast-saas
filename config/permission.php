@@ -132,7 +132,7 @@ return [
      */
 
     'teams' => true,
-    'team_foreign_key' => 'organization_id',
+    'team_foreign_key' => 'team_id',
 
     /*
      * The class to use to resolve the permissions team id

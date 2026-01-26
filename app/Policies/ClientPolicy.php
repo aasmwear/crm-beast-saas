@@ -5,35 +5,97 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
+use Spatie\Permission\PermissionRegistrar;
 
-class ClientPolicy
+final class ClientPolicy
 {
-    /**
-     * Temporarily permissive; routes are org-scoped and controllers check org match.
-     * Later, tighten per role (owner, AM, sales, etc.).
-     */
-    public function viewAny(User $user, Organization $organization): bool
+    private function scopeTeamId(int $teamId): void
     {
-        return true;
+        if ($teamId <= 0) {
+            return;
+        }
+
+        // Defensive: align Spatie "teams" scoping for policy checks.
+        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId);
     }
 
-    public function view(User $user, Client $client, Organization $organization): bool
+    private function currentTeamId(User $user): int
     {
-        return $client->organization_id === $organization->id;
+        // Prefer the org resolved by ResolveTenant middleware (if you bind it).
+        if (app()->bound('scoped.organization')) {
+            $org = app('scoped.organization');
+
+            if ($org instanceof Organization) {
+                return (int) $org->id;
+            }
+
+            if (is_object($org) && isset($org->id) && is_numeric($org->id)) {
+                return (int) $org->id;
+            }
+        }
+
+        // PHPStan considers this non-null (per your User model PHPDoc/types).
+        return (int) $user->active_organization_id;
     }
 
-    public function create(User $user, Organization $organization): bool
+    public function viewAny(User $user): bool
     {
-        return true;
+        // Owners/Admins can always access the Clients module.
+        $this->scopeTeamId($this->currentTeamId($user));
+
+        if ($user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.view')) {
+            return true;
+        }
+
+        // Otherwise, only allow access if the user has at least one visible client
+        // (prevents 403/blank module for task-only team members).
+        $orgId = $this->currentTeamId($user);
+
+        return Client::query()
+            ->forOrg($orgId)
+            ->visibleTo($user)
+            ->exists();
     }
 
-    public function update(User $user, Client $client, Organization $organization): bool
+    public function view(User $user, Client $client): bool
     {
-        return $client->organization_id === $organization->id;
+        // Cross-org guard
+        if ((int) $user->active_organization_id !== (int) $client->organization_id) {
+            return false;
+        }
+
+        $this->scopeTeamId((int) $client->organization_id);
+
+        if ($user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.view')) {
+            return true;
+        }
+
+        // Enforce row-level visibility for direct URL access.
+        return Client::query()
+            ->whereKey($client->id)
+            ->forOrg((int) $client->organization_id)
+            ->visibleTo($user)
+            ->exists();
     }
 
-    public function delete(User $user, Client $client, Organization $organization): bool
+    public function create(User $user): bool
     {
-        return $client->organization_id === $organization->id;
+        $this->scopeTeamId($this->currentTeamId($user));
+
+        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.create');
+    }
+
+    public function update(User $user, Client $client): bool
+    {
+        $this->scopeTeamId((int) $client->organization_id);
+
+        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.update');
+    }
+
+    public function delete(User $user, Client $client): bool
+    {
+        $this->scopeTeamId((int) $client->organization_id);
+
+        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.delete');
     }
 }

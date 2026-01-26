@@ -1,3 +1,28 @@
+@import './theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Base page */
+body {
+  background: rgb(var(--background));
+  color: #e5e7eb;
+}
+
+/* Keep your existing helpers (hero bg + card glass/glow) */
+.hero-bg      { background: var(--gradient-hero), rgb(var(--background)); }
+.card-glass   { border-radius: 1rem; border: 1px solid rgba(255,255,255,.05); background: var(--card-glass); box-shadow: var(--shadow-soft); }
+.card-glow    { box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 18px 60px rgba(88, 28, 135, .15); }
+
+/* Accent color token (kept for components that reference it) */
+:root { --primary: #684EF4; }
+
+/* New helpers used by the layout + dashboard */
+.hero-slab { border-radius: 1rem; overflow: hidden; border: 1px solid rgba(255,255,255,.06); background: var(--gradient-hero); }
+.kpi-card  { border-radius: 18px; background: #0F121C; border: 1px solid rgba(255,255,255,.06); box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 16px 55px rgba(88, 28, 135, .18); }
+.hover-lift { transition: transform .12s ease, box-shadow .2s ease; }
+.hover-lift:hover { transform: translateY(-2px); }
+
+/* Chips (alias for capsule buttons) */
+.chip { border-radius: 9999px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.06); padding: .5rem .9rem; font-weight:600; }
