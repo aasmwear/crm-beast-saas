@@ -2,41 +2,73 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Setting;
+use App\Models\Organization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 final class SettingsController extends Controller
 {
+    /**
+     * Display the organization settings page.
+     */
     public function index(Request $request): Response
     {
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
+        /** @var Organization $organization */
+        $organization = $request->route('organization');
 
-        $settings = Setting::where('organization_id', (int) $org->id)->pluck('value', 'key');
-
-        return Inertia::render('Settings/Index', ['settings' => $settings]);
+        return Inertia::render('Settings/Index', [
+            'organization' => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'slug' => $organization->slug,
+                'logo_path' => $organization->logo_path,
+                'timezone' => $organization->timezone ?? 'UTC',
+                'week_start' => $organization->week_start ?? 'Monday',
+            ],
+            'timezones' => \DateTimeZone::listIdentifiers(\DateTimeZone::ALL),
+        ]);
     }
 
-    public function save(Request $request): RedirectResponse
+    /**
+     * Update organization settings.
+     */
+    public function update(Request $request): RedirectResponse
     {
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
+        /** @var Organization $organization */
+        $organization = $request->route('organization');
 
-        $payload = $request->validate([
-            'slack_webhook_url' => 'nullable|string',
-            'smtp_host' => 'nullable|string',
-            'smtp_user' => 'nullable|string',
-            'smtp_pass' => 'nullable|string',
-            'google_drive_key' => 'nullable|string',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'timezone' => ['required', 'string', 'timezone'],
+            'week_start' => ['required', 'string', 'in:Sunday,Monday'],
+            'logo' => ['nullable', 'image', 'max:1024'],
         ]);
 
-        foreach ($payload as $k => $v) {
-            Setting::put((int) $org->id, $k, $v);
+        $organization->name = $validated['name'];
+        $organization->timezone = $validated['timezone'];
+        $organization->week_start = $validated['week_start'];
+
+        if ($request->hasFile('logo')) {
+            $dir = 'logos';
+            if (! Storage::disk('public')->exists($dir)) {
+                Storage::disk('public')->makeDirectory($dir);
+            }
+
+            if ($organization->logo_path) {
+                Storage::disk('public')->delete($organization->logo_path);
+            }
+
+            $path = $request->file('logo')->store($dir, 'public');
+            $organization->logo_path = $path;
         }
 
-        return back()->with('success', 'Settings saved');
+        $organization->save();
+
+        return redirect()
+            ->route('settings.index', ['organization' => $organization->slug])
+            ->with('success', 'Settings updated');
     }
 }

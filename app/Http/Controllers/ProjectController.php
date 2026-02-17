@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\User;
+use App\Notifications\ProjectStatusChanged;
+use App\Services\ActivityLogger;
 use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +18,7 @@ use Inertia\Response;
 final class ProjectController extends Controller
 {
     /**
-     * Display a listing of the resource (Index view).
+     * Display a listing of the resource (Grid view).
      *
      * Route: GET /org/{organization:slug}/projects (name: projects.index)
      */
@@ -26,16 +29,63 @@ final class ProjectController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        // Eager load client & manager; scope by tenant + visibility
-        $projects = Project::with(['client:id,company_name', 'manager:id,name'])
+        $projectsQuery = Project::with([
+            'client:id,company_name',
+            'manager:id,name',
+            'users:id,name',
+            'tasks' => static function ($q): void {
+                $q->select('id', 'project_id', 'status');
+            },
+        ])
             ->where('organization_id', $organization->id)
             ->visibleTo($user)
-            ->latest()
-            ->simplePaginate(10)
-            ->withQueryString();
+            ->latest();
 
-        // Any user in this org can be selected as PM
-        $cstManagers = DB::table('users')
+        $projectsCollection = $projectsQuery->get();
+
+        $projects = $projectsCollection->map(function (Project $project): array {
+            $tasks = $project->tasks;
+            $total = $tasks->count();
+            $completed = $tasks->filter(static function ($t): bool {
+                $s = strtolower(trim((string) ($t->status ?? '')));
+
+                return in_array($s, ['done', 'completed', 'closed', 'finished'], true);
+            })->count();
+            $progress = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
+
+            $teamUsers = $project->users->isNotEmpty()
+                ? $project->users
+                : ($project->manager ? collect([$project->manager]) : collect());
+            $teamMembers = $teamUsers->take(3)->map(static function ($u): array {
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                ];
+            })->values()->all();
+            $teamExtra = max(0, $teamUsers->count() - 3);
+
+            return [
+                'id' => $project->id,
+                'title' => $project->title,
+                'description' => $project->description,
+                'status' => $project->status,
+                'client_name' => $project->client?->company_name ?? null,
+                'progress' => $progress,
+                'due_date' => $project->end_date?->format('Y-m-d'),
+                'due_date_formatted' => $project->end_date?->format('M j, Y'),
+                'team' => [
+                    'avatars' => $teamMembers,
+                    'extra' => $teamExtra,
+                ],
+            ];
+        })->values()->all();
+
+        $clients = DB::table('clients')
+            ->where('organization_id', $organization->id)
+            ->orderBy('company_name')
+            ->get(['id', 'company_name']);
+
+        $users = DB::table('users')
             ->where('active_organization_id', $organization->id)
             ->select('id', 'name')
             ->orderBy('name')
@@ -44,7 +94,8 @@ final class ProjectController extends Controller
         return Inertia::render('Projects/Index', [
             'organization' => $organization->only(['id', 'name', 'slug']),
             'projects' => $projects,
-            'cstManagers' => $cstManagers,
+            'clients' => $clients,
+            'users' => $users,
         ]);
     }
 
@@ -64,23 +115,73 @@ final class ProjectController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        // Load related data needed for the show page
+        // Load related data needed for the show page (budget, price, currency from model/accessors)
         $project->load([
             'client:id,company_name',
             'manager:id,name',
+            'users:id,name',
             'department:id,name',
-            // Keep tasks lean for the summary and enforce row-level visibility.
             'tasks' => static function ($q) use ($organization, $user): void {
-                $q->select(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'organization_id'])
+                $q->select(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'assignees', 'organization_id'])
                     ->where('organization_id', $organization->id)
                     ->visibleTo($user)
                     ->orderByDesc('id');
             },
+            'files' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
+            'comments' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
+            'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
         ]);
+
+        // Get all users in this organization for task assignment
+        $users = DB::table('users')
+            ->where('active_organization_id', $organization->id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        $projectArray = $project->toArray();
+        unset($projectArray['files']);
+        unset($projectArray['comments']);
+        unset($projectArray['activities']);
+        if (! $user->can('viewBudget', $project)) {
+            foreach (['budget_cents', 'price_cents', 'budget', 'price'] as $key) {
+                unset($projectArray[$key]);
+            }
+        }
+
+        $files = $project->files->map(static fn (\App\Models\ProjectFile $f): array => [
+            'id' => $f->id,
+            'filename' => $f->filename,
+            'path' => $f->path,
+            'mime_type' => $f->mime_type,
+            'size' => $f->size,
+            'is_visible_to_client' => $f->is_visible_to_client,
+            'created_at' => $f->created_at?->toIso8601String(),
+            'uploader' => $f->user ? ['id' => $f->user->id, 'name' => $f->user->name] : null,
+        ])->values()->all();
+
+        $comments = $project->comments->map(static fn (\App\Models\Comment $c): array => [
+            'id' => $c->id,
+            'body' => $c->body,
+            'created_at' => $c->created_at?->toIso8601String(),
+            'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
+        ])->values()->all();
+
+        $activities = $project->activities->map(static fn (\App\Models\Activity $a): array => [
+            'id' => $a->id,
+            'description' => $a->description,
+            'properties' => $a->properties,
+            'created_at' => $a->created_at?->toIso8601String(),
+            'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+        ])->values()->all();
 
         return Inertia::render('Projects/Show', [
             'organizationSlug' => $organization->slug,
-            'project' => $project,
+            'project' => $projectArray,
+            'users' => $users,
+            'files' => $files,
+            'comments' => $comments,
+            'activities' => $activities,
         ]);
     }
 
@@ -114,31 +215,40 @@ final class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
+        $request->merge([
+            'user_ids' => $request->input('user_ids') ?: [],
+        ]);
+
         $data = $request->validate([
-            'client_id' => ['nullable', 'exists:clients,id'],
             'title' => ['required', 'string', 'max:255'],
-            'project_code' => ['nullable', 'string', 'max:255'],
-            'project_manager_id' => [
+            'description' => ['nullable', 'string', 'max:65535'],
+            'client_id' => [
                 'nullable',
+                'integer',
+                Rule::exists('clients', 'id')->where('organization_id', $organization->id),
+            ],
+            'status' => ['required', 'string', Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed'])],
+            'due_date' => ['nullable', 'date'],
+            'user_ids' => ['array'],
+            'user_ids.*' => [
                 'integer',
                 Rule::exists('users', 'id')->where(static function ($query) use ($organization): void {
                     $query->where('active_organization_id', $organization->id);
                 }),
             ],
-            'price' => ['nullable', 'numeric'],
-            'billable' => ['boolean'],
         ]);
 
         $project = Project::create([
             'organization_id' => $organization->id,
             'client_id' => $data['client_id'] ?? null,
             'title' => $data['title'],
-            'project_code' => $data['project_code'] ?? null,
-            'project_manager_id' => $data['project_manager_id'] ?? null,
-            'price' => $data['price'] ?? 0,
-            'billable' => $data['billable'] ?? false,
-            'status' => 'Active',
+            'description' => $data['description'] ?? null,
+            'project_manager_id' => ! empty($data['user_ids']) ? (int) $data['user_ids'][0] : null,
+            'status' => $data['status'],
+            'end_date' => isset($data['due_date']) ? $data['due_date'] : null,
         ]);
+
+        $project->users()->sync($data['user_ids'] ?? []);
 
         AuditLogger::log(
             $organization,
@@ -197,12 +307,19 @@ final class ProjectController extends Controller
                 }),
             ],
             'status' => ['required', 'string', 'max:50'],
-            // Other fields (description, budget, etc.) can be added later
+            'budget' => ['nullable', 'numeric'],
+            'price' => ['nullable', 'numeric'],
+            'currency' => ['nullable', 'string', 'max:3'],
+            'billable' => ['boolean'],
         ]);
 
         $before = $project->getAttributes();
 
         $project->update($data);
+
+        if (isset($before['status'], $data['status']) && (string) $before['status'] !== (string) $data['status']) {
+            $this->notifyProjectStatusChange($project, (string) $before['status'], (string) $data['status'], $request->user()->id);
+        }
 
         AuditLogger::log(
             $organization,
@@ -259,8 +376,20 @@ final class ProjectController extends Controller
         ]);
 
         $before = $project->getAttributes();
+        $oldStatus = (string) ($before['status'] ?? '');
+        $newStatus = (string) $data['status'];
 
-        $project->update(['status' => $data['status']]);
+        $project->update(['status' => $newStatus]);
+
+        if ($oldStatus !== $newStatus) {
+            ActivityLogger::log(
+                $request->user(),
+                $project,
+                'changed project status',
+                ['old_status' => $oldStatus, 'new_status' => $newStatus],
+            );
+            $this->notifyProjectStatusChange($project, $oldStatus, $newStatus, $request->user()->id);
+        }
 
         AuditLogger::log(
             $organization,
@@ -275,5 +404,21 @@ final class ProjectController extends Controller
         );
 
         return back()->with('success', 'Project status updated.');
+    }
+
+    /**
+     * Notify project manager and team members of a project status change.
+     */
+    private function notifyProjectStatusChange(Project $project, string $oldStatus, string $newStatus, int $excludeUserId): void
+    {
+        $project->load(['manager', 'users']);
+        $recipients = collect([$project->manager])
+            ->merge($project->users)
+            ->filter()
+            ->unique('id')
+            ->where('id', '!=', $excludeUserId);
+
+        $notification = new ProjectStatusChanged($project, $oldStatus, $newStatus);
+        $recipients->each(fn (User $u) => $u->notify($notification));
     }
 }

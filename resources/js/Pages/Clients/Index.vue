@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { router, usePage, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import EmptyState from '@/Components/ui/EmptyState.vue'
 
 // Set the layout for the page
 defineOptions({ layout: AuthenticatedLayout })
@@ -225,28 +226,38 @@ function getStatusClass(statusValue: string | null | undefined) {
 
       <!-- Clients Table -->
       <div class="card-neo overflow-hidden">
-        <table class="w-full text-left text-sm text-white">
+        <EmptyState
+          v-if="!props.clients.data.length"
+          title="Add your first Client"
+          description="Get started by adding your first client to the CRM."
+          icon="👤"
+        >
+          <template #action>
+            <Link
+              :href="r('clients.create', { organization: org })"
+              class="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Client
+            </Link>
+          </template>
+        </EmptyState>
+
+        <table v-else class="w-full text-left text-sm text-white">
           <thead class="border-b border-white/10 text-white/50">
             <tr>
               <th class="p-4">Company</th>
               <th class="p-4">Contact</th>
               <th class="p-4">Status</th>
+              <th class="p-4">Projects</th>
               <th class="w-40 p-4"></th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-if="!props.clients.data.length"
-              class="border-t border-white/10"
-            >
-              <td colspan="4" class="p-4 text-center text-sm text-white/60">
-                No clients found for the current filters.
-              </td>
-            </tr>
-
-            <tr
               v-for="c in props.clients.data"
-              v-else
               :key="c.id"
               class="border-t border-white/10 transition duration-150 hover:bg-white/5"
             >
@@ -257,9 +268,12 @@ function getStatusClass(statusValue: string | null | undefined) {
                 {{ c.primary_contact_name }} · {{ c.primary_contact_email }}
               </td>
               <td class="p-4">
-                <span :class="getStatusClass(c.client_activation_status)">
-                  {{ c.client_activation_status || '—' }}
+                <span :class="getStatusClass(c.status)">
+                  {{ c.status || '—' }}
                 </span>
+              </td>
+              <td class="p-4 text-white/70">
+                {{ c.projects_count ?? 0 }}
               </td>
               <td class="p-4 text-right">
                 <Link

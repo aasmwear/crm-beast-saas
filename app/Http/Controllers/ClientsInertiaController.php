@@ -87,6 +87,7 @@ class ClientsInertiaController extends Controller
             ->orderByDesc('id');
 
         $clients = $query
+            ->withCount('projects')
             ->paginate(10)
             ->withQueryString();
 
@@ -107,8 +108,16 @@ class ClientsInertiaController extends Controller
     {
         $this->authorize('create', Client::class);
 
+        // Get all users in this organization for assignment dropdowns
+        $users = DB::table('users')
+            ->where('active_organization_id', $organization->id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Clients/Create', [
             'organizationSlug' => $organization->slug,
+            'users' => $users,
         ]);
     }
 
@@ -121,7 +130,8 @@ class ClientsInertiaController extends Controller
 
         // Eager-load related data for the Show page
         $client->load([
-            // Only load projects/tasks the current user can actually see.
+            'contacts',
+            // Only load projects (active = not Completed/Cancelled) the current user can see.
             'projects' => static function (Builder $q) use ($organization, $user): void {
                 /** @var Builder<Project> $q */
                 $q->select(['id', 'organization_id', 'client_id', 'title', 'status'])
@@ -142,19 +152,63 @@ class ClientsInertiaController extends Controller
             },
         ]);
 
-        return Inertia::render('Clients/Show', [
+        $clientData = $client->toArray();
+        $clientData['contacts'] = collect($clientData['contacts'] ?? [])->map(function (array $c) use ($client): array {
+            $email = $c['email'] ?? null;
+            $hasPortalAccess = $email
+                ? User::where('email', $email)->where('client_id', $client->id)->exists()
+                : false;
+
+            return array_merge($c, ['has_portal_access' => $hasPortalAccess]);
+        })->values()->all();
+
+        $payload = [
             'organizationSlug' => $organization->slug,
-            'client' => $client,
-        ]);
+            'client' => $clientData,
+        ];
+
+        if ($user->can('financials.view')) {
+            $payload['financial_summary'] = $this->financialSummaryForClient($client);
+        } else {
+            $payload['financial_summary'] = null;
+        }
+
+        return Inertia::render('Clients/Show', $payload);
+    }
+
+    /**
+     * Total budget and total invoiced (price) for all projects of this client.
+     *
+     * @return array{total_budget_cents: int, total_invoiced_cents: int, currency: string}
+     */
+    private function financialSummaryForClient(Client $client): array
+    {
+        $sums = $client->projects()
+            ->selectRaw('COALESCE(SUM(budget_cents), 0) as total_budget_cents, COALESCE(SUM(price_cents), 0) as total_invoiced_cents')
+            ->first();
+
+        return [
+            'total_budget_cents' => (int) ($sums->total_budget_cents ?? 0),
+            'total_invoiced_cents' => (int) ($sums->total_invoiced_cents ?? 0),
+            'currency' => $client->currency ?? 'USD',
+        ];
     }
 
     public function edit(Organization $organization, Client $client): Response
     {
         $this->authorize('update', $client);
 
+        // Get all users in this organization for assignment dropdowns
+        $users = DB::table('users')
+            ->where('active_organization_id', $organization->id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Clients/Edit', [
             'organizationSlug' => $organization->slug,
             'client' => $client,
+            'users' => $users,
         ]);
     }
 

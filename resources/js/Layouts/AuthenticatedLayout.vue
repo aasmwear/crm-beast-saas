@@ -1,6 +1,11 @@
 <template>
   <div class="min-h-screen white-bg text-white">
-    <IconRail />
+    <CommandPalette />
+    <Toast />
+    <IconRail
+      :mobile-open="mobileMenuOpen"
+      @close="mobileMenuOpen = false"
+    />
 
     <div class=".white-bg">
     <div class="bg-background bordermainradius">
@@ -12,7 +17,18 @@
         
         <header class="top-0 z-30">
         <div class="mx-auto h-14 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          
+          <!-- Mobile hamburger: visible on screens smaller than lg -->
+          <button
+            type="button"
+            class="lg:hidden p-2 -ml-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition"
+            aria-label="Open menu"
+            @click="mobileMenuOpen = true"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
           <div class="text-sm text-white/60 flex items-center gap-1">
             <template v-for="(b, index) in breadcrumbs" :key="index">
               <Link v-if="b.url !== '#'" :href="b.url" class="text-white/80 hover:text-white/60 transition">
@@ -37,10 +53,7 @@
             <input type="text" placeholder="Search" />
           </div>
 
-          <button class="relative notif-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 17h-8a2 2 0 002 2h4a2 2 0 002-2zM18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <span class="notif-dot"></span>
-          </button>
+          <NotificationDropdown />
           </div>
 
           </div>
@@ -55,9 +68,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 import IconRail from '@/Components/ui/IconRail.vue'
+import Toast from '@/Components/ui/Toast.vue'
+import CommandPalette from '@/Components/Global/CommandPalette.vue'
+import NotificationDropdown from '@/Components/Global/NotificationDropdown.vue'
 // NOTE: The `applyFireflyStyles` function is assumed to be defined here or imported.
 
 // DO NOT REMOVE any existing code in the <script setup> block below this.
@@ -76,6 +92,8 @@ const org = computed(() => {
   const i = parts.indexOf('org')
   return i >= 0 && parts[i + 1] ? parts[i + 1] : 'acme'
 })
+
+const mobileMenuOpen = ref(false)
 
 /* User initials for avatar */
 const user = computed<any>(() => (usePage().props as any)?.auth?.user ?? {})

@@ -10,6 +10,8 @@ use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -53,8 +55,8 @@ final class ClientController extends Controller
                     'website',
                     'address',
                     'tags',
-                    'fronter',
-                    'closer',
+                    'fronter_id',
+                    'closer_id',
                     'assigned_account_manager_id',
                     'google_business_profile_status',
                     'google_business_profile_access_status',
@@ -80,8 +82,8 @@ final class ClientController extends Controller
                         $client->website,
                         $client->address,
                         json_encode($client->tags),
-                        json_encode($client->fronter),
-                        json_encode($client->closer),
+                        $client->fronter_id,
+                        $client->closer_id,
                         $client->assigned_account_manager_id,
                         $client->google_business_profile_status,
                         $client->google_business_profile_access_status,
@@ -146,6 +148,8 @@ final class ClientController extends Controller
             'primary_contact_phone' => ['nullable', 'string', 'max:50'],
             'website' => ['nullable', 'url'],
             'address' => ['nullable', 'string'],
+            'tax_id' => ['nullable', 'string', 'max:100'],
+            'currency' => ['nullable', 'string', 'size:3'],
 
             'tags' => ['nullable', 'array'],
             'fronter' => ['nullable', 'array'],
@@ -160,30 +164,62 @@ final class ClientController extends Controller
             'notes_by_cst' => ['nullable', 'string'],
             'notes_by_sales' => ['nullable', 'string'],
             'notes_by_tech' => ['nullable', 'string'],
+            'notes_sales' => ['nullable', 'string'],
+            'notes_cst' => ['nullable', 'string'],
+            'notes_tech' => ['nullable', 'string'],
 
-            'status' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'string', Rule::in(['Lead', 'Active', 'Inactive'])],
         ]);
 
+        if (! isset($data['currency']) || $data['currency'] === '') {
+            $data['currency'] = 'USD';
+        }
+
+        $data['notes_sales'] = $data['notes_sales'] ?? $data['notes_by_sales'] ?? null;
+        $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
+        $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
+
         return DB::transaction(function () use ($data, $org, $request): RedirectResponse {
-            $data['organization_id'] = (int) $org->id;
+            try {
+                $data['organization_id'] = (int) $org->id;
 
-            $client = Client::query()->create($data);
+                // Log the data being inserted for debugging
+                Log::info('Creating client with data:', [
+                    'organization_id' => $data['organization_id'],
+                    'company_name' => $data['company_name'],
+                    'fronter_id' => $data['fronter_id'] ?? null,
+                    'closer_id' => $data['closer_id'] ?? null,
+                    'assigned_account_manager_id' => $data['assigned_account_manager_id'] ?? null,
+                ]);
 
-            AuditLogger::log(
-                organization: $org,
-                actor: $request->user(),
-                action: 'created',
-                entity: 'client',
-                entityId: (int) $client->id,
-                changes: [
-                    'before' => null,
-                    'after' => $client->getAttributes(),
-                ],
-            );
+                $client = Client::query()->create($data);
 
-            return redirect()
-                ->route('clients.show', ['organization' => $org->slug, 'client' => $client->id])
-                ->with('success', 'Client created');
+                AuditLogger::log(
+                    organization: $org,
+                    actor: $request->user(),
+                    action: 'created',
+                    entity: 'client',
+                    entityId: (int) $client->id,
+                    changes: [
+                        'before' => null,
+                        'after' => $client->getAttributes(),
+                    ],
+                );
+
+                return redirect()
+                    ->route('clients.show', ['organization' => $org->slug, 'client' => $client->id])
+                    ->with('success', 'Client created');
+            } catch (\Exception $e) {
+                // Log the specific error for debugging
+                Log::error('Client creation failed', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'data' => $data,
+                ]);
+
+                // Re-throw to trigger rollback and show error to user
+                throw $e;
+            }
         });
     }
 
@@ -226,10 +262,12 @@ final class ClientController extends Controller
             'primary_contact_phone' => ['nullable', 'string', 'max:50'],
             'website' => ['nullable', 'url'],
             'address' => ['nullable', 'string'],
+            'tax_id' => ['nullable', 'string', 'max:100'],
+            'currency' => ['nullable', 'string', 'size:3'],
 
             'tags' => ['nullable', 'array'],
-            'fronter' => ['nullable', 'array'],
-            'closer' => ['nullable', 'array'],
+            'fronter_id' => ['nullable', 'integer', 'exists:users,id'],
+            'closer_id' => ['nullable', 'integer', 'exists:users,id'],
 
             'assigned_account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
 
@@ -240,28 +278,48 @@ final class ClientController extends Controller
             'notes_by_cst' => ['nullable', 'string'],
             'notes_by_sales' => ['nullable', 'string'],
             'notes_by_tech' => ['nullable', 'string'],
+            'notes_sales' => ['nullable', 'string'],
+            'notes_cst' => ['nullable', 'string'],
+            'notes_tech' => ['nullable', 'string'],
 
-            'status' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'string', Rule::in(['Lead', 'Active', 'Inactive'])],
         ]);
 
+        $data['notes_sales'] = $data['notes_sales'] ?? $data['notes_by_sales'] ?? null;
+        $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
+        $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
+
         return DB::transaction(function () use ($client, $data, $organization, $request): RedirectResponse {
-            $before = $client->getOriginal();
+            try {
+                $before = $client->getOriginal();
 
-            $client->update($data);
+                $client->update($data);
 
-            AuditLogger::log(
-                organization: $organization,
-                actor: $request->user(),
-                action: 'updated',
-                entity: 'client',
-                entityId: (int) $client->id,
-                changes: [
-                    'before' => $before,
-                    'after' => $client->getAttributes(),
-                ],
-            );
+                AuditLogger::log(
+                    organization: $organization,
+                    actor: $request->user(),
+                    action: 'updated',
+                    entity: 'client',
+                    entityId: (int) $client->id,
+                    changes: [
+                        'before' => $before,
+                        'after' => $client->getAttributes(),
+                    ],
+                );
 
-            return back()->with('success', 'Client updated');
+                return back()->with('success', 'Client updated');
+            } catch (\Exception $e) {
+                // Log the specific error for debugging
+                Log::error('Client update failed', [
+                    'client_id' => $client->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'data' => $data,
+                ]);
+
+                // Re-throw to trigger rollback and show error to user
+                throw $e;
+            }
         });
     }
 

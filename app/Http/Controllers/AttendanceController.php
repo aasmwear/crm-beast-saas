@@ -18,6 +18,8 @@ final class AttendanceController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Attendance::class);
+
         /** @var Organization $organization */
         $organization = $request->route('organization');
         $user = $request->user();
@@ -30,31 +32,41 @@ final class AttendanceController extends Controller
         ];
 
         $query = Attendance::query()
-            ->where('organization_id', (int) $organization->id);
+            ->select([
+                'attendance.id',
+                'attendance.organization_id',
+                'attendance.user_id',
+                'attendance.clock_in_at',
+                'attendance.clock_out_at',
+                'attendance.minutes',
+                'attendance.status',
+                'attendance.notes',
+            ])
+            ->where('attendance.organization_id', (int) $organization->id);
 
         // If a specific user is selected (HR/Admin view), filter by that user.
         if (! empty($filters['user_id'])) {
-            $query->where('user_id', (int) $filters['user_id']);
+            $query->where('attendance.user_id', (int) $filters['user_id']);
         } elseif ($user !== null) {
             // Default to current user when no filter is provided.
-            $query->where('user_id', (int) $user->id);
+            $query->where('attendance.user_id', (int) $user->id);
             $filters['user_id'] = (string) $user->id;
         }
 
         if (! empty($filters['date_from'])) {
-            $query->whereDate('clock_in_at', '>=', $filters['date_from']);
+            $query->whereDate('attendance.clock_in_at', '>=', $filters['date_from']);
         }
 
         if (! empty($filters['date_to'])) {
-            $query->whereDate('clock_in_at', '<=', $filters['date_to']);
+            $query->whereDate('attendance.clock_in_at', '<=', $filters['date_to']);
         }
 
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $query->where('attendance.status', $filters['status']);
         }
 
         $attendance = $query
-            ->orderByDesc('clock_in_at')
+            ->orderByDesc('attendance.clock_in_at')
             ->paginate(30)
             ->withQueryString();
 
@@ -64,16 +76,25 @@ final class AttendanceController extends Controller
 
         if ($user !== null) {
             $current = Attendance::query()
-                ->where('organization_id', (int) $organization->id)
-                ->where('user_id', (int) $user->id)
-                ->whereNull('clock_out_at')
-                ->orderByDesc('clock_in_at')
+                ->select([
+                    'attendance.id',
+                    'attendance.clock_in_at',
+                    'attendance.clock_out_at',
+                    'attendance.minutes',
+                    'attendance.status',
+                    'attendance.notes',
+                ])
+                ->where('attendance.organization_id', (int) $organization->id)
+                ->where('attendance.user_id', (int) $user->id)
+                ->whereNull('attendance.clock_out_at')
+                ->orderByDesc('attendance.clock_in_at')
                 ->first();
         }
 
+        // Use organization->users() with qualified columns to avoid ambiguous "id".
         $users = $organization->users()
-            ->select('id', 'name')
-            ->orderBy('name')
+            ->select('users.id', 'users.name')
+            ->orderBy('users.name')
             ->get();
 
         return Inertia::render('Attendance/Index', [
@@ -89,6 +110,8 @@ final class AttendanceController extends Controller
      */
     public function clockIn(Request $request): RedirectResponse
     {
+        $this->authorize('clockIn', Attendance::class);
+
         /** @var Organization $organization */
         $organization = $request->route('organization');
         $user = $request->user();
@@ -117,11 +140,24 @@ final class AttendanceController extends Controller
             return back()->with('error', 'You already have an attendance record for today.');
         }
 
+        // Extract geolocation if provided
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+
         $attendance = new Attendance;
         $attendance->setAttribute('organization_id', (int) $organization->id);
         $attendance->setAttribute('user_id', (int) $user->id);
         $attendance->setAttribute('clock_in_at', now());
+        $attendance->setAttribute('clock_in_ip', $request->ip());
         $attendance->setAttribute('status', 'open');
+
+        // Store geolocation if available
+        if ($lat !== null && $lng !== null) {
+            $attendance->setAttribute('clock_in_lat', (float) $lat);
+            $attendance->setAttribute('clock_in_lng', (float) $lng);
+            $attendance->setAttribute('clock_in_geo', json_encode(['lat' => $lat, 'lng' => $lng]));
+        }
+
         $attendance->save();
 
         return back()->with('success', 'Clocked in');
@@ -132,6 +168,8 @@ final class AttendanceController extends Controller
      */
     public function clockOut(Request $request): RedirectResponse
     {
+        $this->authorize('clockOut', Attendance::class);
+
         /** @var Organization $organization */
         $organization = $request->route('organization');
         $user = $request->user();
@@ -159,9 +197,22 @@ final class AttendanceController extends Controller
             $minutes = (int) $clockIn->diffInMinutes($clockOut);
         }
 
+        // Extract geolocation if provided
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+
         $attendance->setAttribute('clock_out_at', $clockOut);
+        $attendance->setAttribute('clock_out_ip', $request->ip());
         $attendance->setAttribute('minutes', $minutes);
         $attendance->setAttribute('status', 'closed');
+
+        // Store geolocation if available
+        if ($lat !== null && $lng !== null) {
+            $attendance->setAttribute('clock_out_lat', (float) $lat);
+            $attendance->setAttribute('clock_out_lng', (float) $lng);
+            $attendance->setAttribute('clock_out_geo', json_encode(['lat' => $lat, 'lng' => $lng]));
+        }
+
         $attendance->save();
 
         return back()->with('success', 'Clocked out');
@@ -178,6 +229,8 @@ final class AttendanceController extends Controller
         if ((int) $attendance->organization_id !== (int) $organization->id) {
             abort(404);
         }
+
+        $this->authorize('approve', $attendance);
 
         $before = $attendance->getAttributes();
 
@@ -209,6 +262,8 @@ final class AttendanceController extends Controller
         if ((int) $attendance->organization_id !== (int) $organization->id) {
             abort(404);
         }
+
+        $this->authorize('update', $attendance);
 
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'max:50'],

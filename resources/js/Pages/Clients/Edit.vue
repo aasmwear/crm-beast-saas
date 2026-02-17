@@ -5,6 +5,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
+type UserBrief = {
+  id: number
+  name: string
+}
+
 type ClientResource = {
   id: number
   company_name: string
@@ -15,6 +20,10 @@ type ClientResource = {
   primary_contact_email: string | null
   primary_contact_phone: string | null
   address: string | null
+
+  fronter_id: number | null
+  closer_id: number | null
+  assigned_account_manager_id: number | null
 
   google_business_profile_status: string | null
   google_business_profile_access_status: string | null
@@ -44,6 +53,7 @@ const page = usePage<PageProps>()
 const props = defineProps<{
   organizationSlug: string
   client: ClientResource
+  users: UserBrief[]
 }>()
 
 const client = props.client
@@ -65,6 +75,10 @@ const form = useForm<ClientForm>({
   primary_contact_email: client.primary_contact_email ?? null,
   primary_contact_phone: client.primary_contact_phone ?? null,
   address: client.address ?? null,
+
+  fronter_id: client.fronter_id ?? null,  // Single user ID (strict accountability)
+  closer_id: client.closer_id ?? null,    // Single user ID (strict accountability)
+  assigned_account_manager_id: client.assigned_account_manager_id ?? null,
 
   google_business_profile_status:
     client.google_business_profile_status ?? null,
@@ -111,6 +125,23 @@ const activationOptions = [
   { value: 'active', label: 'Active' },
   { value: 'paused', label: 'Paused' },
   { value: 'churned', label: 'Churned / Lost' },
+]
+
+const gbpStatusOptions = [
+  { value: '', label: '— Select GBP status —' },
+  { value: 'not_created', label: 'Not Created' },
+  { value: 'created', label: 'Created' },
+  { value: 'verified', label: 'Verified' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'in_progress', label: 'In Progress' },
+]
+
+const gbpAccessOptions = [
+  { value: '', label: '— Select access level —' },
+  { value: 'none', label: 'No Access' },
+  { value: 'pending', label: 'Access Pending' },
+  { value: 'manager', label: 'Manager Access' },
+  { value: 'owner', label: 'Owner Access' },
 ]
 </script>
 
@@ -252,6 +283,89 @@ const activationOptions = [
         </div>
       </div>
 
+      <!-- Assignment (Strict Accountability - Single Owner Rule) -->
+      <div class="border-t border-white/10 pt-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Assignment
+        </h2>
+        <p class="text-xs text-white/50">
+          Assign single owners for strict accountability. One fronter handles initial contact, one closer handles deal closure.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label :class="labelClass">Fronter (Sales Lead)</label>
+            <select
+              v-model="form.fronter_id"
+              :class="inputClass"
+            >
+              <option :value="null">— Select fronter —</option>
+              <option
+                v-for="user in props.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.name }}
+              </option>
+            </select>
+            <div v-if="form.errors.fronter_id" class="mt-1 text-sm text-red-400">
+              {{ form.errors.fronter_id }}
+            </div>
+            <div class="mt-1 text-xs text-white/40">
+              Responsible for initial contact
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Closer (Sales Closer)</label>
+            <select
+              v-model="form.closer_id"
+              :class="inputClass"
+            >
+              <option :value="null">— Select closer —</option>
+              <option
+                v-for="user in props.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.name }}
+              </option>
+            </select>
+            <div v-if="form.errors.closer_id" class="mt-1 text-sm text-red-400">
+              {{ form.errors.closer_id }}
+            </div>
+            <div class="mt-1 text-xs text-white/40">
+              Responsible for closing deal
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Account Manager</label>
+            <select
+              v-model="form.assigned_account_manager_id"
+              :class="inputClass"
+            >
+              <option :value="null">— Select account manager —</option>
+              <option
+                v-for="user in props.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.name }}
+              </option>
+            </select>
+            <div
+              v-if="form.errors.assigned_account_manager_id"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.assigned_account_manager_id }}
+            </div>
+            <div class="mt-1 text-xs text-white/40">
+              Ongoing relationship manager
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Status & GBP -->
       <div class="border-t border-white/10 pt-6 space-y-4">
         <h2 class="text-sm font-semibold text-white/80">
@@ -298,10 +412,18 @@ const activationOptions = [
 
           <div>
             <label :class="labelClass">GBP status</label>
-            <input
+            <select
               v-model="form.google_business_profile_status"
               :class="inputClass"
-            />
+            >
+              <option
+                v-for="opt in gbpStatusOptions"
+                :key="opt.value"
+                :value="opt.value || null"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
             <div
               v-if="form.errors.google_business_profile_status"
               class="mt-1 text-sm text-red-400"
@@ -312,10 +434,18 @@ const activationOptions = [
 
           <div>
             <label :class="labelClass">GBP access status</label>
-            <input
+            <select
               v-model="form.google_business_profile_access_status"
               :class="inputClass"
-            />
+            >
+              <option
+                v-for="opt in gbpAccessOptions"
+                :key="opt.value"
+                :value="opt.value || null"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
             <div
               v-if="form.errors.google_business_profile_access_status"
               class="mt-1 text-sm text-red-400"

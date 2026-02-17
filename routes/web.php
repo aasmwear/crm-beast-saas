@@ -17,26 +17,39 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 // -----------------------------
 // App Controllers
 // -----------------------------
+use App\Http\Controllers\Auth\RegisteredTenantController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Http\Controllers\BillingPageController;
+use App\Http\Controllers\Admin\SubscriptionController;
+use App\Http\Controllers\ClientContactController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\PortalAccessController;
 use App\Http\Controllers\ClientsImportController;
 use App\Http\Controllers\ClientsInertiaController;
 use App\Http\Controllers\ClientsPipelineController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\HRMController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\NotificationCenterController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectCalendarController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\CommentController;
+use App\Http\Controllers\ProjectFileController;
 use App\Http\Controllers\ProjectMessagesController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Portal\DashboardController as PortalDashboardController;
+use App\Http\Controllers\Portal\InvoiceController as PortalInvoiceController;
+use App\Http\Controllers\Portal\PaymentController as PortalPaymentController;
+use App\Http\Controllers\Portal\ProjectController as PortalProjectController;
+use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -139,6 +152,10 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
 
+    // Public SaaS tenant registration (create org + become owner)
+    Route::get('register-company', [RegisteredTenantController::class, 'create'])->name('register.company');
+    Route::post('register-company', [RegisteredTenantController::class, 'store'])->name('register.company.store');
+
     // Login
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
@@ -209,6 +226,11 @@ Route::prefix('org/{organization:slug}')
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
         Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
 
+        Route::post('/clients/{client}/contacts', [ClientContactController::class, 'store'])->name('clients.contacts.store');
+        Route::put('/clients/{client}/contacts/{contact}', [ClientContactController::class, 'update'])->name('clients.contacts.update');
+        Route::delete('/clients/{client}/contacts/{contact}', [ClientContactController::class, 'destroy'])->name('clients.contacts.destroy');
+        Route::post('/clients/{client}/contacts/{contact}/portal-access', [PortalAccessController::class, 'store'])->name('clients.contacts.portal.store');
+
         Route::get('/clients/export', [ClientController::class, 'exportCsv'])->name('clients.export');
 
         /*
@@ -218,6 +240,14 @@ Route::prefix('org/{organization:slug}')
         */
         Route::get('/projects/board', [ProjectBoardController::class, 'index'])->name('projects.board');
         Route::get('/projects/calendar', [ProjectCalendarController::class, 'index'])->name('projects.calendar');
+
+        Route::post('/projects/{project}/comments', [CommentController::class, 'store'])->name('projects.comments.store');
+        Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy')->scopeBindings();
+
+        Route::post('/projects/{project}/files', [ProjectFileController::class, 'store'])->name('projects.files.store');
+        Route::delete('/projects/{project}/files/{projectFile}', [ProjectFileController::class, 'destroy'])->name('projects.files.destroy');
+        Route::patch('/projects/{project}/files/{projectFile}/visibility', [ProjectFileController::class, 'toggleVisibility'])->name('projects.files.toggleVisibility');
+        Route::get('/projects/{project}/files/{projectFile}/download', [ProjectFileController::class, 'download'])->name('projects.files.download');
 
         Route::get('/projects/{project}/messages', [ProjectMessagesController::class, 'index'])->name('projects.messages.index');
         Route::post('/projects/{project}/messages', [ProjectMessagesController::class, 'store'])->name('projects.messages.store');
@@ -248,10 +278,26 @@ Route::prefix('org/{organization:slug}')
 
         /*
         |------------------------------
+        | Invoices
+        |------------------------------
+        */
+        Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
+        Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+        Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
+        Route::post('/invoices/{invoice}/mark-sent', [InvoiceController::class, 'markSent'])->name('invoices.mark-sent');
+        Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
+
+        /*
+        |------------------------------
         | Billing
         |------------------------------
         */
-        Route::get('/billing', [BillingPageController::class, 'index'])->name('billing.index');
+        Route::get('/billing', [SubscriptionController::class, 'index'])->name('billing.index');
+        Route::post('/billing/checkout', [SubscriptionController::class, 'checkout'])->name('billing.checkout');
+        Route::get('/billing/portal', [SubscriptionController::class, 'portal'])->name('billing.portal');
 
         /*
         |------------------------------
@@ -263,6 +309,15 @@ Route::prefix('org/{organization:slug}')
         Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show'])->name('announcements.show');
         Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
         Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+
+        /*
+        |------------------------------
+        | HRM / Employees
+        |------------------------------
+        */
+        Route::get('/hrm', [HRMController::class, 'index'])->name('hrm.index');
+        Route::post('/hrm', [HRMController::class, 'store'])->name('hrm.store');
+        Route::delete('/hrm/{user}', [HRMController::class, 'destroy'])->name('hrm.destroy');
 
         /*
         |------------------------------
@@ -279,6 +334,14 @@ Route::prefix('org/{organization:slug}')
 
         /*
         |------------------------------
+        | Settings
+        |------------------------------
+        */
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::match(['put', 'post'], '/settings', [SettingsController::class, 'update'])->name('settings.update');
+
+        /*
+        |------------------------------
         | Activity / Audit Log
         |------------------------------
         */
@@ -290,6 +353,7 @@ Route::prefix('org/{organization:slug}')
         |------------------------------
         */
         Route::get('/notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/list', [NotificationCenterController::class, 'list'])->name('notifications.list');
         Route::post('/notifications/read-all', [NotificationCenterController::class, 'markAllRead'])->name('notifications.readAll');
         Route::post('/notifications/{notification}/read', [NotificationCenterController::class, 'markRead'])->name('notifications.read');
 
@@ -305,9 +369,19 @@ Route::prefix('org/{organization:slug}')
 
         /*
         |------------------------------
-        | Roles & Permissions (Spatie)
+        | User Management & Role Assignment
         |------------------------------
         */
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+
+        /*
+        |------------------------------
+        | Roles & Permissions (Spatie) — /settings/roles
+        |------------------------------
+        */
+        Route::get('/settings/roles', [RolePermissionController::class, 'index'])->name('roles.index');
+        Route::put('/settings/roles', [RolePermissionController::class, 'update'])->name('roles.update');
         Route::get('/roles-permissions', [RolePermissionController::class, 'editor'])->name('roles.editor');
         Route::post('/roles-permissions/save', [RolePermissionController::class, 'save'])->name('roles.save');
 
@@ -320,14 +394,7 @@ Route::prefix('org/{organization:slug}')
         Route::get('/export/csv/{entity}', [ReportController::class, 'exportCsv'])->name('export.csv');
         Route::post('/backup/snapshot', [ReportController::class, 'snapshot'])->name('backup.snapshot');
 
-        /*
-        |------------------------------
-        | Settings
-        |------------------------------
-        */
-        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-        Route::post('/settings', [SettingsController::class, 'save'])->name('settings.save');
-    });
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -370,6 +437,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Client Portal (role: Client, user has client_id)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['web', 'auth', 'portal'])
+    ->prefix('portal')
+    ->name('portal.')
+    ->group(function () {
+        Route::get('/dashboard', [PortalDashboardController::class, 'index'])->name('dashboard');
+        Route::post('/invoices/{invoice}/pay', [PortalPaymentController::class, 'pay'])->name('invoices.pay');
+        Route::get('/invoices/{invoice}/success', [PortalPaymentController::class, 'success'])->name('invoices.success');
+        Route::get('/projects/{project}', [PortalProjectController::class, 'show'])->name('projects.show');
+        Route::get('/projects/{project}/files/{projectFile}/download', [PortalProjectController::class, 'downloadFile'])->name('projects.files.download');
+        Route::get('/invoices/{invoice}/download', [PortalInvoiceController::class, 'download'])->name('invoices.download');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Stripe Webhook (no auth, no CSRF)
+|--------------------------------------------------------------------------
+*/
+Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('webhooks.stripe');
 
 // Fallback Inertia route for 404s, etc. (optional)
 Route::fallback(function () {

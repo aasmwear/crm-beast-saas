@@ -1,6 +1,7 @@
 <template>
   <div class="space-y-6">
-    <!-- Hero -->
+    <!-- Hero + Date Picker + Stat Cards (Admins only) -->
+    <template v-if="$page.props.auth?.is_admin">
     <section
       class=".hero-slab"
     >
@@ -23,20 +24,71 @@
       </div>
     </section>
 
-    <!-- KPIs -->
+    <!-- Top Row: KPI Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <Card title="Total Revenue" class="card-neo">
+        <div class="text-2xl font-semibold text-white">
+          {{ formatCurrency(kpis.total_revenue ?? 0) }}
+        </div>
+      </Card>
+      <Card title="Outstanding" class="card-neo">
+        <div class="text-2xl font-semibold text-red-400">
+          {{ formatCurrency(kpis.outstanding_revenue ?? 0) }}
+        </div>
+      </Card>
+      <Card title="Active Projects" class="card-neo">
+        <div class="text-2xl font-semibold text-blue-400">
+          {{ kpis.active_projects ?? 0 }}
+        </div>
+      </Card>
+    </section>
+
+    <!-- Middle Row: Charts -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card title="Revenue History" class="card-neo">
+        <BarChart
+          :labels="monthlyRevenue.labels"
+          :values="monthlyRevenue.values"
+        />
+      </Card>
+      <Card title="Project Distribution" class="card-neo">
+        <DoughnutChart
+          :labels="projectStatus.labels"
+          :values="projectStatus.values"
+        />
+      </Card>
+    </section>
+
+    <!-- Bottom Row: Recent Activity -->
+    <section>
+      <Card title="Recent Activity" class="card-neo">
+        <ActivityFeed :activities="activities" />
+      </Card>
+    </section>
+
+    <!-- Legacy KPIs -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Card title="Clients (30d) card-neo">
+      <Card title="Clients (30d)" class="card-neo">
         <div class="text-4xl font-semibold mb-2">{{ stats.clients }}</div>
         <MiniArea :labels="clients30d.labels" :values="clients30d.values" />
       </Card>
-      <Card title="Projects (30d) card-neo">
+      <Card title="Projects (30d)" class="card-neo">
         <div class="text-4xl font-semibold mb-2">{{ stats.projects }}</div>
         <MiniArea :labels="projects30d.labels" :values="projects30d.values" />
       </Card>
-      <Card title="Tasks (30d) card-neo">
+      <Card title="Tasks (30d)" class="card-neo">
         <div class="text-4xl font-semibold mb-2">{{ stats.tasks }}</div>
         <MiniArea :labels="tasks30d.labels" :values="tasks30d.values" />
       </Card>
+    </section>
+    </template>
+
+    <!-- Attendance Clock Widget (Employees only) -->
+    <section v-if="!$page.props.auth?.is_admin">
+      <ClockWidget
+        :current="currentAttendance"
+        :organization-slug="org"
+      />
     </section>
 
     <!-- Charts + lists -->
@@ -122,10 +174,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePage, Link } from '@inertiajs/vue3' 
+import ActivityFeed from '@/Components/ActivityFeed.vue'
 import Card from '@/Components/ui/Card.vue'
+import BarChart from '@/Components/charts/BarChart.vue'
+import DoughnutChart from '@/Components/charts/DoughnutChart.vue'
 import MiniArea from '@/Components/charts/MiniArea.vue'
 import DonutChart from '@/Components/charts/DonutChart.vue'
 import DateRangeButton from '@/Components/ui/DateRangeButton.vue'
+import ClockWidget from '@/Components/Attendance/ClockWidget.vue'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
@@ -160,21 +216,59 @@ const dateRange = computed(() => ({
 
 const props = defineProps<{
   stats: { clients: number; projects: number; tasks: number }
+  kpis?: {
+    total_revenue: number
+    outstanding_revenue: number
+    active_projects: number
+  }
   charts?: {
     clients30d?: { labels: string[]; values: number[] }
     projects30d?: { labels: string[]; values: number[] }
     tasks30d?: { labels: string[]; values: number[] }
     workload?: { labels: string[]; values: number[] }
     tasksByAssignee?: { labels: string[]; values: number[] }
+    monthly_revenue?: { labels: string[]; values: number[] }
+    project_status?: { labels: string[]; values: number[] }
   }
+  activities?: Array<{
+    id: number
+    description: string
+    properties: Record<string, unknown> | null
+    created_at: string | null
+    user: { id: number; name: string } | null
+  }>
   recent?: Array<{ id: number | string; when: string; message: string }>
   deadlines?: Array<{ id: number | string; title: string; due: string }>
-  // IMPORTANT: The raw dates are passed down to the DateRangeButton
-  startDateFormatted?: string;
-  endDateFormatted?: string;
-  rawStartDate: string; // Must be present
-  rawEndDate: string; // Must be present
+  currentAttendance?: {
+    id: number
+    clock_in_at: string
+    clock_out_at: string | null
+    status: string
+  } | null
+  startDateFormatted?: string
+  endDateFormatted?: string
+  rawStartDate: string
+  rawEndDate: string
 }>()
+
+function formatCurrency(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100)
+}
+
+const kpis = computed(() => props.kpis ?? {
+  total_revenue: 0,
+  outstanding_revenue: 0,
+  active_projects: 0,
+})
+
+const monthlyRevenue = computed(() => props.charts?.monthly_revenue ?? { labels: [], values: [] })
+const projectStatus = computed(() => props.charts?.project_status ?? { labels: ['Active', 'Completed', 'On Hold'], values: [0, 0, 0] })
+const activities = computed(() => props.activities ?? [])
 
 const labels30 = Array.from({ length: 12 }, (_, i) => `W${i + 1}`)
 const zeros12 = Array(12).fill(0)

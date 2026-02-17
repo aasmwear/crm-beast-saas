@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import EmptyState from '@/Components/ui/EmptyState.vue'
 import TaskDrawer from '@/Components/tasks/TaskDrawer.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
@@ -76,6 +77,17 @@ const projectFilter = ref<string | null>(
 const dueFromFilter = ref<string>(props.filters?.due_from ?? '')
 const dueToFilter = ref<string>(props.filters?.due_to ?? '')
 const search = ref<string>(props.filters?.search ?? '')
+
+const hasFilters = computed(() =>
+  !!(
+    statusFilter.value ||
+    mineFilter.value ||
+    projectFilter.value ||
+    dueFromFilter.value ||
+    dueToFilter.value ||
+    search.value
+  ),
+)
 
 const statusOptions = [
   { value: '', label: 'All statuses' },
@@ -375,8 +387,30 @@ function closeDrawer() {
         <div>Due</div>
       </div>
 
-      <div v-if="!props.tasks.data.length" class="px-4 py-6 text-center text-sm text-white/60">
-        No tasks match your filters.
+      <div v-if="!props.tasks.data.length" class="px-4 py-6">
+        <EmptyState
+          :title="hasFilters ? 'No tasks match your filters' : 'All caught up!'"
+          :description="hasFilters ? 'Try adjusting your filters to see more tasks.' : 'No active tasks right now.'"
+          icon="✓"
+        >
+          <template v-if="hasFilters" #action>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition"
+              @click="resetFilters"
+            >
+              Reset filters
+            </button>
+          </template>
+          <template v-else #action>
+            <Link
+              :href="r('projects.index', { organization: org })"
+              class="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition"
+            >
+              View projects
+            </Link>
+          </template>
+        </EmptyState>
       </div>
 
       <div

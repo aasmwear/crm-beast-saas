@@ -3,130 +3,109 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    /**
+     * Global Cockpit: System Overview for Super Admins.
+     * KPIs: total tenants, total users, active tenants (30d), recent tenants.
+     * Chart: tenant growth per month (last 6 months).
+     */
     public function index(): Response
     {
-        // Totals
-        $stats = [
-            'organizations' => (int) DB::table('organizations')->count(),
-            'users' => (int) DB::table('users')->count(),
-            'clients' => (int) DB::table('clients')->count(),
-            'projects' => (int) DB::table('projects')->count(),
-            'tasks' => (int) DB::table('tasks')->count(),
-        ];
+        $now = now();
 
-        // Recent organizations
-        $recentOrgs = DB::table('organizations')
-            ->latest('id')
-            ->limit(6)
-            ->get(['id', 'name', 'slug', 'created_at']);
+        // KPIs
+        $totalTenants = (int) DB::table('organizations')->count();
+        $totalUsers = (int) DB::table('users')->count();
 
-        // New orgs/users last 30 days (for the sparkline)
-        $orgsByDay = $this->seriesByDay('organizations', 'created_at', 30);
-        $usersByDay = $this->seriesByDay('users', 'created_at', 30);
+        // Active tenants: orgs with login or activity in last 30 days (proxy: orgs with recent project/task/client/org creation)
+        $thirtyDaysAgo = $now->copy()->subDays(30);
+        $activeTenants30d = (int) DB::table('organizations')
+            ->where(function ($q) use ($thirtyDaysAgo) {
+                $q->where('organizations.created_at', '>=', $thirtyDaysAgo)
+                    ->orWhereExists(function ($sub) use ($thirtyDaysAgo) {
+                        $sub->selectRaw(1)
+                            ->from('projects')
+                            ->whereColumn('projects.organization_id', 'organizations.id')
+                            ->where('projects.created_at', '>=', $thirtyDaysAgo);
+                    })
+                    ->orWhereExists(function ($sub) use ($thirtyDaysAgo) {
+                        $sub->selectRaw(1)
+                            ->from('tasks')
+                            ->whereColumn('tasks.organization_id', 'organizations.id')
+                            ->where('tasks.created_at', '>=', $thirtyDaysAgo);
+                    })
+                    ->orWhereExists(function ($sub) use ($thirtyDaysAgo) {
+                        $sub->selectRaw(1)
+                            ->from('clients')
+                            ->whereColumn('clients.organization_id', 'organizations.id')
+                            ->where('clients.created_at', '>=', $thirtyDaysAgo);
+                    });
+            })
+            ->count();
 
-        // Donut: projects by status (Active/Paused/Pending/Completed)
-        $projectStatus = $this->countsBy('projects', 'status', [
-            'Active', 'Paused', 'Pending', 'Completed',
-        ]);
+        // Recent tenants: last 5 created organizations, with owner email
+        $recentTenants = DB::table('organizations')
+            ->select([
+                'organizations.id',
+                'organizations.name',
+                'organizations.slug',
+                'organizations.created_at',
+                DB::raw("(SELECT u.email FROM organization_user ou JOIN users u ON u.id = ou.user_id WHERE ou.organization_id = organizations.id AND ou.is_owner = true LIMIT 1) as owner_email"),
+            ])
+            ->orderByDesc('organizations.created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'name' => $row->name,
+                'slug' => $row->slug,
+                'created_at' => $row->created_at,
+                'owner_email' => $row->owner_email ?? '—',
+            ])
+            ->values()
+            ->all();
 
-        // Mini cards: task review/submit pipeline (optional but nice)
-        $taskFlow = $this->countsBy('tasks', 'review_status', [
-            'Not Submitted', 'Submitted', 'Approved', 'Rejected',
-        ]);
-
-        // “Transactions” table: latest activity (use your notifications table)
-        $activity = DB::table('notifications')
-            ->orderByDesc('id')
-            ->limit(8)
-            ->get(['id', 'type', 'data', 'created_at']);
+        // Tenant growth: new tenants per month for last 6 months
+        $tenantGrowth = $this->monthlyTenantGrowth(6);
 
         return Inertia::render('Admin/Dashboard', [
-            'stats' => $stats,
-            'recentOrgs' => $recentOrgs,
-            // charts
-            'spark' => [
-                'labels' => $orgsByDay['labels'],
-                'values' => $orgsByDay['values'],
-                'title' => 'New organizations (30d)',
+            'kpis' => [
+                'total_tenants' => $totalTenants,
+                'total_users' => $totalUsers,
+                'active_tenants_30d' => $activeTenants30d,
             ],
-            'sparkUsers' => [
-                'labels' => $usersByDay['labels'],
-                'values' => $usersByDay['values'],
-                'title' => 'New users (30d)',
-            ],
-            'projectsDonut' => [
-                'labels' => array_keys($projectStatus),
-                'values' => array_values($projectStatus),
-                'center' => 'Projects',
-            ],
-            'taskFlow' => [
-                'labels' => array_keys($taskFlow),
-                'values' => array_values($taskFlow),
-            ],
-            'activity' => $activity,
+            'recent_tenants' => $recentTenants,
+            'tenant_growth' => $tenantGrowth,
+            'system_status' => 'operational',
         ]);
     }
 
     /**
-     * Return daily counts for the last N days.
+     * New tenants created per month for the last N months.
      *
-     * @return array{labels: array<int,string>, values: array<int,int>}
+     * @return array{labels: list<string>, values: list<int>}
      */
-    private function seriesByDay(string $table, string $column, int $days = 30): array
+    private function monthlyTenantGrowth(int $months = 6): array
     {
-        $start = now()->startOfDay()->subDays($days - 1);
-
-        $raw = DB::table($table)
-            ->selectRaw("to_char(date_trunc('day', {$column}), 'YYYY-MM-DD') as d, count(*) as c")
-            ->where($column, '>=', $start)
-            ->groupBy('d')
-            ->orderBy('d')
-            ->pluck('c', 'd')
-            ->all(); // ['2025-10-01' => 3, ...]
-
         $labels = [];
         $values = [];
-        for ($i = 0; $i < $days; $i++) {
-            /** @var Carbon $day */
-            $day = (clone $start)->addDays($i);
-            $key = $day->format('Y-m-d');
-            $labels[] = $day->format('M d');
-            /** @var int $val */
-            $val = (int) ($raw[$key] ?? 0);
-            $values[] = $val;
+
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $labels[] = $date->format('M Y');
+            $start = $date->copy()->startOfMonth();
+            $end = $date->copy()->endOfMonth();
+
+            $values[] = (int) DB::table('organizations')
+                ->whereBetween('created_at', [$start, $end])
+                ->count();
         }
 
         return ['labels' => $labels, 'values' => $values];
-    }
-
-    /**
-     * Count rows grouped by a field, returned as ordered label => value map.
-     *
-     * @param  array<int,string>  $order
-     * @return array<string,int>
-     */
-    private function countsBy(string $table, string $field, array $order): array
-    {
-        $rows = DB::table($table)
-            ->select($field, DB::raw('count(*) as c'))
-            ->groupBy($field)
-            ->pluck('c', $field)
-            ->all();
-
-        $result = [];
-        foreach ($order as $label) {
-            /** @var int $val */
-            $val = (int) ($rows[$label] ?? 0);
-            $result[$label] = $val;
-        }
-
-        return $result;
     }
 }

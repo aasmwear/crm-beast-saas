@@ -7,24 +7,58 @@ use Illuminate\Database\Eloquent\Factories\Factory as EloquentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Concerns\Commentable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Schema;
 
+/**
+ * Project model.
+ *
+ * @property int $id
+ * @property int $organization_id
+ * @property int $client_id
+ * @property string $title
+ * @property string|null $project_code
+ * @property string|null $description
+ * @property int|null $project_manager_id
+ * @property int|null $department_id
+ * @property \Illuminate\Support\Carbon|null $start_date
+ * @property \Illuminate\Support\Carbon|null $end_date
+ * @property string $status
+ * @property int|null $budget_cents
+ * @property int|null $price_cents
+ * @property float|null $budget
+ * @property float|null $price
+ * @property string $currency
+ * @property bool $billable
+ * @property string|null $gbp_status
+ * @property string|null $client_activation_status
+ * @property string|null $notes_cst
+ * @property string|null $notes_sales
+ * @property string|null $notes_tech
+ * @property array|null $attachments
+ * @property array|null $custom_fields
+ *
+ * @method static Builder<Project> query()
+ *
+ * @mixin \Eloquent
+ */
 final class Project extends Model
 {
-    /**
-     * @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Database\Factories\ProjectFactory>
-     *
-     * @phpstan-use \Illuminate\Database\Eloquent\Factories\HasFactory<\Database\Factories\ProjectFactory>
-     */
+    use Commentable;
     use HasFactory;
 
     protected $fillable = [
         'organization_id', 'client_id', 'title', 'project_code', 'description',
         'project_manager_id', 'department_id', 'start_date', 'end_date',
-        'status', 'budget', 'price', 'billable', 'google_business_profile_status',
-        'google_business_profile_access_status', 'client_activation_status',
-        'notes_by_cst', 'notes_by_sales', 'notes_by_tech', 'attachments', 'custom_fields',
+        'status', 'budget_cents', 'price_cents', 'budget', 'price', 'currency', 'billable', 'gbp_status',
+        'client_activation_status',
+        'notes_cst', 'notes_sales', 'notes_tech', 'attachments', 'custom_fields',
     ];
+
+    protected $appends = ['budget', 'price'];
 
     protected $casts = [
         'billable' => 'boolean',
@@ -75,6 +109,70 @@ final class Project extends Model
     }
 
     /**
+     * Budget in decimal form (for display and form binding). Stored as budget_cents in DB when that column exists.
+     */
+    protected function budget(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function (): ?float {
+                if (\array_key_exists('budget_cents', $this->attributes) && $this->attributes['budget_cents'] !== null) {
+                    return (float) ($this->attributes['budget_cents'] / 100);
+                }
+                if (\array_key_exists('budget', $this->attributes) && $this->attributes['budget'] !== null) {
+                    return (float) $this->attributes['budget'];
+                }
+
+                return null;
+            },
+            set: function ($value): array {
+                $num = $value !== null && $value !== '' ? (float) $value : null;
+                if (Schema::hasColumn($this->getTable(), 'budget_cents')) {
+                    return ['budget_cents' => $num !== null ? (int) round($num * 100) : null];
+                }
+
+                return ['budget' => $num];
+            },
+        );
+    }
+
+    /**
+     * Price (billable amount) in decimal form. Stored as price_cents in DB when that column exists.
+     */
+    protected function price(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function (): ?float {
+                if (\array_key_exists('price_cents', $this->attributes) && $this->attributes['price_cents'] !== null) {
+                    return (float) ($this->attributes['price_cents'] / 100);
+                }
+                if (\array_key_exists('price', $this->attributes) && $this->attributes['price'] !== null) {
+                    return (float) $this->attributes['price'];
+                }
+
+                return null;
+            },
+            set: function ($value): array {
+                $num = $value !== null && $value !== '' ? (float) $value : null;
+                if (Schema::hasColumn($this->getTable(), 'price_cents')) {
+                    return ['price_cents' => $num !== null ? (int) round($num * 100) : null];
+                }
+
+                return ['price' => $num];
+            },
+        );
+    }
+
+    /**
+     * Team members assigned to the project (many-to-many).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<\App\Models\User, \App\Models\Project>
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_user');
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Task, \App\Models\Project>
      *
      * @phpstan-return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Task, $this>
@@ -82,6 +180,22 @@ final class Project extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\ProjectFile, \App\Models\Project>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(ProjectFile::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\App\Models\Activity, \App\Models\Project>
+     */
+    public function activities(): MorphMany
+    {
+        return $this->morphMany(\App\Models\Activity::class, 'subject');
     }
 
     /**

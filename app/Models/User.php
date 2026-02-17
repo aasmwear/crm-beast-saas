@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Cashier\Billable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -21,6 +20,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $name
  * @property string $email
  * @property int|null $active_organization_id
+ * @property int|null $client_id
  * @property bool $is_super_admin
  * @property array<string, mixed>|null $notification_prefs
  * @property \App\Models\Organization $activeOrganization
@@ -28,7 +28,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use Billable, HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     protected string $guard_name = 'web';
 
@@ -37,7 +37,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'department_id',
+        'designation',
+        'joining_date',
         'active_organization_id',
+        'client_id',
         'notification_prefs',
     ];
 
@@ -48,6 +51,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'joining_date' => 'date',
         'notification_prefs' => 'array',
         'is_super_admin' => 'boolean',
     ];
@@ -87,6 +91,14 @@ class User extends Authenticatable implements MustVerifyEmail
         $rel = $this->belongsTo(Organization::class, 'active_organization_id');
 
         return $rel;
+    }
+
+    /**
+     * @return BelongsTo<\App\Models\Client, \App\Models\User>
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 
     /**

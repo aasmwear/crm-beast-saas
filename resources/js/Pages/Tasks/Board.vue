@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import TaskDrawer from '@/Components/tasks/TaskDrawer.vue'
+import { useRealtime } from '@/Composables/useRealtime'
+import type { TaskMovedPayload, TaskUpdatedPayload } from '@/Composables/useRealtime'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -24,6 +26,7 @@ interface BoardTask {
 const props = defineProps<{
   organization: { id: number; name: string; slug: string }
   tasks: BoardTask[]
+  projectId?: number // Optional: if viewing a single project's task board
 }>()
 
 const page = usePage()
@@ -32,6 +35,74 @@ const orgSlug = computed(() => {
   const p = page.props as any
   return props.organization?.slug ?? p?.tenant?.slug ?? p?.organization?.slug ?? 'acme'
 })
+
+// ========================================
+// REALTIME SETUP
+// ========================================
+const { subscribeToProject, unsubscribeAll, isReady } = useRealtime()
+
+// Track local task state (for realtime updates)
+const localTasks = ref<BoardTask[]>([...props.tasks])
+
+// Subscribe to realtime updates if viewing a specific project
+onMounted(() => {
+  if (props.projectId && isReady()) {
+    console.log('[TaskBoard] Subscribing to project realtime updates:', props.projectId)
+    
+    subscribeToProject(props.organization.id, props.projectId, {
+      onTaskMoved: handleTaskMoved,
+      onTaskUpdated: handleTaskUpdated,
+    })
+  } else if (isReady()) {
+    console.log('[TaskBoard] Realtime: Not subscribing (multi-project board)')
+  } else {
+    console.warn('[TaskBoard] Laravel Echo not initialized')
+  }
+})
+
+onUnmounted(() => {
+  unsubscribeAll()
+})
+
+/**
+ * Handle TaskMoved event (status change).
+ */
+function handleTaskMoved(data: TaskMovedPayload) {
+  console.log('[TaskBoard] Task moved:', data)
+  
+  const task = localTasks.value.find(t => t.id === data.task_id)
+  if (task) {
+    // Update status in local state
+    task.status = data.new_status
+    
+    // Optional: Show a toast notification
+    console.log(`[TaskBoard] Task #${data.task_id} moved to ${data.new_status}`)
+  } else {
+    // Task not in current view, might need to refresh
+    console.log('[TaskBoard] Task moved but not in current view, consider refreshing')
+  }
+}
+
+/**
+ * Handle TaskUpdated event (detail changes).
+ */
+function handleTaskUpdated(data: TaskUpdatedPayload) {
+  console.log('[TaskBoard] Task updated:', data)
+  
+  const task = localTasks.value.find(t => t.id === data.task_id)
+  if (task) {
+    // Apply changes to local task
+    if (data.changes.title) task.title = data.changes.title as string
+    if (data.changes.priority) task.priority = data.changes.priority as string
+    if (data.changes.due_date) task.due_date = data.changes.due_date as string
+    
+    console.log(`[TaskBoard] Task #${data.task_id} updated with changes:`, Object.keys(data.changes))
+  }
+}
+
+// ========================================
+// END REALTIME SETUP
+// ========================================
 
 const columns = [
   { key: 'todo', label: 'Todo' },
@@ -62,7 +133,7 @@ function normalizeStatus(status: string | null | undefined): ColumnKey {
 }
 
 function tasksInColumn(key: ColumnKey): BoardTask[] {
-  return props.tasks.filter((t) => normalizeStatus(t.status) === key)
+  return localTasks.value.filter((t) => normalizeStatus(t.status) === key)
 }
 
 function priorityClass(priority: string | null): string {
@@ -103,6 +174,10 @@ function updateStatus(task: BoardTask, columnKey: ColumnKey) {
 
   isUpdating.value = task.id
 
+  // Optimistic update
+  const oldStatus = task.status
+  task.status = col.label
+
   router.put(
     route('tasks.update', {
       organization: orgSlug.value,
@@ -114,6 +189,10 @@ function updateStatus(task: BoardTask, columnKey: ColumnKey) {
       preserveState: true,
       onFinish: () => {
         isUpdating.value = null
+      },
+      onError: () => {
+        // Revert on error
+        task.status = oldStatus
       },
     },
   )

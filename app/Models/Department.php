@@ -6,6 +6,17 @@ use Illuminate\Database\Eloquent\Factories\Factory as EloquentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Department model.
+ *
+ * @property int $id
+ * @property int $organization_id
+ * @property string $name
+ * @property string $code
+ * @property bool $is_pm_capable
+ *
+ * @mixin \Eloquent
+ */
 final class Department extends Model
 {
     /**
@@ -15,8 +26,14 @@ final class Department extends Model
      */
     use HasFactory;
 
-    // Match the actual table schema: no 'description' column
-    protected $fillable = ['organization_id', 'name', 'code'];
+    protected $fillable = ['organization_id', 'name', 'code', 'is_pm_capable'];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'is_pm_capable' => 'boolean',
+    ];
 
     /**
      * @return \Database\Factories\DepartmentFactory

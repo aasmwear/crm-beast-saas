@@ -23,17 +23,19 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $primary_contact_phone
  * @property string|null $website
  * @property string|null $address
- * @property array<int, int>|null $fronter
- * @property array<int, int>|null $closer
+ * @property int|null $fronter_id
+ * @property int|null $closer_id
  * @property array<int, string>|null $tags
  * @property int|null $assigned_account_manager_id
- * @property string|null $google_business_profile_status
- * @property string|null $google_business_profile_access_status
+ * @property string|null $gbp_status
+ * @property string|null $gbp_access
  * @property string|null $client_activation_status
- * @property string|null $notes_by_cst
- * @property string|null $notes_by_sales
- * @property string|null $notes_by_tech
+ * @property string|null $notes_cst
+ * @property string|null $notes_sales
+ * @property string|null $notes_tech
  * @property string|null $status
+ * @property string|null $tax_id
+ * @property string $currency
  *
  * @method static Builder<Client> query()
  * @method static ClientFactory factory($count = null, $state = [])
@@ -62,16 +64,18 @@ final class Client extends Model
         'primary_contact_phone',
         'website',
         'address',
+        'tax_id',
+        'currency',
         'tags',
-        'fronter',
-        'closer',
+        'fronter_id',
+        'closer_id',
         'assigned_account_manager_id',
-        'google_business_profile_status',
-        'google_business_profile_access_status',
+        'gbp_status',
+        'gbp_access',
         'client_activation_status',
-        'notes_by_cst',
-        'notes_by_sales',
-        'notes_by_tech',
+        'notes_cst',
+        'notes_sales',
+        'notes_tech',
         'status',
     ];
 
@@ -80,8 +84,6 @@ final class Client extends Model
      */
     protected $casts = [
         'tags' => 'array',
-        'fronter' => 'array',
-        'closer' => 'array',
     ];
 
     /**
@@ -102,6 +104,50 @@ final class Client extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    /**
+     * @return HasMany<ClientContact, Client>
+     *
+     * @phpstan-return HasMany<ClientContact, $this>
+     */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(ClientContact::class);
+    }
+
+    /**
+     * @return HasMany<Invoice, Client>
+     *
+     * @phpstan-return HasMany<Invoice, $this>
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Fronter (sales lead) relation - single user responsible for initial contact.
+     *
+     * @return BelongsTo<User, Client>
+     *
+     * @phpstan-return BelongsTo<User, $this>
+     */
+    public function fronter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fronter_id');
+    }
+
+    /**
+     * Closer (sales closer) relation - single user responsible for closing the deal.
+     *
+     * @return BelongsTo<User, Client>
+     *
+     * @phpstan-return BelongsTo<User, $this>
+     */
+    public function closer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closer_id');
     }
 
     /**
@@ -132,8 +178,8 @@ final class Client extends Model
      *
      * - Super Admins, Admins and Owners can see **all** clients in the organization.
      * - Everyone else only sees clients where:
-     *   - their id appears in `fronter` JSON, or
-     *   - their id appears in `closer` JSON, or
+     *   - `fronter_id` = their id, or
+     *   - `closer_id` = their id, or
      *   - `assigned_account_manager_id` = their id, or
      *   - they are `project_manager_id` on at least one related project.
      *   - they are assigned to at least one task on any related project.
@@ -150,8 +196,8 @@ final class Client extends Model
         $uid = $user->id;
 
         return $q->where(function (Builder $qq) use ($uid): void {
-            $qq->whereJsonContains('fronter', $uid)
-                ->orWhereJsonContains('closer', $uid)
+            $qq->where('fronter_id', $uid)
+                ->orWhere('closer_id', $uid)
                 ->orWhere('assigned_account_manager_id', $uid)
                 ->orWhereHas('projects', static function (Builder $qp) use ($uid): void {
                     $qp->where('project_manager_id', $uid);

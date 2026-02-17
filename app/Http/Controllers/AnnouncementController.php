@@ -16,6 +16,8 @@ class AnnouncementController extends Controller
      */
     public function index(Request $request, Organization $organization): Response
     {
+        $this->authorize('viewAny', Announcement::class);
+
         $announcements = Announcement::query()
             ->forOrganization($organization->id)
             ->orderByDesc('pinned')
@@ -46,6 +48,8 @@ class AnnouncementController extends Controller
      */
     public function store(Request $request, Organization $organization): RedirectResponse
     {
+        $this->authorize('create', Announcement::class);
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'body' => ['nullable', 'string'],
@@ -75,6 +79,8 @@ class AnnouncementController extends Controller
             abort(404);
         }
 
+        $this->authorize('update', $announcement);
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'body' => ['nullable', 'string'],
@@ -101,6 +107,8 @@ class AnnouncementController extends Controller
         if ((int) $announcement->organization_id !== (int) $organization->id) {
             abort(404);
         }
+
+        $this->authorize('delete', $announcement);
 
         $announcement->delete();
 

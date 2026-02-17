@@ -22,9 +22,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => bcrypt('password'),
             'remember_token' => Str::random(10),
-            // Multitenant defaults
-            'active_organization_id' => Organization::factory(), // FIX: Use correct FK name
-            'department_id' => null,
+            
         ];
     }
 

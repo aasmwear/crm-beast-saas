@@ -150,7 +150,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
     ...{ class: "ms-2 text-sm text-gray-600" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "mt-4 flex items-center justify-end" },
+    ...{ class: "mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "flex flex-wrap gap-x-4 gap-y-1 text-sm" },
 });
 if (__VLS_ctx.canResetPassword) {
     const __VLS_29 = {}.Link;
@@ -158,29 +161,42 @@ if (__VLS_ctx.canResetPassword) {
     // @ts-ignore
     const __VLS_30 = __VLS_asFunctionalComponent(__VLS_29, new __VLS_29({
         href: (__VLS_ctx.route('password.request')),
-        ...{ class: "rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" },
+        ...{ class: "text-gray-600 underline hover:text-gray-900" },
     }));
     const __VLS_31 = __VLS_30({
         href: (__VLS_ctx.route('password.request')),
-        ...{ class: "rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" },
+        ...{ class: "text-gray-600 underline hover:text-gray-900" },
     }, ...__VLS_functionalComponentArgsRest(__VLS_30));
     __VLS_32.slots.default;
     var __VLS_32;
 }
+const __VLS_33 = {}.Link;
+/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+// @ts-ignore
+const __VLS_34 = __VLS_asFunctionalComponent(__VLS_33, new __VLS_33({
+    href: (__VLS_ctx.route('register.company')),
+    ...{ class: "text-gray-600 underline hover:text-gray-900" },
+}));
+const __VLS_35 = __VLS_34({
+    href: (__VLS_ctx.route('register.company')),
+    ...{ class: "text-gray-600 underline hover:text-gray-900" },
+}, ...__VLS_functionalComponentArgsRest(__VLS_34));
+__VLS_36.slots.default;
+var __VLS_36;
 /** @type {[typeof PrimaryButton, typeof PrimaryButton, ]} */ ;
 // @ts-ignore
-const __VLS_33 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
-    ...{ class: "ms-4" },
+const __VLS_37 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
+    ...{ class: "sm:ms-4" },
     ...{ class: ({ 'opacity-25': __VLS_ctx.form.processing }) },
     disabled: (__VLS_ctx.form.processing),
 }));
-const __VLS_34 = __VLS_33({
-    ...{ class: "ms-4" },
+const __VLS_38 = __VLS_37({
+    ...{ class: "sm:ms-4" },
     ...{ class: ({ 'opacity-25': __VLS_ctx.form.processing }) },
     disabled: (__VLS_ctx.form.processing),
-}, ...__VLS_functionalComponentArgsRest(__VLS_33));
-__VLS_35.slots.default;
-var __VLS_35;
+}, ...__VLS_functionalComponentArgsRest(__VLS_37));
+__VLS_39.slots.default;
+var __VLS_39;
 var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['mb-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
@@ -204,18 +220,23 @@ var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['justify-end']} */ ;
-/** @type {__VLS_StyleScopedClasses['rounded-md']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm:flex-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm:items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm:justify-between']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-x-4']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-y-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
 /** @type {__VLS_StyleScopedClasses['underline']} */ ;
 /** @type {__VLS_StyleScopedClasses['hover:text-gray-900']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:ring-2']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-500']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:ring-offset-2']} */ ;
-/** @type {__VLS_StyleScopedClasses['ms-4']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['underline']} */ ;
+/** @type {__VLS_StyleScopedClasses['hover:text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm:ms-4']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {

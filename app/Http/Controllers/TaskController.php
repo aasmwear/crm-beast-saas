@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskMoved;
+use App\Events\TaskUpdated;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskAssigned;
+use App\Services\ActivityLogger;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -128,6 +132,8 @@ final class TaskController extends Controller
 
         return DB::transaction(function () use ($data, $org, $request): RedirectResponse {
             $task = Task::create($data);
+            $currentUserId = $request->user()->id;
+            $assignerName = $request->user()->name;
 
             AuditLogger::log(
                 $org,
@@ -137,6 +143,15 @@ final class TaskController extends Controller
                 (int) $task->id,
                 $data,
             );
+
+            $assigneeIds = array_filter(array_unique($data['assignees'] ?? []));
+            if ($assigneeIds !== []) {
+                User::query()
+                    ->whereIn('id', $assigneeIds)
+                    ->where('id', '!=', $currentUserId)
+                    ->get()
+                    ->each(fn (User $u) => $u->notify(new TaskAssigned($task, $assignerName)));
+            }
 
             return back()->with('success', 'Task created');
         });
@@ -277,6 +292,19 @@ final class TaskController extends Controller
 
             $after = $task->getAttributes();
 
+            if (array_key_exists('assignees', $update)) {
+                $currentUserId = $request->user()->id;
+                $assignerName = $request->user()->name;
+                $assigneeIds = array_filter(array_unique((array) ($task->assignees ?? [])));
+                if ($assigneeIds !== []) {
+                    User::query()
+                        ->whereIn('id', $assigneeIds)
+                        ->where('id', '!=', $currentUserId)
+                        ->get()
+                        ->each(fn (User $u) => $u->notify(new TaskAssigned($task, $assignerName)));
+                }
+            }
+
             AuditLogger::log(
                 $org,
                 $request->user(),
@@ -289,7 +317,47 @@ final class TaskController extends Controller
                 ],
             );
 
-            if (array_key_exists('status', $update) && ($before['status'] ?? null) !== ($after['status'] ?? null)) {
+            // ========================================
+            // REALTIME EVENT DISPATCHING
+            // ========================================
+
+            // Detect if status changed (task was moved)
+            $statusChanged = array_key_exists('status', $update) && ($before['status'] ?? null) !== ($after['status'] ?? null);
+
+            if ($statusChanged) {
+                $newStatus = (string) ($after['status'] ?? '');
+                $oldStatus = (string) ($before['status'] ?? '');
+                $completedStatuses = ['completed', 'done', 'closed', 'finished'];
+                if (in_array(strtolower($newStatus), $completedStatuses, true)) {
+                    $task->load('project');
+                    ActivityLogger::log(
+                        $request->user(),
+                        $task,
+                        'completed the task',
+                        ['old_status' => $oldStatus, 'new_status' => $newStatus, 'task_title' => $task->title],
+                    );
+                    // Also log on project for project activity feed
+                    if ($task->project) {
+                        ActivityLogger::log(
+                            $request->user(),
+                            $task->project,
+                            'task completed: ' . $task->title,
+                            ['task_id' => $task->id, 'old_status' => $oldStatus, 'new_status' => $newStatus],
+                        );
+                    }
+                }
+
+                // Dispatch TaskMoved event for Kanban board updates
+                TaskMoved::dispatch(
+                    taskId: (int) $task->id,
+                    projectId: (int) $task->project_id,
+                    organizationId: (int) $task->organization_id,
+                    newStatus: (string) $after['status'],
+                    newSortOrder: (string) ($after['sort_order'] ?? ''),
+                    movedBy: (int) $request->user()->id,
+                );
+
+                // Audit log for status change
                 AuditLogger::log(
                     $org,
                     $request->user(),
@@ -302,6 +370,29 @@ final class TaskController extends Controller
                     ],
                 );
             }
+
+            // Detect if other fields changed (not just status)
+            $detailChanges = [];
+            foreach (['title', 'description', 'priority', 'due_date', 'assignees', 'estimated_hours'] as $field) {
+                if (array_key_exists($field, $update) && ($before[$field] ?? null) !== ($after[$field] ?? null)) {
+                    $detailChanges[$field] = $after[$field];
+                }
+            }
+
+            if (! empty($detailChanges)) {
+                // Dispatch TaskUpdated event for detail changes
+                TaskUpdated::dispatch(
+                    taskId: (int) $task->id,
+                    projectId: (int) $task->project_id,
+                    organizationId: (int) $task->organization_id,
+                    changes: $detailChanges,
+                    updatedBy: (int) $request->user()->id,
+                );
+            }
+
+            // ========================================
+            // END REALTIME EVENT DISPATCHING
+            // ========================================
 
             if (array_key_exists('assignees', $update)) {
                 $beforeAssignees = $before['assignees'] ?? null;
@@ -449,6 +540,24 @@ final class TaskController extends Controller
             $task->update($update);
 
             $after = $task->getAttributes();
+
+            if (($data['review_status'] ?? '') === 'Approved') {
+                $task->load('project');
+                ActivityLogger::log(
+                    $user,
+                    $task,
+                    'approved the task',
+                    ['review_status' => 'Approved'],
+                );
+                if ($task->project) {
+                    ActivityLogger::log(
+                        $user,
+                        $task->project,
+                        'task approved: ' . $task->title,
+                        ['task_id' => $task->id],
+                    );
+                }
+            }
 
             AuditLogger::log(
                 $org,

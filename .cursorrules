@@ -1,0 +1,84 @@
+# .cursorrules — CRM Beast (Laravel 12 + Inertia/Vue) — Cursor AI Pro
+
+## Project Identity
+- Project: **CRM Beast (“The Beast”)**
+- Stack: **Laravel 12**, **Sail**, **PostgreSQL**, **Inertia.js**, **Vue 3 (script setup + TS)**, **Tailwind**, **Breeze**, **Spatie Permissions (Teams)**, **Cashier**
+- Local ports (current): **APP 8080**, **Vite 5199**
+- This repo/workspace: **crm-beast-saas** (canonical)
+
+---
+
+## NON-NEGOTIABLE: Production Build Assets Only (No Dev Server)
+- We are using **Production Builds** (pre-compiled assets) in:
+  - `public/build` (Vite output)
+  - `public/build/manifest.json` must exist for runtime
+- **Do NOT use** `npm run dev` or Vite HMR for this project in Cursor.
+- Use:
+  - `npm ci` (or `npm install`) once
+  - `npm run build` whenever frontend changes are needed
+- Laravel must render assets via **`@vite(...)`** and the build manifest.
+- Never hardcode asset URLs.
+
+---
+
+## Multi-Tenancy Rules (MANDATORY)
+- All tenant routes must be scoped under:
+  - `/org/{organization:slug}/...`
+- Tenant resolution must be done via:
+  - `ResolveTenant` middleware
+- **No cross-tenant leakage**:
+  - Every org-scoped model query must be filtered by `organization_id`
+  - All controllers/services must assume tenant context is required
+- If a route is not tenant-scoped, it must be explicitly reviewed and justified.
+
+---
+
+## RBAC / Permissions (Spatie Teams Required)
+- Authorization is implemented using **Spatie Laravel-Permission** with **Teams enabled**.
+- We have **164 granular permissions** seeded by:
+  - `RolesAndPermissionsSeeder`
+- Permissions and roles must be **team-scoped**:
+  - `team_id` must equal `organization_id`
+- The tenant context must be set before any permission checks:
+  - `ResolveTenant` must set Spatie team context for the current request.
+
+### User Model Requirement
+- `app/Models/User.php` **must** use Spatie’s trait:
+  - `Spatie\Permission\Traits\HasRoles`
+- Do not create a parallel/custom roles system.
+
+---
+
+## Development Standards (Enterprise CRM)
+- Follow enterprise-level CRM practices:
+  - Policies / Gates for server-side enforcement
+  - FormRequest validation
+  - Small, reviewable changes
+  - Keep DB schema ↔ Models ↔ Controllers ↔ Vue Pages in sync
+- Always protect critical actions on the server:
+  - UI hiding is not security
+- When editing a file, output the **entire file** (no truncation).
+
+---
+
+## Next Milestone (Immediate)
+- Build **Granular Role Maker UI + Logic**:
+  - Tenant admin UI to manage roles (Company/Employee/Client) and assign the 164 permissions
+  - Save changes via Spatie tables (team-scoped)
+  - Enforce permissions across modules in priority order:
+    - Clients → Projects → Tasks → Attendance → Announcements → Notifications → Activity → Settings → Billing
+
+---
+
+## Cursor Agent Workflow Rules
+1. Before coding:
+   - Inspect `ResolveTenant` middleware behavior
+   - Inspect `User.php` for `HasRoles`
+   - Confirm Spatie Teams configuration and the seeded permission set
+2. Then implement:
+   - Routes → Controller → Requests/Policies → Inertia pages/components
+3. Always run:
+   - `php artisan test` (or at least relevant tests)
+   - `npm run build`
+4. Report:
+   - What changed, where, and how to verify quickly

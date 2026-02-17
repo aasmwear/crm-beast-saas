@@ -34,8 +34,12 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended(route('dashboard', absolute: false));
         }
 
-        // Real app: redirect to the user's active organization
+        // Real app: redirect to the user's active organization (or portal for Client users)
         $user = $request->user();
+
+        if ($user->hasRole('Client') && ! empty($user->client_id)) {
+            return redirect()->intended('/portal/dashboard');
+        }
 
         $slug = optional($user->activeOrganization)->slug
             ?: DB::table('organizations')->where('id', $user->active_organization_id)->value('slug')

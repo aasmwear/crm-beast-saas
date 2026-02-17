@@ -13,6 +13,8 @@ final class DepartmentController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Department::class);
+
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
@@ -23,6 +25,8 @@ final class DepartmentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Department::class);
+
         /** @var \App\Models\Organization|null $org */
         $org = app('tenant');
         abort_if(! $org, 404, 'Organization not resolved');
@@ -45,6 +49,8 @@ final class DepartmentController extends Controller
 
     public function update(Request $request, Department $department): RedirectResponse
     {
+        $this->authorize('update', $department);
+
         // Schema-aware rules (no 'description' in your DB)
         $rules = [
             'name' => 'sometimes|string|max:255',

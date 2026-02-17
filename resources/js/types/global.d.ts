@@ -1,7 +1,21 @@
-import 'vue'
+/**
+ * Global type definitions for CRM Beast.
+ */
 
-declare module '@vue/runtime-core' {
-  interface ComponentCustomProperties {
-    route: (name?: string, params?: any, absolute?: boolean, config?: any) => any
-  }
+import type { AxiosInstance } from 'axios';
+import ziggyRoute from 'ziggy-js';
+
+declare global {
+    interface Window {
+        axios: AxiosInstance;
+        Echo?: import('laravel-echo').default;
+        Pusher?: typeof import('pusher-js');
+        route: typeof ziggyRoute;
+    }
+
+    /* eslint-disable no-var */
+    var route: typeof ziggyRoute;
+    var Ziggy: { url?: string; port?: number | null; defaults?: Record<string, unknown>; routes?: Record<string, unknown> };
 }
+
+export {};

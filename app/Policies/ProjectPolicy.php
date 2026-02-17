@@ -66,4 +66,17 @@ final class ProjectPolicy
 
         return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('projects.delete');
     }
+
+    /**
+     * Whether the user may see budget/price (financial) data for the project.
+     * Used before sending budget_cents, price_cents, budget, price to the frontend.
+     */
+    public function viewBudget(User $user, Project $project): bool
+    {
+        if ((int) $user->active_organization_id !== (int) $project->organization_id) {
+            return false;
+        }
+
+        return $user->can('financials.view');
+    }
 }
