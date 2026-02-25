@@ -29,3 +29,15 @@ resources/js/**/*.vue.js
 # local bundles / scratch
 *.zip
 crm-beast-working.zip
+*.tgz
+
+# Windows metadata (WSL/Windows compatibility)
+*Zone.Identifier
+*:Zone.Identifier
+*Zone.Identifier*
+*- Copy.Identifier*
+*:Zone - Copy.Identifier*
+
+# backups (DB dumps, etc.)
+/backups/
+crm_backup.sql
