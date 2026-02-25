@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\TaskMoved;
 use App\Events\TaskUpdated;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -229,14 +230,11 @@ final class TaskController extends Controller
     /**
      * Update a task's core fields, submission or review metadata.
      */
-    public function update(Request $request, Task $task): RedirectResponse
+    public function update(Request $request, Organization $organization, Task $task): RedirectResponse
     {
         $this->authorize('update', $task);
 
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
-
-        if ((int) $task->organization_id !== (int) $org->id) {
+        if ((int) $task->organization_id !== (int) $organization->id) {
             abort(404);
         }
 
@@ -257,7 +255,7 @@ final class TaskController extends Controller
             'comments' => 'nullable|array',
         ]);
 
-        return DB::transaction(function () use ($task, $data, $org, $request): RedirectResponse {
+        return DB::transaction(function () use ($task, $data, $organization, $request): RedirectResponse {
             $before = $task->getAttributes();
 
             $update = [];
@@ -306,7 +304,7 @@ final class TaskController extends Controller
             }
 
             AuditLogger::log(
-                $org,
+                $organization,
                 $request->user(),
                 'updated',
                 'task',
@@ -349,17 +347,17 @@ final class TaskController extends Controller
 
                 // Dispatch TaskMoved event for Kanban board updates
                 TaskMoved::dispatch(
-                    taskId: (int) $task->id,
-                    projectId: (int) $task->project_id,
-                    organizationId: (int) $task->organization_id,
-                    newStatus: (string) $after['status'],
-                    newSortOrder: (string) ($after['sort_order'] ?? ''),
-                    movedBy: (int) $request->user()->id,
+                    (int) $task->id,
+                    (int) $task->project_id,
+                    (int) $task->organization_id,
+                    (string) $after['status'],
+                    (string) ($after['sort_order'] ?? ''),
+                    (int) $request->user()->id,
                 );
 
                 // Audit log for status change
                 AuditLogger::log(
-                    $org,
+                    $organization,
                     $request->user(),
                     'status_changed',
                     'task',
@@ -382,11 +380,11 @@ final class TaskController extends Controller
             if (! empty($detailChanges)) {
                 // Dispatch TaskUpdated event for detail changes
                 TaskUpdated::dispatch(
-                    taskId: (int) $task->id,
-                    projectId: (int) $task->project_id,
-                    organizationId: (int) $task->organization_id,
-                    changes: $detailChanges,
-                    updatedBy: (int) $request->user()->id,
+                    (int) $task->id,
+                    (int) $task->project_id,
+                    (int) $task->organization_id,
+                    $detailChanges,
+                    (int) $request->user()->id,
                 );
             }
 
@@ -400,7 +398,7 @@ final class TaskController extends Controller
 
                 if ($beforeAssignees !== $afterAssignees) {
                     AuditLogger::log(
-                        $org,
+                        $organization,
                         $request->user(),
                         'assignees_changed',
                         'task',

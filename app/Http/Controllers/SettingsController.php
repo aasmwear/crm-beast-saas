@@ -16,6 +16,8 @@ final class SettingsController extends Controller
      */
     public function index(Request $request): Response
     {
+        abort_unless($request->user()?->can('settings.view'), 403);
+
         /** @var Organization $organization */
         $organization = $request->route('organization');
 
@@ -37,6 +39,8 @@ final class SettingsController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->can('settings.update'), 403);
+
         /** @var Organization $organization */
         $organization = $request->route('organization');
 

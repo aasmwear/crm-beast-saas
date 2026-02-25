@@ -18,7 +18,7 @@ final class UpdateRolePermissionsMatrixRequest extends FormRequest
         /** @var \App\Models\Organization $org */
         $org = $this->route('organization');
 
-        return $user->is_super_admin || $user->hasPermissionTo('roles.manage', $org->id);
+        return $user->is_super_admin || $user->hasPermissionTo('roles.manage');
     }
 
     /**

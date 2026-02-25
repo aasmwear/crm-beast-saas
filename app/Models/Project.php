@@ -34,7 +34,6 @@ use Illuminate\Support\Facades\Schema;
  * @property string $currency
  * @property bool $billable
  * @property string|null $gbp_status
- * @property string|null $client_activation_status
  * @property string|null $notes_cst
  * @property string|null $notes_sales
  * @property string|null $notes_tech
@@ -54,7 +53,6 @@ final class Project extends Model
         'organization_id', 'client_id', 'title', 'project_code', 'description',
         'project_manager_id', 'department_id', 'start_date', 'end_date',
         'status', 'budget_cents', 'price_cents', 'budget', 'price', 'currency', 'billable', 'gbp_status',
-        'client_activation_status',
         'notes_cst', 'notes_sales', 'notes_tech', 'attachments', 'custom_fields',
     ];
 

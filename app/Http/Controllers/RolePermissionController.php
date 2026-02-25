@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRolePermissionsMatrixRequest;
 use App\Http\Requests\UpdateRolePermissionsRequest;
 use App\Services\AuditLogger;
@@ -25,11 +26,36 @@ final class RolePermissionController extends Controller
     }
 
     /**
-     * Display the role/permission editor for the current tenant (per-role view).
+     * Store a new role for the current tenant (team-scoped).
      */
-    public function editor(Request $request): Response
+    public function store(StoreRoleRequest $request): RedirectResponse
     {
-        return $this->rolesAndMatrixResponse($request, 'Settings/RoleEditor');
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        /** @var \App\Models\Organization $org */
+        $org = $request->route('organization');
+
+        $name = $request->validated('name');
+
+        $role = Role::create([
+            'name' => $name,
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+
+        AuditLogger::log(
+            $org,
+            $user,
+            'create',
+            'role',
+            $role->id,
+            ['name' => $name],
+        );
+
+        return back()
+            ->with('success', 'Role created. Now choose permissions and click Save.')
+            ->with('created_role_id', $role->id);
     }
 
     /**
@@ -45,7 +71,7 @@ final class RolePermissionController extends Controller
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
-        if (! $user->is_super_admin && ! $user->hasPermissionTo('roles.manage', $org->id)) {
+        if (! $user->is_super_admin && ! $user->hasPermissionTo('roles.manage')) {
             abort(403, 'You do not have permission to manage roles.');
         }
 
@@ -73,10 +99,13 @@ final class RolePermissionController extends Controller
 
         $groupedPermissions = $allPermissions->groupBy('module')->map(fn ($perms) => $perms->values());
 
+        $permissionCatalog = $this->buildPermissionCatalog($allPermissions);
+
         return Inertia::render($page, array_merge([
             'roles' => $roles,
             'permissions' => $allPermissions,
             'groupedPermissions' => $groupedPermissions,
+            'permissionCatalog' => $permissionCatalog,
         ], $extra));
     }
 
@@ -114,7 +143,7 @@ final class RolePermissionController extends Controller
             ['permission_ids' => $validated['permission_ids']],
         );
 
-        return back()->with('success', "Permissions for role '{$role->name}' updated successfully.");
+        return back()->with('success', "Permissions saved.");
     }
 
     /**
@@ -162,5 +191,115 @@ final class RolePermissionController extends Controller
         $parts = explode('.', $permissionName);
 
         return $parts[0] ?? 'other';
+    }
+
+    /**
+     * Build the permission catalog for the Matrix UI.
+     * Single source of truth: modules, actions, matrix (module->action->permission), specials, aliases.
+     *
+     * @param  \Illuminate\Support\Collection<int, array{id: int, name: string, module: string}>  $allPermissions
+     * @return array{modules: array<int, array{key: string, label: string, icon: string, sortOrder: int}>, actions: array<int, array{key: string, label: string}>, matrix: array<string, array<string, string>>, specials: array<int, array{module: string, permission: string, label: string}>, aliasMap: array<string, string>}
+     */
+    private function buildPermissionCatalog($allPermissions): array
+    {
+        $permissionNames = $allPermissions->pluck('name')->toArray();
+
+        $modules = [
+            ['key' => 'clients', 'label' => 'Clients', 'icon' => '👥', 'sortOrder' => 1],
+            ['key' => 'projects', 'label' => 'Projects', 'icon' => '📁', 'sortOrder' => 2],
+            ['key' => 'tasks', 'label' => 'Tasks', 'icon' => '✅', 'sortOrder' => 3],
+            ['key' => 'attendance', 'label' => 'Attendance', 'icon' => '⏰', 'sortOrder' => 4],
+            ['key' => 'announcements', 'label' => 'Announcements', 'icon' => '📢', 'sortOrder' => 5],
+            ['key' => 'notifications', 'label' => 'Notifications', 'icon' => '🔔', 'sortOrder' => 6],
+            ['key' => 'activity', 'label' => 'Activity', 'icon' => '📋', 'sortOrder' => 7],
+            ['key' => 'settings', 'label' => 'Settings', 'icon' => '⚙️', 'sortOrder' => 8],
+            ['key' => 'billing', 'label' => 'Billing', 'icon' => '💳', 'sortOrder' => 9],
+            ['key' => 'users', 'label' => 'Users', 'icon' => '👤', 'sortOrder' => 10],
+            ['key' => 'departments', 'label' => 'Departments', 'icon' => '🏬', 'sortOrder' => 11],
+            ['key' => 'reports', 'label' => 'Reports', 'icon' => '📊', 'sortOrder' => 12],
+            ['key' => 'roles', 'label' => 'Roles', 'icon' => '🎭', 'sortOrder' => 13],
+            ['key' => 'financials', 'label' => 'Financials', 'icon' => '💰', 'sortOrder' => 14],
+            ['key' => 'contacts', 'label' => 'Contacts', 'icon' => '📇', 'sortOrder' => 15],
+            ['key' => 'messages', 'label' => 'Messages', 'icon' => '💬', 'sortOrder' => 16],
+        ];
+
+        $actions = [
+            ['key' => 'view', 'label' => 'View'],
+            ['key' => 'create', 'label' => 'Create'],
+            ['key' => 'update', 'label' => 'Update'],
+            ['key' => 'delete', 'label' => 'Delete'],
+            ['key' => 'manage', 'label' => 'Manage'],
+        ];
+
+        // Canonical permission names: *.view, *.create, *.update, *.delete
+        $matrixTemplate = [
+            'clients' => ['view' => 'clients.view', 'create' => 'clients.create', 'update' => 'clients.update', 'delete' => 'clients.delete', 'manage' => 'clients.manage'],
+            'projects' => ['view' => 'projects.view', 'create' => 'projects.create', 'update' => 'projects.update', 'delete' => 'projects.delete'],
+            'tasks' => ['view' => 'tasks.view', 'create' => 'tasks.create', 'update' => 'tasks.update', 'delete' => 'tasks.delete'],
+            'attendance' => ['view' => 'attendance.view', 'manage' => 'attendance.manage'],
+            'announcements' => ['view' => 'announcements.view', 'create' => 'announcements.create', 'update' => 'announcements.update', 'delete' => 'announcements.delete'],
+            'notifications' => ['view' => 'notifications.view', 'update' => 'notifications.update'],
+            'activity' => [],
+            'settings' => ['view' => 'settings.view', 'update' => 'settings.update'],
+            'billing' => ['view' => 'billing.view', 'manage' => 'billing.manage'],
+            'users' => ['view' => 'users.view', 'create' => 'users.create', 'update' => 'users.update', 'delete' => 'users.delete', 'manage' => 'users.manage'],
+            'departments' => ['view' => 'departments.view', 'create' => 'departments.create', 'update' => 'departments.update', 'delete' => 'departments.delete'],
+            'reports' => ['view' => 'reports.view'],
+            'roles' => ['view' => 'roles.view', 'manage' => 'roles.manage'],
+            'financials' => ['view' => 'financials.view'],
+            'contacts' => ['manage' => 'contacts.manage'],
+            'messages' => ['create' => 'messages.create'],
+        ];
+
+        $specials = [
+            ['module' => 'clients', 'permission' => 'clients.import', 'label' => 'Import'],
+            ['module' => 'clients', 'permission' => 'clients.export', 'label' => 'Export'],
+            ['module' => 'tasks', 'permission' => 'tasks.review', 'label' => 'Review'],
+            ['module' => 'attendance', 'permission' => 'attendance.view-own', 'label' => 'View Own'],
+            ['module' => 'attendance', 'permission' => 'attendance.clock-in', 'label' => 'Clock In'],
+            ['module' => 'attendance', 'permission' => 'attendance.clock-out', 'label' => 'Clock Out'],
+            ['module' => 'attendance', 'permission' => 'attendance.approve', 'label' => 'Approve'],
+            ['module' => 'announcements', 'permission' => 'announcements.pin', 'label' => 'Pin'],
+            ['module' => 'roles', 'permission' => 'roles.assign', 'label' => 'Assign'],
+            ['module' => 'users', 'permission' => 'users.assign-roles', 'label' => 'Assign Roles'],
+            ['module' => 'reports', 'permission' => 'reports.export', 'label' => 'Export'],
+        ];
+
+        // Legacy -> canonical: when resolving UI display, map legacy to canonical for consistency
+        $aliasMap = [
+            'clients.edit' => 'clients.update',
+            'projects.edit' => 'projects.update',
+            'tasks.edit' => 'tasks.update',
+            'users.edit' => 'users.update',
+        ];
+
+        $matrix = [];
+        foreach ($matrixTemplate as $modKey => $actionPerms) {
+            $matrix[$modKey] = [];
+            foreach ($actionPerms as $actionKey => $permName) {
+                if (in_array($permName, $permissionNames, true)) {
+                    $matrix[$modKey][$actionKey] = $permName;
+                }
+            }
+        }
+
+        $filteredSpecials = [];
+        foreach ($specials as $s) {
+            if (in_array($s['permission'], $permissionNames, true)) {
+                $filteredSpecials[] = [
+                    'module' => $s['module'],
+                    'permission' => $s['permission'],
+                    'label' => $s['label'],
+                ];
+            }
+        }
+
+        return [
+            'modules' => $modules,
+            'actions' => $actions,
+            'matrix' => $matrix,
+            'specials' => $filteredSpecials,
+            'aliasMap' => $aliasMap,
+        ];
     }
 }

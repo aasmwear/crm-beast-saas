@@ -15,18 +15,18 @@ final class NotificationCenterController extends Controller
      */
     public function list(Request $request): JsonResponse
     {
+        abort_unless($request->user()?->can('notifications.view'), 403);
+
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $unreadCount = $user->unreadNotifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $unreadCount = $this->scopeNotificationsByOrg($user->unreadNotifications(), $org)
             ->count();
 
-        $notifications = $user->unreadNotifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $notifications = $this->scopeNotificationsByOrg($user->unreadNotifications(), $org)
             ->latest()
             ->limit(10)
             ->get()
@@ -48,20 +48,20 @@ final class NotificationCenterController extends Controller
 
     public function index(Request $request): Response
     {
+        abort_unless($request->user()?->can('notifications.view'), 403);
+
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $list = $user->notifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $list = $this->scopeNotificationsByOrg($user->notifications(), $org)
             ->latest()
             ->paginate(30)
             ->withQueryString();
 
-        $unreadCount = $user->unreadNotifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $unreadCount = $this->scopeNotificationsByOrg($user->unreadNotifications(), $org)
             ->count();
 
         return Inertia::render('Notifications/Index', [
@@ -72,14 +72,15 @@ final class NotificationCenterController extends Controller
 
     public function markAllRead(Request $request): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('notifications.update'), 403);
+
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $user->unreadNotifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $this->scopeNotificationsByOrg($user->unreadNotifications(), $org)
             ->update(['read_at' => now()]);
 
         if ($request->expectsJson()) {
@@ -94,14 +95,15 @@ final class NotificationCenterController extends Controller
      */
     public function markRead(Request $request, string $notification): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('notifications.update'), 403);
+
         /** @var \App\Models\Organization $org */
         $org = $request->route('organization');
 
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $n = $user->notifications()
-            ->whereRaw("data->>'organization_id' = ?", [(string) $org->id])
+        $n = $this->scopeNotificationsByOrg($user->notifications(), $org)
             ->whereKey($notification)
             ->first();
 
@@ -114,5 +116,18 @@ final class NotificationCenterController extends Controller
         }
 
         return back()->with('success', 'Read');
+    }
+
+    /**
+     * Scope notifications by organization: use organization_id column when set, else fallback to JSON.
+     */
+    private function scopeNotificationsByOrg($query, $org)
+    {
+        $id = (string) $org->id;
+
+        return $query->where(function ($q) use ($id) {
+            $q->where('organization_id', $id)
+                ->orWhereRaw("(organization_id IS NULL AND data->>'organization_id' = ?)", [$id]);
+        });
     }
 }

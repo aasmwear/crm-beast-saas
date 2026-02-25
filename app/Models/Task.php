@@ -190,8 +190,8 @@ class Task extends Model
                         ->where('project_manager_id', $uid)
                         ->orWhereHas('client', static function (Builder $clientQuery) use ($uid): void {
                             $clientQuery
-                                ->whereJsonContains('fronter', $uid)
-                                ->orWhereJsonContains('closer', $uid)
+                                ->where('fronter_id', $uid)
+                                ->orWhere('closer_id', $uid)
                                 ->orWhere('assigned_account_manager_id', $uid);
                         });
                 });

@@ -17,6 +17,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('attendance', function (Blueprint $table) {
+            // IP columns (required by controller; geo migration references them)
+            if (! Schema::hasColumn('attendance', 'clock_in_ip')) {
+                $table->string('clock_in_ip', 45)->nullable()->after('clock_in_at');
+            }
+            if (! Schema::hasColumn('attendance', 'clock_out_ip')) {
+                $table->string('clock_out_ip', 45)->nullable()->after('clock_out_at');
+            }
+        });
+
+        Schema::table('attendance', function (Blueprint $table) {
             // Geo-proof fields for clock in
             $table->decimal('clock_in_lat', 10, 7)->nullable()->after('clock_in_ip');
             $table->decimal('clock_in_lng', 10, 7)->nullable()->after('clock_in_lat');

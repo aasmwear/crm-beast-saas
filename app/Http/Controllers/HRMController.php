@@ -22,8 +22,7 @@ final class HRMController extends Controller
      */
     public function index(Request $request): Response
     {
-        // 🔓 COUNCIL OVERRIDE: Security check disabled for MVP build.
-        // $this->authorize('viewAny', User::class);
+        $this->authorize('viewAny', User::class);
 
         /** @var Organization $organization */
         $organization = $request->route('organization');
@@ -34,42 +33,37 @@ final class HRMController extends Controller
         }
 
         $users = $organization->users()
-            ->with('department')
-            ->select('users.id', 'users.name', 'users.email', 'users.created_at', 'users.joining_date', 'users.active_organization_id', 'users.department_id')
+            ->with(['department', 'roles'])
+            ->select('users.id', 'users.name', 'users.email', 'users.designation', 'users.created_at', 'users.joining_date', 'users.active_organization_id', 'users.department_id')
             ->orderBy('users.name')
             ->get();
 
         $employees = $users->map(function ($user) use ($organization) {
-            $roleLabel = 'Employee';
-            try {
-                // Try to get the real role if Spatie is set up
-                app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
-                if ($user->hasRole('Admin')) {
-                    $roleLabel = 'Admin';
-                }
-            } catch (\Exception $e) {
-                // Fallback if roles aren't fully configured
-            }
+            $roleLabel = $user->roles->pluck('name')->join(', ') ?: 'Employee';
 
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'designation' => $user->designation,
                 'role' => $roleLabel,
                 'department_id' => $user->department_id,
                 'department_name' => $user->department->name ?? '-',
                 'status' => ($user->active_organization_id == $organization->id) ? 'Active' : 'Inactive',
                 'joined' => ($user->joining_date ?? $user->created_at)?->format('M d, Y') ?? 'N/A',
-                'avatar_path' => $user->avatar_path, // Ensure avatar is passed
+                'avatar_path' => $user->avatar_path,
             ];
         });
 
         // Get Departments for the dropdown
         $departments = Department::where('organization_id', $organization->id)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'code']);
 
-        $roles = collect(['Admin', 'Employee', 'Manager', 'Viewer']);
+        $roles = Role::where('team_id', $organization->id)
+            ->orWhereNull('team_id')
+            ->orderBy('name')
+            ->pluck('name');
 
         return Inertia::render('HRM/Index', [
             'employees' => $employees,
@@ -84,8 +78,7 @@ final class HRMController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // 🔓 COUNCIL OVERRIDE: Security check disabled.
-        // $this->authorize('create', User::class);
+        $this->authorize('create', User::class);
 
         /** @var Organization $organization */
         $organization = $request->route('organization');
@@ -95,9 +88,9 @@ final class HRMController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'joining_date' => ['nullable', 'date'],
-            'role' => ['required', 'string', 'in:Admin,Employee,Manager,Viewer'],
+            'role' => ['required', 'string'],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', 'in:Admin,Employee,Manager,Viewer'],
+            'roles.*' => ['string'],
             'department_id' => ['nullable', 'integer'],
         ]);
 
@@ -135,18 +128,55 @@ final class HRMController extends Controller
     }
 
     /**
+     * Update an employee's profile and role in the current organization.
+     */
+    public function update(Request $request, $organization, $user_id): RedirectResponse
+    {
+        /** @var Organization $organization */
+        $organization = $request->route('organization');
+
+        $user = User::findOrFail($user_id);
+        $this->authorize('update', $user);
+
+        if (! $organization->users()->where('user_id', $user->id)->exists()) {
+            return redirect()->back()->with('error', 'User is not in this organization.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'designation' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'role' => ['required', 'string'],
+        ]);
+
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->designation = $validated['designation'] ?? null;
+        $user->department_id = $validated['department_id'] ?? null;
+        $user->save();
+
+        try {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
+            $user->syncRoles([$validated['role']]);
+        } catch (\Exception $e) {
+            // Ignore if role not found or permission errors
+        }
+
+        return redirect()->back()->with('success', 'Employee updated.');
+    }
+
+    /**
      * Remove the user from the current organization.
      */
-    public function destroy(Request $request, $user_id): RedirectResponse
+    public function destroy(Request $request, $organization, $user_id): RedirectResponse
     {
-        // 🔓 COUNCIL OVERRIDE: Security check disabled.
-        // $this->authorize('delete', $user);
-
         /** @var Organization $organization */
         $organization = $request->route('organization');
         
         // Find the user manually since we passed an ID, not a model binding
         $user = User::findOrFail($user_id);
+        $this->authorize('delete', $user);
 
         if (!$organization->users()->where('user_id', $user->id)->exists()) {
             return redirect()->back()->with('error', 'User is not in this organization.');

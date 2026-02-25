@@ -6,8 +6,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Organization;
-use App\Models\Project;
-use App\Models\Task;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Contracts\Database\Query\Builder as BaseBuilder;
@@ -129,21 +127,18 @@ class ClientsInertiaController extends Controller
         $user = $request->user();
 
         // Eager-load related data for the Show page
+        // Note: load() closures receive Relation, not Builder.
         $client->load([
             'contacts',
             // Only load projects (active = not Completed/Cancelled) the current user can see.
-            'projects' => static function (Builder $q) use ($organization, $user): void {
-                /** @var Builder<Project> $q */
-                $q->select(['id', 'organization_id', 'client_id', 'title', 'status'])
+            'projects' => static function (Relation $relation) use ($organization, $user): void {
+                $relation->select(['id', 'organization_id', 'client_id', 'title', 'status'])
                     ->where('organization_id', $organization->id)
                     ->visibleTo($user)
                     ->orderByDesc('id')
                     ->with([
-                        'tasks' => static function (Relation $relation) use ($organization, $user): void {
-                            /** @var Builder<Task> $qt */
-                            $qt = $relation->getQuery();
-
-                            $qt->select(['id', 'project_id', 'title', 'status', 'due_date', 'organization_id'])
+                        'tasks' => static function (Relation $tasksRelation) use ($organization, $user): void {
+                            $tasksRelation->select(['id', 'project_id', 'title', 'status', 'due_date', 'organization_id'])
                                 ->where('organization_id', $organization->id)
                                 ->visibleTo($user)
                                 ->orderByDesc('id');
@@ -214,8 +209,7 @@ class ClientsInertiaController extends Controller
 
     public function import(Organization $organization): Response
     {
-        // Treat import as a "create clients" operation
-        $this->authorize('create', Client::class);
+        abort_unless(request()->user()?->can('clients.import'), 403);
 
         return Inertia::render('Clients/Import', [
             'organizationSlug' => $organization->slug,

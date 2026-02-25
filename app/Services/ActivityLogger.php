@@ -23,8 +23,10 @@ final class ActivityLogger
         ?array $properties = null,
     ): Activity {
         $userId = $user instanceof User ? $user->id : ($user ? (int) $user : null);
+        $orgId = (int) ($subject->organization_id ?? 0);
 
         return Activity::query()->create([
+            'organization_id' => $orgId,
             'user_id' => $userId,
             'description' => $description,
             'subject_type' => $subject->getMorphClass(),

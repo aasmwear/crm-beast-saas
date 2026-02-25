@@ -54,7 +54,6 @@ final class ProjectFactory extends Factory
             'price_cents' => $this->faker->optional(0.8)->passthrough($priceCents),
             'billable' => $this->faker->boolean(90), // 90% billable
             'gbp_status' => $this->faker->optional(0.6)->randomElement(self::GBP_STATUSES),
-            'client_activation_status' => $this->faker->optional(0.5)->randomElement(['Inactive', 'Active', 'Paused', 'Cancelled']),
             'start_date' => $this->faker->optional(0.7)->dateTimeBetween('-6 months', 'now'),
             'end_date' => $this->faker->optional(0.4)->dateTimeBetween('now', '+6 months'),
             'notes_sales' => $this->faker->optional(0.3)->paragraph(),

@@ -160,7 +160,32 @@ async function fetchTask() {
         organization: props.organizationSlug,
         task: props.taskId,
       }),
+      {
+        headers: { Accept: 'application/json' },
+        validateStatus: () => true, // Don't throw on 4xx/5xx so we can handle them
+      },
     )
+
+    if (resp.status === 403) {
+      loadError.value = 'You do not have permission to view this task.'
+      task.value = null
+      return
+    }
+    if (resp.status === 404) {
+      loadError.value = 'Task not found.'
+      task.value = null
+      return
+    }
+    if (resp.status >= 500) {
+      loadError.value = 'Server error. Please try again.'
+      task.value = null
+      return
+    }
+    if (resp.status !== 200 || typeof resp.data !== 'object') {
+      loadError.value = 'Failed to load task.'
+      task.value = null
+      return
+    }
 
     task.value = resp.data as TaskPayload
 
@@ -196,7 +221,13 @@ async function fetchTask() {
 
     reviewComment.value = ''
   } catch (e: any) {
-    loadError.value = 'Failed to load task'
+    loadError.value = e?.response?.status === 403
+      ? 'You do not have permission to view this task.'
+      : e?.response?.status === 404
+        ? 'Task not found.'
+        : e?.response?.status >= 500
+          ? 'Server error. Please try again.'
+          : 'Failed to load task.'
     task.value = null
   } finally {
     isLoading.value = false

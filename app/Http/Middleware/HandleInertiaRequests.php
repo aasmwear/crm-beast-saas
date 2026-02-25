@@ -16,9 +16,14 @@ class HandleInertiaRequests extends Middleware
 
     /**
      * Determine the current asset version.
+     * In testing, return null to disable version conflict checks (avoids 409).
      */
     public function version(Request $request): ?string
     {
+        if (app()->environment('testing')) {
+            return null;
+        }
+
         return parent::version($request);
     }
 
@@ -65,6 +70,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                'created_role_id' => fn () => $request->session()->get('created_role_id'),
             ],
         ]);
     }

@@ -19,7 +19,7 @@ final class UpdateRolePermissionsRequest extends FormRequest
         $org = $this->route('organization');
 
         // Super Admin bypass OR user must have roles.manage permission (team-scoped)
-        return $user->is_super_admin || $user->hasPermissionTo('roles.manage', $org->id);
+        return $user->is_super_admin || $user->hasPermissionTo('roles.manage');
     }
 
     /**

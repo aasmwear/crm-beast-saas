@@ -123,6 +123,7 @@ class DashboardController extends Controller
         if (! empty($projectIds)) {
             $recentActivity = Activity::query()
                 ->with('user:id,name')
+                ->forOrganization($orgId)
                 ->where(function ($q) use ($projectIds) {
                     $q->whereHasMorph('subject', [Project::class], fn ($q) => $q->whereIn('id', $projectIds))
                         ->orWhereHasMorph('subject', [Task::class], fn ($q) => $q->whereIn('project_id', $projectIds));
@@ -245,11 +246,7 @@ class DashboardController extends Controller
         if ($orgId) {
             $recentActivities = Activity::query()
                 ->with('user:id,name')
-                ->where(function ($q) use ($orgId) {
-                    $q->whereHasMorph('subject', [Project::class], fn ($q) => $q->where('organization_id', $orgId))
-                        ->orWhereHasMorph('subject', [Task::class], fn ($q) => $q->where('organization_id', $orgId))
-                        ->orWhereHasMorph('subject', [Invoice::class], fn ($q) => $q->where('organization_id', $orgId));
-                })
+                ->forOrganization($orgId)
                 ->orderByDesc('created_at')
                 ->limit(15)
                 ->get()

@@ -26,7 +26,7 @@ class NewActivityTest extends TestCase
         $client = Client::factory()->create([
             'organization_id' => $org->id,
             'company_name' => 'Acme Co',
-            'fronter' => [$user->id],
+            'fronter_id' => $user->id,
         ]);
 
         // Org-level event log

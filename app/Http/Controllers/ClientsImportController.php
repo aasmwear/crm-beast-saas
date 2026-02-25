@@ -11,6 +11,8 @@ final class ClientsImportController extends Controller
 {
     public function import(Request $request, string $organization): RedirectResponse
     {
+        abort_unless($request->user()?->can('clients.import'), 403);
+
         $org = Organization::query()->where('slug', $organization)->firstOrFail();
         $file = $request->file('file');
         if (! $file) {

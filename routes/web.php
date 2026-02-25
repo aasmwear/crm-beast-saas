@@ -317,6 +317,7 @@ Route::prefix('org/{organization:slug}')
         */
         Route::get('/hrm', [HRMController::class, 'index'])->name('hrm.index');
         Route::post('/hrm', [HRMController::class, 'store'])->name('hrm.store');
+        Route::put('/hrm/{user}', [HRMController::class, 'update'])->name('hrm.update');
         Route::delete('/hrm/{user}', [HRMController::class, 'destroy'])->name('hrm.destroy');
 
         /*
@@ -381,8 +382,8 @@ Route::prefix('org/{organization:slug}')
         |------------------------------
         */
         Route::get('/settings/roles', [RolePermissionController::class, 'index'])->name('roles.index');
+        Route::post('/settings/roles', [RolePermissionController::class, 'store'])->name('roles.store');
         Route::put('/settings/roles', [RolePermissionController::class, 'update'])->name('roles.update');
-        Route::get('/roles-permissions', [RolePermissionController::class, 'editor'])->name('roles.editor');
         Route::post('/roles-permissions/save', [RolePermissionController::class, 'save'])->name('roles.save');
 
         /*

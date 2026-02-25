@@ -5,6 +5,7 @@ namespace Tests\Feature\Clients;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
@@ -20,6 +21,8 @@ final class SoftDeleteExportTest extends TestCase
      */
     private function tenant(): array
     {
+        (new RolesAndPermissionsSeeder)->run();
+
         /** @var Organization $org */
         $org = Organization::factory()->create([
             'slug' => 'acme',

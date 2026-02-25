@@ -17,6 +17,8 @@ final class SubscriptionController extends Controller
      */
     public function index(Organization $organization): InertiaResponse
     {
+        abort_unless(request()->user()?->can('billing.view'), 403);
+
         $subscription = $organization->subscription('default');
         $onPro = $subscription && $subscription->active();
         $onTrial = $organization->onGenericTrial() || ($subscription && $subscription->onTrial());
@@ -79,6 +81,8 @@ final class SubscriptionController extends Controller
      */
     public function checkout(Request $request, Organization $organization): JsonResponse
     {
+        abort_unless($request->user()?->can('billing.manage'), 403);
+
         $priceId = config('services.stripe.price_pro_monthly');
         if (empty($priceId)) {
             return response()->json(['error' => 'Pro plan price not configured. Set STRIPE_PRICE_PRO_MONTHLY in .env.'], 500);
@@ -109,6 +113,8 @@ final class SubscriptionController extends Controller
      */
     public function portal(Request $request, Organization $organization): JsonResponse|\Illuminate\Http\RedirectResponse
     {
+        abort_unless($request->user()?->can('billing.view'), 403);
+
         if (empty(config('cashier.secret'))) {
             return back()->with('error', 'Stripe is not configured.');
         }

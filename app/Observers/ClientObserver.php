@@ -29,8 +29,12 @@ final class ClientObserver
         }
 
         $recipients = [];
-        $recipients = array_merge($recipients, (array) ($client->fronter ?? []));
-        $recipients = array_merge($recipients, (array) ($client->closer ?? []));
+        if ($client->fronter_id) {
+            $recipients[] = (int) $client->fronter_id;
+        }
+        if ($client->closer_id) {
+            $recipients[] = (int) $client->closer_id;
+        }
         if ($client->assigned_account_manager_id) {
             $recipients[] = (int) $client->assigned_account_manager_id;
         }

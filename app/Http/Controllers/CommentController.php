@@ -27,6 +27,7 @@ final class CommentController extends Controller
         ]);
 
         Comment::create([
+            'organization_id' => $organization->id,
             'user_id' => $request->user()->id,
             'body' => $data['body'],
             'commentable_type' => $project->getMorphClass(),
@@ -52,6 +53,7 @@ final class CommentController extends Controller
         ]);
 
         Comment::create([
+            'organization_id' => $organization->id,
             'user_id' => $request->user()->id,
             'body' => $data['body'],
             'commentable_type' => $task->getMorphClass(),
@@ -81,6 +83,10 @@ final class CommentController extends Controller
             : ($commentable instanceof Task ? $commentable->organization_id ?? null : null);
 
         if ($orgId === null || (int) $orgId !== (int) $organization->id) {
+            abort(404);
+        }
+
+        if ((int) $comment->organization_id !== (int) $organization->id) {
             abort(404);
         }
 

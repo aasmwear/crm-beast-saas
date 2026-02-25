@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useForm, usePage } from '@inertiajs/vue3'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { useForm, usePage, router } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PermissionMatrix from '@/Components/Permissions/PermissionMatrix.vue'
+import type { PermissionCatalog, Permission } from '@/lib/permissionCatalog'
+import { getRecognizedPermissionNames } from '@/lib/permissionCatalog'
+import { toSlug, sanitizeSlug } from '@/lib/slug'
 
 defineOptions({ layout: AuthenticatedLayout })
-
-interface Permission {
-  id: number
-  name: string
-  module: string
-}
 
 interface Role {
   id: number
@@ -23,10 +21,11 @@ const props = defineProps<{
   roles: Role[]
   permissions: Permission[]
   groupedPermissions: Record<string, Permission[]>
+  permissionCatalog: PermissionCatalog
 }>()
 
 const page = usePage()
-const flash = computed(() => (page.props as { flash?: { success?: string } }).flash)
+const flash = computed(() => (page.props as { flash?: { success?: string; error?: string; created_role_id?: number } }).flash)
 
 const org = computed(() => {
   const routeGlobal = (window as any).route
@@ -40,153 +39,736 @@ const org = computed(() => {
 const r = (name: string, params: Record<string, string> = {}) =>
   (window as any).route ? (window as any).route(name, { ...params, organization: org.value }) : '#'
 
-// Matrix state: roleId -> Set of permission ids
-const matrix = ref<Record<number, Set<number>>>({})
+// Create Role modal
+const showCreateModal = ref(false)
+const createRoleForm = useForm<{ name: string }>({ name: '' })
+const displayName = ref('')
+const slugOverride = ref('')
+const showSlugOverride = ref(false)
 
-function buildMatrix() {
-  const m: Record<number, Set<number>> = {}
-  props.roles.forEach((role) => {
-    m[role.id] = new Set(role.permission_ids)
-  })
-  matrix.value = m
+const slugFromDisplay = computed(() => toSlug(displayName.value))
+const effectiveSlug = computed(() => {
+  const manual = slugOverride.value.trim()
+  if (manual) return sanitizeSlug(manual)
+  return slugFromDisplay.value
+})
+
+function openCreateModal() {
+  createRoleForm.reset()
+  createRoleForm.clearErrors()
+  displayName.value = ''
+  slugOverride.value = ''
+  showSlugOverride.value = false
+  showCreateModal.value = true
 }
 
+function closeCreateModal() {
+  showCreateModal.value = false
+  createRoleForm.reset()
+  displayName.value = ''
+  slugOverride.value = ''
+  showSlugOverride.value = false
+}
+
+function onSlugOverrideInput(e: Event) {
+  const target = e.target as HTMLInputElement
+  slugOverride.value = sanitizeSlug(target.value)
+}
+
+function submitCreateRole() {
+  const slug = effectiveSlug.value
+  if (!slug) {
+    createRoleForm.setError('name', 'Enter a role name.')
+    return
+  }
+  createRoleForm.name = slug
+  createRoleForm.post(r('roles.store'), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeCreateModal()
+      // selectedRoleId will be set by watcher when flash.created_role_id arrives
+    },
+  })
+}
+
+// Mode: 'matrix' | 'advanced'
+const editorMode = ref<'matrix' | 'advanced'>('matrix')
+
+// Role selection
+const selectedRoleId = ref<number | null>(props.roles[0]?.id ?? null)
+const selectedRole = computed(() =>
+  props.roles.find(role => role.id === selectedRoleId.value)
+)
+
+// Selected permissions (synced with selected role; user edits mutate this)
+const selectedPermissionIds = ref<Set<number>>(new Set())
+
+// Track "baseline" (last saved) to detect unsaved changes
+const baselinePermissionIds = ref<Set<number>>(new Set())
+
+const hasUnsavedChanges = computed(() => {
+  if (selectedPermissionIds.value.size !== baselinePermissionIds.value.size) return true
+  for (const id of selectedPermissionIds.value) {
+    if (!baselinePermissionIds.value.has(id)) return true
+  }
+  for (const id of baselinePermissionIds.value) {
+    if (!selectedPermissionIds.value.has(id)) return true
+  }
+  return false
+})
+
+function syncFromRole() {
+  const role = props.roles.find(r => r.id === selectedRoleId.value)
+  if (role) {
+    selectedPermissionIds.value = new Set(role.permission_ids)
+    baselinePermissionIds.value = new Set(role.permission_ids)
+  }
+}
+
+watch(selectedRoleId, () => syncFromRole(), { immediate: true })
+
+// Auto-select newly created role when flash.created_role_id is set
 watch(
-  () => [props.roles, props.permissions],
-  () => buildMatrix(),
+  () => flash.value?.created_role_id,
+  (id) => {
+    if (id != null && props.roles.some(r => r.id === id)) {
+      selectedRoleId.value = id
+      syncFromRole()
+    }
+  },
   { immediate: true }
 )
 
-function isChecked(roleId: number, permId: number): boolean {
-  return matrix.value[roleId]?.has(permId) ?? false
+watch(
+  () => props.roles,
+  (roles) => {
+    if (roles.length && selectedRoleId.value === null) {
+      selectedRoleId.value = roles[0].id
+    }
+    syncFromRole()
+  },
+  { deep: true }
+)
+
+// Matrix: search, expanded modules
+const matrixSearchQuery = ref('')
+const expandedModules = ref<Set<string>>(new Set())
+
+function toggleMatrixModule(moduleKey: string) {
+  const next = new Set(expandedModules.value)
+  if (next.has(moduleKey)) next.delete(moduleKey)
+  else next.add(moduleKey)
+  expandedModules.value = next
 }
 
-function toggle(roleId: number, permId: number) {
-  if (!matrix.value[roleId]) matrix.value[roleId] = new Set()
-  if (matrix.value[roleId].has(permId)) {
-    matrix.value[roleId].delete(permId)
-  } else {
-    matrix.value[roleId].add(permId)
+function expandAllMatrix() {
+  expandedModules.value = new Set(
+    (props.permissionCatalog?.modules ?? []).map(m => m.key)
+  )
+}
+
+function collapseAllMatrix() {
+  expandedModules.value = new Set()
+}
+
+function togglePermission(permId: number) {
+  const next = new Set(selectedPermissionIds.value)
+  if (next.has(permId)) next.delete(permId)
+  else next.add(permId)
+  selectedPermissionIds.value = next
+}
+
+// Advanced mode: filters
+type AdvancedFilter = 'all' | 'recognized' | 'orphan'
+const advancedFilter = ref<AdvancedFilter>('recognized')
+
+const recognizedNames = computed(() =>
+  props.permissionCatalog ? getRecognizedPermissionNames(props.permissionCatalog) : new Set<string>()
+)
+
+const filteredGroupedPermissions = computed(() => {
+  let base = props.groupedPermissions
+  if (advancedFilter.value === 'recognized') {
+    const filtered: Record<string, Permission[]> = {}
+    for (const [mod, perms] of Object.entries(base)) {
+      const match = perms.filter(p => recognizedNames.value.has(p.name))
+      if (match.length) filtered[mod] = match
+    }
+    base = filtered
+  } else if (advancedFilter.value === 'orphan') {
+    const filtered: Record<string, Permission[]> = {}
+    for (const [mod, perms] of Object.entries(base)) {
+      const match = perms.filter(p => !recognizedNames.value.has(p.name))
+      if (match.length) filtered[mod] = match
+    }
+    base = filtered
   }
-  matrix.value = { ...matrix.value }
+  const query = matrixSearchQuery.value.toLowerCase().trim()
+  if (!query) return base
+  const out: Record<string, Permission[]> = {}
+  for (const [mod, perms] of Object.entries(base)) {
+    const match = perms.filter(
+      p =>
+        p.name.toLowerCase().includes(query) || mod.toLowerCase().includes(query)
+    )
+    if (match.length) out[mod] = match
+  }
+  return out
+})
+
+const modulePriorityOrder = [
+  'clients', 'projects', 'tasks', 'attendance', 'announcements', 'notifications',
+  'audit-log', 'settings', 'billing', 'users', 'organizations', 'departments',
+  'reports', 'roles', 'permissions', 'subscriptions', 'portal',
+]
+
+const sortedModules = computed(() => {
+  const modules = Object.keys(filteredGroupedPermissions.value)
+  return modules.sort((a, b) => {
+    const iA = modulePriorityOrder.indexOf(a)
+    const iB = modulePriorityOrder.indexOf(b)
+    if (iA !== -1 && iB !== -1) return iA - iB
+    if (iA !== -1) return -1
+    if (iB !== -1) return 1
+    return a.localeCompare(b)
+  })
+})
+
+const moduleIcons: Record<string, string> = {
+  clients: '👥', projects: '📁', tasks: '✅', attendance: '⏰',
+  announcements: '📢', notifications: '🔔', 'audit-log': '📋', settings: '⚙️',
+  billing: '💳', users: '👤', organizations: '🏢', departments: '🏬',
+  reports: '📊', roles: '🎭', permissions: '🔐', subscriptions: '💎', portal: '🌐',
 }
 
-// Module groups for display (matches seeded permissions)
-const MODULE_GROUPS: Record<string, string[]> = {
-  Projects: ['projects'],
-  Finance: ['financials'],
-  Users: ['users'],
-  Clients: ['clients'],
-  Contacts: ['contacts'],
-  Roles: ['roles'],
+function getModuleStats(module: string) {
+  const perms = filteredGroupedPermissions.value[module] || []
+  const selected = perms.filter(p => selectedPermissionIds.value.has(p.id)).length
+  return { total: perms.length, selected }
 }
 
-const groupedForDisplay = computed(() => {
-  const groups: { label: string; modules: string[] }[] = []
-  const seen = new Set<string>()
-  for (const [label, modules] of Object.entries(MODULE_GROUPS)) {
-    const existing = modules.filter((m) => props.groupedPermissions[m]?.length)
-    if (existing.length) {
-      groups.push({ label, modules: existing })
-      existing.forEach((m) => seen.add(m))
+function toggleModule(module: string) {
+  const next = new Set(expandedModules.value)
+  if (next.has(module)) next.delete(module)
+  else next.add(module)
+  expandedModules.value = next
+}
+
+function toggleModulePermissions(module: string, selectAll: boolean) {
+  const perms = filteredGroupedPermissions.value[module] || []
+  const next = new Set(selectedPermissionIds.value)
+  perms.forEach(p => {
+    if (selectAll) next.add(p.id)
+    else next.delete(p.id)
+  })
+  selectedPermissionIds.value = next
+}
+
+function areAllModulePermissionsSelected(module: string): boolean {
+  const perms = filteredGroupedPermissions.value[module] || []
+  return perms.length > 0 && perms.every(p => selectedPermissionIds.value.has(p.id))
+}
+
+function expandAll() {
+  expandedModules.value = new Set(Object.keys(filteredGroupedPermissions.value))
+}
+
+function collapseAll() {
+  expandedModules.value = new Set()
+}
+
+// Save / Discard
+const saveForm = useForm({
+  role_id: null as number | null,
+  permission_ids: [] as number[],
+})
+
+function savePermissions() {
+  if (!selectedRoleId.value) return
+  saveForm.role_id = selectedRoleId.value
+  saveForm.permission_ids = Array.from(selectedPermissionIds.value)
+  saveForm.post(r('roles.save'), {
+    preserveScroll: true,
+    onSuccess: () => {
+      baselinePermissionIds.value = new Set(saveForm.permission_ids)
+      const role = props.roles.find(r => r.id === selectedRoleId.value)
+      if (role) role.permission_ids = [...saveForm.permission_ids]
+    },
+  })
+}
+
+function discardChanges() {
+  syncFromRole()
+}
+
+// Leave-with-unsaved confirmation
+const showLeaveConfirm = ref(false)
+const pendingNavigation = ref<{ url: string } | null>(null)
+const allowNextLeave = ref(false)
+
+const removeBeforeListener = router.on('before', (event: { detail: { visit: { url: { href?: string } | string; method?: string } }; preventDefault: () => void }) => {
+  if (allowNextLeave.value) return
+  if (!hasUnsavedChanges.value) return
+  // Do NOT block form submissions (Save, Create Role) — only block actual navigation (GET)
+  const method = (event.detail.visit?.method ?? 'get').toLowerCase()
+  if (method !== 'get') return
+  const url = typeof event.detail.visit.url === 'string' ? event.detail.visit.url : event.detail.visit.url?.href
+  if (!url) return
+  event.preventDefault()
+  pendingNavigation.value = { url }
+  showLeaveConfirm.value = true
+})
+
+function confirmLeave() {
+  allowNextLeave.value = true
+  if (pendingNavigation.value) {
+    router.visit(pendingNavigation.value.url)
+    pendingNavigation.value = null
+  }
+  showLeaveConfirm.value = false
+  setTimeout(() => { allowNextLeave.value = false }, 100)
+}
+
+function cancelLeave() {
+  pendingNavigation.value = null
+  showLeaveConfirm.value = false
+}
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  if (hasUnsavedChanges.value) e.preventDefault()
+}
+
+window.addEventListener('beforeunload', handleBeforeUnload)
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  removeBeforeListener?.()
+})
+
+// Catalog permission count (recognized only) for Matrix mode
+const catalogPermissionCount = computed(() => {
+  if (!props.permissionCatalog) return 0
+  let total = 0
+  for (const mod of Object.keys(props.permissionCatalog.matrix)) {
+    total += Object.keys(props.permissionCatalog.matrix[mod]).length
+  }
+  total += props.permissionCatalog.specials.length
+  return total
+})
+
+const catalogSelectedCount = computed(() => {
+  if (!props.permissionCatalog) return 0
+  const nameToId: Record<string, number> = {}
+  for (const p of props.permissions) nameToId[p.name] = p.id
+  let count = 0
+  for (const mod of Object.keys(props.permissionCatalog.matrix)) {
+    for (const perm of Object.values(props.permissionCatalog.matrix[mod])) {
+      const id = nameToId[perm]
+      if (id != null && selectedPermissionIds.value.has(id)) count++
     }
   }
-  const other = Object.keys(props.groupedPermissions).filter((m) => !seen.has(m))
-  if (other.length) groups.push({ label: 'Other', modules: other.sort() })
-  return groups
+  for (const s of props.permissionCatalog.specials) {
+    const id = nameToId[s.permission]
+    if (id != null && selectedPermissionIds.value.has(id)) count++
+  }
+  return count
 })
-
-const form = useForm<{ matrix: Record<string, number[]> }>({
-  matrix: {},
-})
-
-function saveChanges() {
-  const payload: Record<string, number[]> = {}
-  props.roles.forEach((role) => {
-    payload[String(role.id)] = Array.from(matrix.value[role.id] ?? [])
-  })
-  form.matrix = payload
-  form.put(r('roles.update'), {
-    preserveScroll: true,
-  })
-}
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Hero -->
     <section class="hero-slab">
-      <div class="flex items-end justify-between gap-6">
+      <div class="flex items-end justify-between gap-6 flex-wrap">
         <div>
           <div class="text-sm text-white/60">Settings • {{ org }}</div>
           <h1 class="mt-1 text-3xl font-semibold tracking-tight">Roles & Permissions</h1>
           <p class="mt-1 text-white/60">
-            Matrix: assign permissions to roles. Save changes to apply.
+            Manage granular permissions for each role in your organization.
           </p>
         </div>
-        <button
-          type="button"
-          :disabled="form.processing"
-          @click="saveChanges"
-          :class="[
-            'px-4 py-2 rounded-lg font-medium transition',
-            form.processing
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg'
-          ]"
-        >
-          {{ form.processing ? 'Saving...' : 'Save Changes' }}
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="openCreateModal"
+            class="px-4 py-2 rounded-lg font-medium transition bg-white/10 text-white border border-white/20 hover:bg-white/20"
+          >
+            Create Role
+          </button>
+        </div>
       </div>
     </section>
 
-    <div v-if="flash?.success" class="rounded-lg bg-green-900/30 border border-green-700/50 px-4 py-2 text-green-200 text-sm">
+    <div
+      v-if="flash?.success"
+      class="rounded-lg bg-green-900/30 border border-green-700/50 px-4 py-2 text-green-200 text-sm"
+    >
       {{ flash.success }}
     </div>
 
-    <div class="glass-card overflow-x-auto">
-      <table class="w-full min-w-[800px] border-collapse">
-        <thead>
-          <tr class="border-b border-gray-700">
-            <th class="text-left py-3 px-4 text-white/80 font-semibold">Permission</th>
-            <th v-for="role in roles" :key="role.id" class="py-3 px-4 text-center text-white/80 font-semibold">
-              <span class="capitalize">{{ role.name.replace(/-/g, ' ') }}</span>
-              <span
-                v-if="role.is_team_scoped"
-                class="ml-1 text-xs text-white/50"
-              >(team)</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="group in groupedForDisplay" :key="group.label">
-            <tr class="bg-gray-800/30">
-              <td colspan="100" class="py-2 px-4 text-sm font-semibold text-indigo-300">
-                {{ group.label }}
-              </td>
-            </tr>
-            <tr
-              v-for="perm in group.modules.flatMap((m) => groupedPermissions[m] || [])"
-              :key="perm.id"
-              class="border-b border-gray-700/50 hover:bg-gray-800/20"
+    <div class="grid grid-cols-12 gap-6">
+      <!-- Left: Role list -->
+      <div class="col-span-12 lg:col-span-3">
+        <div class="glass-card p-4 space-y-3">
+          <h3 class="text-sm font-semibold text-white/80 mb-3">Select Role</h3>
+          <div class="space-y-2">
+            <button
+              v-for="role in roles"
+              :key="role.id"
+              type="button"
+              :class="[
+                'w-full text-left px-3 py-2.5 rounded-lg transition-all',
+                selectedRoleId === role.id
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white'
+              ]"
+              @click="selectedRoleId = role.id"
             >
-              <td class="py-2 px-4 text-sm text-white/90 font-mono">{{ perm.name }}</td>
-              <td
-                v-for="role in roles"
-                :key="role.id"
-                class="py-2 px-4 text-center"
+              <div class="flex items-center justify-between">
+                <span class="font-medium capitalize">{{ role.name.replace(/-/g, ' ') }}</span>
+                <span
+                  v-if="role.is_team_scoped"
+                  class="text-xs px-2 py-0.5 rounded-full bg-white/10"
+                >
+                  Team
+                </span>
+                <span
+                  v-else
+                  class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300"
+                >
+                  Global
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Editor -->
+      <div class="col-span-12 lg:col-span-9">
+        <div class="glass-card p-6 space-y-6">
+          <!-- Mode toggle + header -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-semibold text-white">
+                Permissions for: <span class="text-indigo-400 capitalize">{{ selectedRole?.name?.replace(/-/g, ' ') }}</span>
+              </h3>
+              <p class="text-sm text-white/60 mt-1">
+                <template v-if="editorMode === 'matrix'">
+                  {{ catalogSelectedCount }} / {{ catalogPermissionCount }} catalog permissions
+                </template>
+                <template v-else>
+                  {{ selectedRole ? Array.from(selectedPermissionIds).length : 0 }} / {{ permissions.length }} permissions
+                </template>
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="flex rounded-lg border border-gray-700 overflow-hidden">
+                <button
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-sm font-medium transition',
+                    editorMode === 'matrix'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white'
+                  ]"
+                  @click="editorMode = 'matrix'"
+                >
+                  Quick Matrix
+                </button>
+                <button
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-sm font-medium transition',
+                    editorMode === 'advanced'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white'
+                  ]"
+                  @click="editorMode = 'advanced'"
+                >
+                  Advanced
+                </button>
+              </div>
+              <template v-if="editorMode === 'matrix'">
+                <button
+                  type="button"
+                  @click="expandAllMatrix"
+                  class="px-3 py-1.5 text-sm rounded-lg bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white transition"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  @click="collapseAllMatrix"
+                  class="px-3 py-1.5 text-sm rounded-lg bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white transition"
+                >
+                  Collapse All
+                </button>
+              </template>
+              <template v-else>
+                <select
+                  v-model="advancedFilter"
+                  class="px-3 py-1.5 text-sm rounded-lg bg-gray-800/50 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All DB Permissions</option>
+                  <option value="recognized">Recognized Only</option>
+                  <option value="orphan">Orphan Only</option>
+                </select>
+                <button
+                  type="button"
+                  @click="expandAll"
+                  class="px-3 py-1.5 text-sm rounded-lg bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white transition"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  @click="collapseAll"
+                  class="px-3 py-1.5 text-sm rounded-lg bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white transition"
+                >
+                  Collapse All
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Search -->
+          <div class="relative">
+            <input
+              v-model="matrixSearchQuery"
+              type="text"
+              :placeholder="editorMode === 'matrix' ? 'Search modules...' : 'Search permissions...'"
+              class="w-full px-4 py-2.5 pl-10 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <svg
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <path
+                d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+
+          <!-- MODE A: Quick Matrix -->
+          <div v-if="editorMode === 'matrix'" class="max-h-[600px] overflow-y-auto pr-2">
+            <PermissionMatrix
+              v-if="permissionCatalog"
+              :catalog="permissionCatalog"
+              :permissions="permissions"
+              :selected-permission-ids="selectedPermissionIds"
+              :search-query="matrixSearchQuery"
+              :expanded-modules="expandedModules"
+              @toggle="togglePermission"
+              @toggle-module="toggleMatrixModule"
+            />
+          </div>
+
+          <!-- MODE B: Advanced (grouped list) -->
+          <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+            <div
+              v-for="module in sortedModules"
+              :key="module"
+              class="border border-gray-700/50 rounded-lg bg-gray-900/30 overflow-hidden"
+            >
+              <div
+                class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/30 transition"
+                @click="toggleModule(module)"
               >
-                <input
-                  type="checkbox"
-                  :checked="isChecked(role.id, perm.id)"
-                  @change="toggle(role.id, perm.id)"
-                  class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
-                />
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">{{ moduleIcons[module] || '📦' }}</span>
+                  <div>
+                    <h4 class="text-sm font-semibold text-white capitalize">{{ module }}</h4>
+                    <p class="text-xs text-white/50">
+                      {{ getModuleStats(module).selected }} / {{ getModuleStats(module).total }} selected
+                    </p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    class="px-2 py-1 text-xs rounded bg-gray-800 text-white/70 hover:text-white transition"
+                    @click.stop="toggleModulePermissions(module, !areAllModulePermissionsSelected(module))"
+                  >
+                    {{ areAllModulePermissionsSelected(module) ? 'Deselect All' : 'Select All' }}
+                  </button>
+                  <svg
+                    :class="[
+                      'w-5 h-5 text-white/60 transition-transform',
+                      expandedModules.has(module) ? 'rotate-180' : ''
+                    ]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </div>
+              <div v-show="expandedModules.has(module)" class="p-4 pt-0 space-y-2">
+                <label
+                  v-for="perm in filteredGroupedPermissions[module]"
+                  :key="perm.id"
+                  class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-800/40 cursor-pointer transition"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedPermissionIds.has(perm.id)"
+                    class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                    @change="togglePermission(perm.id)"
+                  />
+                  <span class="text-sm text-white/80 font-mono">{{ perm.name }}</span>
+                </label>
+              </div>
+            </div>
+            <div
+              v-if="sortedModules.length === 0"
+              class="text-center py-12 text-white/50"
+            >
+              <p>No permissions found matching "{{ matrixSearchQuery }}"</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Sticky bottom bar: Unsaved changes -->
+    <div
+      v-if="hasUnsavedChanges"
+      class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 rounded-xl border border-amber-500/50 bg-amber-900/30 px-6 py-4 shadow-lg"
+    >
+      <span class="text-amber-200 font-medium">Unsaved changes</span>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="discardChanges"
+          class="px-4 py-2 rounded-lg font-medium text-amber-200 hover:bg-amber-800/50 transition"
+        >
+          Discard
+        </button>
+        <button
+          type="button"
+          :disabled="saveForm.processing"
+          class="px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          @click="savePermissions"
+        >
+          {{ saveForm.processing ? 'Saving...' : 'Save' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Create Role Modal -->
+    <Teleport to="body">
+      <div
+        v-show="showCreateModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        aria-modal="true"
+        role="dialog"
+        aria-labelledby="create-role-title"
+      >
+        <div
+          class="fixed inset-0 bg-black/60 backdrop-blur-sm"
+          aria-hidden="true"
+          @click="closeCreateModal"
+        />
+        <div
+          class="relative w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 shadow-2xl p-6"
+          @click.stop
+        >
+          <h2 id="create-role-title" class="text-lg font-semibold text-white mb-4">Create Role</h2>
+          <form @submit.prevent="submitCreateRole" class="space-y-4">
+            <div>
+              <label for="role-name" class="block text-sm font-medium text-white/80 mb-1">Role Name</label>
+              <input
+                id="role-name"
+                v-model="displayName"
+                type="text"
+                placeholder="e.g. WordPress Developer"
+                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                :class="{ 'border-red-500': createRoleForm.errors.name }"
+              />
+              <p v-if="createRoleForm.errors.name" class="mt-1 text-sm text-red-400">
+                {{ createRoleForm.errors.name }}
+              </p>
+              <p v-if="effectiveSlug" class="mt-1 text-xs text-white/50">
+                This will create role key: <span class="font-mono text-indigo-300">{{ effectiveSlug }}</span>
+              </p>
+              <button
+                v-if="!showSlugOverride"
+                type="button"
+                class="mt-1 text-xs text-indigo-400 hover:text-indigo-300 transition"
+                @click="showSlugOverride = true; slugOverride = slugFromDisplay"
+              >
+                Customize key
+              </button>
+              <div v-else class="mt-2">
+                <label for="role-slug" class="block text-xs font-medium text-white/60 mb-1">Role key (optional override)</label>
+                <input
+                  id="role-slug"
+                  :value="slugOverride"
+                  type="text"
+                  placeholder="wordpress-developer"
+                  class="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  @input="onSlugOverrideInput"
+                />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                @click="closeCreateModal"
+                class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="createRoleForm.processing || !effectiveSlug"
+                class="px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {{ createRoleForm.processing ? 'Creating...' : 'Create' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Leave with unsaved confirm -->
+    <Teleport to="body">
+      <div
+        v-show="showLeaveConfirm"
+        class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="cancelLeave" />
+        <div class="relative w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 shadow-2xl p-6">
+          <h2 class="text-lg font-semibold text-white mb-2">Unsaved changes</h2>
+          <p class="text-sm text-white/70 mb-4">
+            You have unsaved permission changes. Are you sure you want to leave?
+          </p>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              @click="cancelLeave"
+              class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-gray-800 transition"
+            >
+              Stay
+            </button>
+            <button
+              type="button"
+              @click="confirmLeave"
+              class="px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition"
+            >
+              Leave anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

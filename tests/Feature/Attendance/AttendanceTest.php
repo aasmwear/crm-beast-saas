@@ -5,6 +5,7 @@ namespace Tests\Feature\Attendance;
 use App\Models\Attendance;
 use App\Models\Organization;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -21,6 +22,8 @@ class AttendanceTest extends TestCase
      */
     protected function makeTenant(): array
     {
+        (new RolesAndPermissionsSeeder)->run();
+
         /** @var Organization $org */
         $org = Organization::factory()->create([
             'slug' => 'acme',

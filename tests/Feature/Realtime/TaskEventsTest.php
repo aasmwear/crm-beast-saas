@@ -4,11 +4,15 @@ namespace Tests\Feature\Realtime;
 
 use App\Events\TaskMoved;
 use App\Events\TaskUpdated;
+use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -34,6 +38,8 @@ final class TaskEventsTest extends TestCase
     {
         parent::setUp();
 
+        (new RolesAndPermissionsSeeder)->run();
+
         // Create organization
         $this->org = Organization::factory()->create();
 
@@ -41,12 +47,19 @@ final class TaskEventsTest extends TestCase
         $this->user = User::factory()->create();
         $this->org->users()->attach($this->user->id, ['is_owner' => true]);
 
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->org->id);
+        Role::findOrCreate('Owner', config('auth.defaults.guard', 'web'));
+        $this->user->assignRole('Owner');
+
         // Set active organization
         $this->user->update(['active_organization_id' => $this->org->id]);
 
-        // Create project
+        // Create client and project
+        $client = Client::factory()->create(['organization_id' => $this->org->id]);
         $this->project = Project::factory()->create([
             'organization_id' => $this->org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $this->user->id,
             'title' => 'Test Project',
         ]);
 
@@ -171,14 +184,8 @@ final class TaskEventsTest extends TestCase
 
         $response->assertRedirect();
 
-        // Assert event was pushed to queue
-        Queue::assertPushed(function ($job) {
-            $jobClass = get_class($job);
-
-            // Laravel broadcasts events via BroadcastEvent job
-            return str_contains($jobClass, 'BroadcastEvent')
-                || str_contains($jobClass, 'CallQueuedListener');
-        });
+        // Assert event was pushed to queue (Laravel uses BroadcastEvent for ShouldBroadcast events)
+        Queue::assertPushed(\Illuminate\Broadcasting\BroadcastEvent::class);
     }
 
     /**

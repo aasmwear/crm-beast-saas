@@ -15,6 +15,7 @@ type Employee = {
   id: number
   name: string
   email: string
+  designation?: string | null
   role: string
   department_id: number | null
   department_name: string | null
@@ -77,6 +78,7 @@ const showAddModal = ref(false)
 
 function openAddModal() {
   addForm.reset()
+  addForm.role = (props.roles && props.roles.length) ? props.roles[0] : ''
   showAddModal.value = true
 }
 
@@ -89,8 +91,7 @@ const addForm = useForm({
   email: '',
   job_title: '',
   joining_date: '' as string,
-  role: 'Employee' as string,
-  roles: [] as string[],
+  role: '' as string,
   department_id: null as number | null,
 })
 
@@ -100,6 +101,41 @@ function submitAdd() {
     onSuccess: () => {
       closeAddModal()
     },
+  })
+}
+
+const showEditModal = ref(false)
+const editingEmployee = ref<Employee | null>(null)
+
+const editForm = useForm({
+  name: '',
+  email: '',
+  designation: '',
+  department_id: null as number | null,
+  role: '' as string,
+})
+
+function openEditModal(employee: Employee) {
+  editingEmployee.value = employee
+  editForm.name = employee.name
+  editForm.email = employee.email
+  editForm.designation = employee.designation ?? ''
+  editForm.department_id = employee.department_id
+  editForm.role = employee.role.split(',')[0]?.trim() || (props.roles?.[0] ?? '')
+  editForm.clearErrors()
+  showEditModal.value = true
+}
+
+function closeEditModal() {
+  showEditModal.value = false
+  editingEmployee.value = null
+}
+
+function submitEdit() {
+  if (!editingEmployee.value) return
+  editForm.put(r('hrm.update', { organization: org.value, user: editingEmployee.value.id }), {
+    preserveScroll: true,
+    onSuccess: () => closeEditModal(),
   })
 }
 
@@ -277,7 +313,8 @@ function removeEmployee(employee: Employee) {
                   <button
                     type="button"
                     class="rounded p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition"
-                    title="Edit (coming soon)"
+                    title="Edit"
+                    @click="openEditModal(employee)"
                   >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -422,37 +459,13 @@ function removeEmployee(employee: Employee) {
               class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
             >
               <option
-                v-for="r in (roles || ['Employee', 'Admin'])"
-                :key="r"
-                :value="r"
+                v-for="roleName in roles"
+                :key="roleName"
+                :value="roleName"
               >
-                {{ r }}
+                {{ roleName }}
               </option>
             </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-white/60 tracking-wide mb-2">
-              Permissions (Roles)
-            </label>
-            <div class="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
-              <label
-                v-for="roleOption in (roles || ['Admin', 'Employee', 'Manager', 'Viewer'])"
-                :key="roleOption"
-                class="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  v-model="addForm.roles"
-                  type="checkbox"
-                  :value="roleOption"
-                  class="rounded border-white/20 bg-white/5 text-[var(--primary)] focus:ring-[var(--primary)]"
-                />
-                <span class="text-sm text-white/80">{{ roleOption }}</span>
-              </label>
-            </div>
-            <p class="mt-1 text-xs text-white/40">
-              Select one or more roles. Primary role above is used if none selected.
-            </p>
           </div>
 
           <div>
@@ -491,6 +504,123 @@ function removeEmployee(employee: Employee) {
               :disabled="addForm.processing"
             >
               {{ addForm.processing ? 'Creating…' : 'Create Employee' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Employee Modal -->
+    <div
+      v-if="showEditModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      @click.self="closeEditModal"
+    >
+      <div class="w-full max-w-md rounded-2xl border border-white/15 bg-[#0b0b0f] p-6 shadow-2xl">
+        <div class="mb-4 flex items-start justify-between">
+          <div>
+            <h2 class="text-xl font-semibold text-white">Edit Employee</h2>
+            <p class="mt-1 text-sm text-white/60">
+              Update profile and role for this team member.
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="closeEditModal"
+            class="text-white/40 hover:text-white transition"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form @submit.prevent="submitEdit" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-white/60 tracking-wide mb-1">Full Name</label>
+            <input
+              v-model="editForm.name"
+              type="text"
+              required
+              placeholder="Jane Doe"
+              class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+              :class="{ 'border-red-500/50': editForm.errors.name }"
+            />
+            <p v-if="editForm.errors.name" class="mt-1 text-xs text-red-400">{{ editForm.errors.name }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-white/60 tracking-wide mb-1">Email Address</label>
+            <input
+              v-model="editForm.email"
+              type="email"
+              required
+              placeholder="jane@example.com"
+              class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+              :class="{ 'border-red-500/50': editForm.errors.email }"
+            />
+            <p v-if="editForm.errors.email" class="mt-1 text-xs text-red-400">{{ editForm.errors.email }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-white/60 tracking-wide mb-1">Job Title</label>
+            <input
+              v-model="editForm.designation"
+              type="text"
+              placeholder="e.g. Project Manager"
+              class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-white/60 tracking-wide mb-1">Role</label>
+            <select
+              v-model="editForm.role"
+              class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+            >
+              <option
+                v-for="roleName in roles"
+                :key="roleName"
+                :value="roleName"
+              >
+                {{ roleName }}
+              </option>
+            </select>
+            <p v-if="editForm.errors.role" class="mt-1 text-xs text-red-400">{{ editForm.errors.role }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-white/60 tracking-wide mb-1">Department</label>
+            <select
+              v-model="editForm.department_id"
+              class="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+            >
+              <option :value="null">— None —</option>
+              <option
+                v-for="dept in departments"
+                :key="dept.id"
+                :value="dept.id"
+              >
+                {{ dept.name }} ({{ dept.code }})
+              </option>
+            </select>
+            <p v-if="editForm.errors.department_id" class="mt-1 text-xs text-red-400">{{ editForm.errors.department_id }}</p>
+          </div>
+
+          <div class="pt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              @click="closeEditModal"
+              class="btn-capsule text-white/60 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50"
+              :disabled="editForm.processing"
+            >
+              {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
             </button>
           </div>
         </form>

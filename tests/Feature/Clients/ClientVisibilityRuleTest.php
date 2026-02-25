@@ -18,11 +18,12 @@ class ClientVisibilityRuleTest extends TestCase
     {
         $org = Organization::factory()->create();
         $user = User::factory()->create();
+        $user->organizations()->attach($org->id);
 
         $client = Client::factory()->create([
             'organization_id' => $org->id,
             'company_name' => 'Acme Co',
-            'fronter' => [$user->id],
+            'fronter_id' => $user->id,
             'tags' => ['lead'],
         ]);
 
@@ -35,12 +36,12 @@ class ClientVisibilityRuleTest extends TestCase
     {
         $org = Organization::factory()->create();
         $user = User::factory()->create();
+        $user->organizations()->attach($org->id);
 
         $client = Client::factory()->create([
             'organization_id' => $org->id,
             'company_name' => 'Beta Co',
             'assigned_account_manager_id' => $user->id,
-            'tags' => ['lead'],
         ]);
 
         $this->actingAs($user);
@@ -52,11 +53,11 @@ class ClientVisibilityRuleTest extends TestCase
     {
         $org = Organization::factory()->create();
         $user = User::factory()->create();
+        $user->organizations()->attach($org->id);
 
         $client = Client::factory()->create([
             'organization_id' => $org->id,
             'company_name' => 'Gamma Co',
-            'tags' => ['lead'],
         ]);
 
         $project = Project::create([
