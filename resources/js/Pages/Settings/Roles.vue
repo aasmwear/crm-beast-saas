@@ -2,6 +2,8 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useForm, usePage, router } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
+import PageHeader from '@/Components/ui/PageHeader.vue'
 import PermissionMatrix from '@/Components/Permissions/PermissionMatrix.vue'
 import type { PermissionCatalog, Permission } from '@/lib/permissionCatalog'
 import { getRecognizedPermissionNames } from '@/lib/permissionCatalog'
@@ -376,27 +378,21 @@ const catalogSelectedCount = computed(() => {
 
 <template>
   <div class="space-y-6">
-    <!-- Hero -->
-    <section class="hero-slab">
-      <div class="flex items-end justify-between gap-6 flex-wrap">
-        <div>
-          <div class="text-sm text-white/60">Settings • {{ org }}</div>
-          <h1 class="mt-1 text-3xl font-semibold tracking-tight">Roles & Permissions</h1>
-          <p class="mt-1 text-white/60">
-            Manage granular permissions for each role in your organization.
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            @click="openCreateModal"
-            class="px-4 py-2 rounded-lg font-medium transition bg-white/10 text-white border border-white/20 hover:bg-white/20"
-          >
-            Create Role
-          </button>
-        </div>
-      </div>
-    </section>
+    <PageHeader
+      :breadcrumb="`Settings • ${org}`"
+      title="Roles & Permissions"
+      subtitle="Manage granular permissions for each role in your organization."
+    >
+      <template #actions>
+        <button
+          type="button"
+          @click="openCreateModal"
+          class="px-4 py-2 rounded-lg font-medium transition bg-white/10 text-white border border-white/20 hover:bg-white/20"
+        >
+          Create Role
+        </button>
+      </template>
+    </PageHeader>
 
     <div
       v-if="flash?.success"
@@ -462,32 +458,14 @@ const catalogSelectedCount = computed(() => {
               </p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <div class="flex rounded-lg border border-gray-700 overflow-hidden">
-                <button
-                  type="button"
-                  :class="[
-                    'px-3 py-1.5 text-sm font-medium transition',
-                    editorMode === 'matrix'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white'
-                  ]"
-                  @click="editorMode = 'matrix'"
-                >
-                  Quick Matrix
-                </button>
-                <button
-                  type="button"
-                  :class="[
-                    'px-3 py-1.5 text-sm font-medium transition',
-                    editorMode === 'advanced'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-800/50 text-white/70 hover:bg-gray-800 hover:text-white'
-                  ]"
-                  @click="editorMode = 'advanced'"
-                >
-                  Advanced
-                </button>
-              </div>
+              <ChromeTabs
+                v-model="editorMode"
+                :tabs="[
+                  { key: 'matrix', label: 'Quick Matrix' },
+                  { key: 'advanced', label: 'Advanced' },
+                ]"
+                local
+              />
               <template v-if="editorMode === 'matrix'">
                 <button
                   type="button"
@@ -778,12 +756,5 @@ const catalogSelectedCount = computed(() => {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-}
-
-.hero-slab {
-  padding: 2rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 </style>

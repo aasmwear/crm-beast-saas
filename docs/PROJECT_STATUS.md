@@ -38,6 +38,13 @@
 
 ## Last PR Notes
 
+- **UI foundation: Chrome-style tabs + consistent page header (PR):**
+  - **ChromeTabs.vue** (`resources/js/Components/ui/ChromeTabs.vue`): Chrome-like overlapping tabs, dark/glass theme. Supports Inertia (Link) and local mode (v-model). Accessible: keyboard (←/→, Home/End), aria roles, focus states. Responsive: horizontal scroll on mobile.
+  - **PageHeader.vue** (`resources/js/Components/ui/PageHeader.vue`): Standard layout: optional breadcrumb, H1 title, optional subtitle, right-side actions slot. Uses hero-slab styling.
+  - **Applied to:** Settings/Index.vue (tabs + header), Settings/Roles.vue (Quick Matrix/Advanced toggle + header), Projects/Show.vue (Overview/Tasks/Files/Notes tabs).
+  - **QA:** Settings tabs (Organization, Branding, etc.) switch correctly; Roles Quick Matrix ↔ Advanced switch works; keyboard navigation (Tab to focus tabs, Arrow keys to move); save flow, create role, unsaved-changes bar unchanged.
+  - **Follow-ups:** Consider applying ChromeTabs to other pages (Tasks list/board, Clients, etc.); Inertia mode (tabs with href) ready for future route-based tab pages.
+
 - **Tenant Settings (Enterprise v1):** Tabs: Organization (name, slug read-only, timezone, week_start, locale, currency), Branding (logo), Work Hours (work_week, start/end time), Notification Defaults (inapp, email), Integrations (Slack webhook, SMTP). FormRequest validation. Settings stored in organizations table + settings table (Setting::put). Org-scoped. See docs/SETTINGS_AUDIT.md.
 - **Activity module enterprise polish:** activity.view permission added; ActivityController gated by activity.view (was Task::viewAny). Nav (IconRail, CommandPalette) hides Activity if user lacks permission. AuditLogger added for: Clients import, Announcements (create/update/delete), Attendance (clock-in/out), Invoice paid (webhook). Subject links in Activity/Index.vue (client, project, task, etc.). Tests: 403 without activity.view; audit log with organization_id.
 - **Reports page + RBAC + export alignment:** Reports/Index.vue created (dark/glass UI, quick cards for Clients/Projects/Tasks/Attendance/Invoices). Permissions reports.view, reports.export added; index requires reports.view, export requires reports.export. Export columns fixed to primary_contact_email, primary_contact_phone. See QA steps below.
@@ -75,7 +82,7 @@
 
 1. **Settings page:** `/org/{org-slug}/settings` (e.g. `/org/acme/settings`)
    - Requires `settings.view` to view, `settings.update` to save.
-2. **Tabs:** Organization, Branding, Work Hours, Notification Defaults, Integrations.
+2. **Tabs (ChromeTabs):** Organization, Branding, Work Hours, Notification Defaults, Integrations. Chrome-style overlapping tabs; keyboard: Tab to focus, ←/→ to switch.
 3. **Organization:** Name, slug (read-only), timezone, week start, locale, currency.
 4. **Branding:** Logo upload (max 1 MB).
 5. **Work Hours:** Mon–Fri / Sun–Thu, start/end time (for attendance/reporting).
@@ -86,6 +93,6 @@
 ## Roles & Permissions — Matrix UX
 
 - **Page:** `/org/{org}/settings/roles`
-- **Modes:** Quick Matrix (default), Advanced
-- **Features:** Permission catalog, sticky bar, leave confirmation, team-scoped badges
-- **QA:** See Manual QA Steps in root PROJECT_STATUS.md or run through: persist, save flow, create role, unsaved flow, mode switch, search.
+- **Modes:** Quick Matrix (default), Advanced — now via ChromeTabs (local mode)
+- **Features:** Permission catalog, sticky bar, leave confirmation, team-scoped badges, PageHeader
+- **QA:** See Manual QA Steps in root PROJECT_STATUS.md or run through: persist, save flow, create role, unsaved flow, mode switch (ChromeTabs), search.

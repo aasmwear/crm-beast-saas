@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useForm, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
+import PageHeader from '@/Components/ui/PageHeader.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -152,32 +154,21 @@ const inputClass =
 const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
 
 const tabs = [
-  { id: 'organization', label: 'Organization' },
-  { id: 'branding', label: 'Branding' },
-  { id: 'work_hours', label: 'Work Hours' },
-  { id: 'notifications', label: 'Notification Defaults' },
-  { id: 'integrations', label: 'Integrations' },
+  { key: 'organization', label: 'Organization' },
+  { key: 'branding', label: 'Branding' },
+  { key: 'work_hours', label: 'Work Hours' },
+  { key: 'notifications', label: 'Notification Defaults' },
+  { key: 'integrations', label: 'Integrations' },
 ]
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <section class="hero-slab">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <div class="text-xs text-white/60">
-            Organization • {{ org.toUpperCase() }}
-          </div>
-          <h1 class="mt-1 text-3xl font-semibold tracking-tight">
-            Settings
-          </h1>
-          <p class="mt-1 text-white/60">
-            Configure your organization branding, localization, work hours, and integrations.
-          </p>
-        </div>
-      </div>
-    </section>
+    <PageHeader
+      :breadcrumb="`Organization • ${org.toUpperCase()}`"
+      title="Settings"
+      subtitle="Configure your organization branding, localization, work hours, and integrations."
+    />
 
     <!-- Toast -->
     <Transition
@@ -197,19 +188,11 @@ const tabs = [
     </Transition>
 
     <form @submit.prevent="submit" class="space-y-6">
-      <!-- Tabs -->
-      <div class="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          type="button"
-          class="rounded-lg px-3 py-2 text-sm font-medium transition"
-          :class="activeTab === tab.id ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white/80 hover:bg-white/5'"
-          @click="activeTab = tab.id"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
+      <ChromeTabs
+        v-model="activeTab"
+        :tabs="tabs"
+        local
+      />
 
       <!-- Organization -->
       <section v-show="activeTab === 'organization'" class="card-neo p-6 space-y-6">

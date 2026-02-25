@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import ActivityFeed from '@/Components/ActivityFeed.vue'
 import CommentStream from '@/Components/CommentStream.vue'
+import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
@@ -430,57 +431,16 @@ function deleteFile(f: ProjectFileBrief) {
         </div>
       </div>
 
-      <!-- Tabs -->
-      <div class="flex gap-2 border-b border-white/10">
-        <button
-          type="button"
-          :class="[
-            'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-            activeTab === 'overview'
-              ? 'bg-white/10 text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/5',
-          ]"
-          @click="activeTab = 'overview'"
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          :class="[
-            'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-            activeTab === 'tasks'
-              ? 'bg-white/10 text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/5',
-          ]"
-          @click="activeTab = 'tasks'"
-        >
-          Tasks
-        </button>
-        <button
-          type="button"
-          :class="[
-            'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-            activeTab === 'files'
-              ? 'bg-white/10 text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/5',
-          ]"
-          @click="activeTab = 'files'"
-        >
-          Files
-        </button>
-        <button
-          type="button"
-          :class="[
-            'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-            activeTab === 'notes'
-              ? 'bg-white/10 text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/5',
-          ]"
-          @click="activeTab = 'notes'"
-        >
-          Internal notes
-        </button>
-      </div>
+      <ChromeTabs
+        v-model="activeTab"
+        :tabs="[
+          { key: 'overview', label: 'Overview' },
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'files', label: 'Files' },
+          { key: 'notes', label: 'Internal notes' },
+        ]"
+        local
+      />
 
       <div
         class="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
