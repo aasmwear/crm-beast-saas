@@ -3,6 +3,7 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\Organization;
+use App\Models\Setting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,5 +74,30 @@ class SettingsAuthorizationTest extends TestCase
             ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_settings_saved_are_org_scoped(): void
+    {
+        $orgB = Organization::factory()->create(['slug' => 'other', 'name' => 'Other Corp']);
+
+        $this->actingAs($this->userWithSettings)
+            ->post(route('settings.update', ['organization' => $this->org->slug]), [
+                'name' => 'Acme Corp',
+                'timezone' => 'UTC',
+                'week_start' => 'Monday',
+                'work_hours' => [
+                    'work_week' => 'Sun-Thu',
+                    'start_time' => '08:00',
+                    'end_time' => '16:00',
+                ],
+            ])
+            ->assertRedirect();
+
+        $orgAWorkHours = Setting::get((int) $this->org->id, 'work_hours');
+        $this->assertIsArray($orgAWorkHours);
+        $this->assertSame('Sun-Thu', $orgAWorkHours['work_week'] ?? null);
+
+        $orgBWorkHours = Setting::get((int) $orgB->id, 'work_hours');
+        $this->assertNull($orgBWorkHours);
     }
 }
