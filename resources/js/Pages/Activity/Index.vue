@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
@@ -15,6 +15,7 @@ interface ActivityItem {
   id: number
   action: string
   entity: string
+  entity_id?: number
   created_at: string
   actor?: string | null
   actor_id?: number | null
@@ -106,6 +107,32 @@ function humanAction(action: string): string {
 
 function actorLabel(item: ActivityItem): string {
   return item.actor || 'System'
+}
+
+function subjectUrl(item: ActivityItem): string | null {
+  const org = orgSlug.value
+  const e = (item.entity || '').toLowerCase()
+  const id = item.entity_id
+  if (!org || id == null) return null
+  if (e === 'client') return r('clients.show', { organization: org, client: id })
+  if (e === 'project') return r('projects.show', { organization: org, project: id })
+  if (e === 'task') return r('tasks.show', { organization: org, task: id })
+  if (e === 'attendance') return r('attendance.index', { organization: org })
+  if (e === 'announcement') return r('announcements.index', { organization: org })
+  if (e === 'invoice') return r('invoices.index', { organization: org })
+  return null
+}
+
+function subjectLabel(item: ActivityItem): string {
+  const e = (item.entity || '').toLowerCase()
+  const id = item.entity_id
+  if (e === 'client') return id != null ? `Client #${id}` : 'client'
+  if (e === 'project') return id != null ? `Project #${id}` : 'project'
+  if (e === 'task') return id != null ? `Task #${id}` : 'task'
+  if (e === 'attendance') return 'attendance'
+  if (e === 'announcement') return id != null ? `Announcement #${id}` : 'announcement'
+  if (e === 'invoice') return id != null ? `Invoice #${id}` : 'invoice'
+  return humanEntity(item.entity)
 }
 </script>
 
@@ -244,7 +271,14 @@ function actorLabel(item: ActivityItem): string {
                   {{ humanAction(item.action) }}
                 </span>
                 <span class="text-white/40">
-                  {{ humanEntity(item.entity) }}
+                  <Link
+                    v-if="subjectUrl(item)"
+                    :href="subjectUrl(item) ?? '#'"
+                    class="text-emerald-400 hover:text-emerald-300 underline decoration-emerald-500/50"
+                  >
+                    {{ subjectLabel(item) }}
+                  </Link>
+                  <span v-else>{{ humanEntity(item.entity) }}</span>
                 </span>
               </div>
             </div>
@@ -267,3 +301,4 @@ function actorLabel(item: ActivityItem): string {
     </div>
   </div>
 </template>
+mplate>

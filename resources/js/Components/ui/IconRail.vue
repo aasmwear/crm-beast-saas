@@ -74,13 +74,15 @@
               Announcements
             </Link>
             <div v-if="isAdmin" class="border-t border-[#0d0f14]/10 my-2 pt-2">
+              <Link v-if="canViewActivity" :href="r('activity.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('activity.index') }" @click="emit('close')">Activity</Link>
               <Link :href="r('hrm.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('hrm.index') }" @click="emit('close')">Employees</Link>
               <Link :href="r('attendance.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('attendance.index') }" @click="emit('close')">Attendance</Link>
               <Link :href="r('settings.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('settings.index') }" @click="emit('close')">Settings</Link>
               <Link :href="r('billing.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('billing.index') }" @click="emit('close')">Billing</Link>
             </div>
             <div v-else class="border-t border-[#0d0f14]/10 my-2 pt-2">
-              <Link :href="r('attendance.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('attendance.index') }" @click="emit('close')">Attendance</Link>
+              <Link v-if="canViewActivity" :href="r('activity.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('activity.index') }" @click="emit('close')">Activity</Link>
+            <Link :href="r('attendance.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isCurrent('attendance.index') }" @click="emit('close')">Attendance</Link>
             </div>
           </nav>
         </aside>
@@ -234,6 +236,25 @@
         </svg>
       </Link>
 
+      <!-- Activity (permission-gated) -->
+      <Link
+        v-if="canViewActivity"
+        class="rail-btn"
+        :href="r('activity.index', { organization: org })"
+        aria-label="Activity"
+        :class="tileClass(isCurrent('activity.index'))"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          class="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+        >
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      </Link>
+
       <!-- Attendance -->
       <Link
         class="rail-btn"
@@ -305,8 +326,9 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 const mobileOpen = computed(() => props.mobileOpen ?? false)
 
-const page = usePage<{ auth?: { is_admin?: boolean }; organization?: { name?: string; logo_path?: string | null } }>()
+const page = usePage<{ auth?: { is_admin?: boolean; can?: { activity?: boolean } }; organization?: { name?: string; logo_path?: string | null } }>()
 const isAdmin = computed(() => !!page.props.auth?.is_admin)
+const canViewActivity = computed(() => !!page.props.auth?.can?.activity)
 const organization = computed(() => page.props.organization ?? null)
 const logoUrl = computed(() => {
   const path = organization.value?.logo_path

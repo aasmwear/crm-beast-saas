@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         $isAdmin = $this->resolveIsAdmin($request, $user);
+        $can = $this->resolveCan($request, $user);
 
         return array_merge(parent::share($request), [
             'app' => [
@@ -65,6 +66,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
 
                 'is_admin' => $isAdmin,
+                'can' => $can,
             ],
             'organization' => $organization,
             'flash' => [
@@ -114,5 +116,34 @@ class HandleInertiaRequests extends Middleware
         }
 
         return (bool) $user->hasAnyRole(['Super Admin', 'Manager', 'Owner', 'Admin']);
+    }
+
+    /**
+     * Resolve nav-relevant permission checks (activity.view, reports.view).
+     */
+    private function resolveCan(Request $request, $user): array
+    {
+        if (! $user || ! method_exists($user, 'can')) {
+            return ['activity' => false, 'reports' => false];
+        }
+
+        $org = $request->route('organization');
+        $orgId = null;
+        if ($org instanceof Organization) {
+            $orgId = (int) $org->id;
+        } elseif ($org && is_object($org) && isset($org->id)) {
+            $orgId = (int) $org->id;
+        } elseif (isset($user->active_organization_id) && $user->active_organization_id) {
+            $orgId = (int) $user->active_organization_id;
+        }
+
+        if ($orgId) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($orgId);
+        }
+
+        return [
+            'activity' => (bool) $user->can('activity.view'),
+            'reports' => (bool) $user->can('reports.view'),
+        ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Announcement;
 use App\Models\Organization;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -60,7 +61,16 @@ class AnnouncementController extends Controller
         $data['author_id'] = $request->user()->id;
         $data['pinned'] = $request->boolean('pinned');
 
-        Announcement::create($data);
+        $announcement = Announcement::create($data);
+
+        AuditLogger::log(
+            $organization,
+            $request->user(),
+            'created',
+            'announcement',
+            (int) $announcement->id,
+            ['title' => $announcement->title],
+        );
 
         return redirect()
             ->route('announcements.index', ['organization' => $organization->slug])
@@ -89,7 +99,17 @@ class AnnouncementController extends Controller
 
         $data['pinned'] = $request->boolean('pinned');
 
+        $before = $announcement->getAttributes();
         $announcement->update($data);
+
+        AuditLogger::log(
+            $organization,
+            $request->user(),
+            'updated',
+            'announcement',
+            (int) $announcement->id,
+            ['before' => $before, 'after' => $announcement->getAttributes()],
+        );
 
         return redirect()
             ->route('announcements.index', ['organization' => $organization->slug])
@@ -110,7 +130,18 @@ class AnnouncementController extends Controller
 
         $this->authorize('delete', $announcement);
 
+        $announcementId = (int) $announcement->id;
+        $before = $announcement->getAttributes();
         $announcement->delete();
+
+        AuditLogger::log(
+            $organization,
+            $request->user(),
+            'deleted',
+            'announcement',
+            $announcementId,
+            ['before' => $before],
+        );
 
         return redirect()
             ->route('announcements.index', ['organization' => $organization->slug])

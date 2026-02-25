@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Organization;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +21,7 @@ final class ClientsImportController extends Controller
         }
         $fh = fopen($file->getRealPath(), 'r');
         $header = fgetcsv($fh);
+        $count = 0;
         while (($row = fgetcsv($fh)) !== false) {
             $rec = array_combine($header, $row);
             if (! $rec || empty($rec['company_name'])) {
@@ -33,8 +35,20 @@ final class ClientsImportController extends Controller
                 'status' => $rec['status'] ?? 'lead',
                 'primary_contact_email' => $rec['primary_contact_email'] ?? null,
             ]);
+            $count++;
         }
         fclose($fh);
+
+        if ($count > 0) {
+            AuditLogger::log(
+                $org,
+                $request->user(),
+                'imported',
+                'client',
+                0,
+                ['count' => $count],
+            );
+        }
 
         return back()->with('success', 'Clients imported');
     }

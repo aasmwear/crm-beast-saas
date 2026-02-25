@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organization;
-use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -25,8 +24,7 @@ class ActivityController extends Controller
      */
     public function index(Request $request, Organization $organization): Response
     {
-        // Reuse task visibility as a baseline gate for activity viewing.
-        $this->authorize('viewAny', Task::class);
+        abort_unless($request->user()?->can('activity.view'), 403);
 
         $filters = [
             'actor_id' => $request->query('actor_id'),
@@ -67,6 +65,7 @@ class ActivityController extends Controller
                 'audit_logs.id as id',
                 'audit_logs.action as action',
                 'audit_logs.entity as entity',
+                'audit_logs.entity_id as entity_id',
                 'audit_logs.created_at as created_at',
                 'audit_logs.actor_id as actor_id',
                 'users.name as actor',

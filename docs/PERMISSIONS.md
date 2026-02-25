@@ -24,6 +24,7 @@
 | announcements | ✓  | ✓      | ✓      | ✓      | —     | pin                                |
 | attendance  | ✓    | —      | —      | —      | ✓     | view-own, clock-in, clock-out, approve |
 | reports     | ✓    | —      | —      | —      | —     | export                             |
+| activity    | ✓    | —      | —      | —      | —     | —                                  |
 | roles       | ✓    | —      | —      | —      | ✓     | assign                             |
 
 ---
@@ -133,3 +134,13 @@ php artisan permissions:reconcile --assign --dry-run
 
 - **Seeder:** Both permissions created; Owner/Manager get both; Employee gets reports.view only.
 - **Matrix:** reports.view in matrix; reports.export as special under Reports module.
+
+## Activity Permissions
+
+| Permission      | Enforced in                    | Description                          |
+|-----------------|--------------------------------|--------------------------------------|
+| `activity.view` | ActivityController::index      | View Activity / Audit Log page       |
+
+- **Seeder:** Permission created; Owner/Manager/Employee get activity.view.
+- **Matrix:** activity.view in matrix under Activity module.
+- **Nav:** IconRail and Command Palette hide Activity link when user lacks activity.view.

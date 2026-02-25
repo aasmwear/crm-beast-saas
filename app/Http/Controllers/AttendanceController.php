@@ -160,6 +160,15 @@ final class AttendanceController extends Controller
 
         $attendance->save();
 
+        AuditLogger::log(
+            $organization,
+            $user,
+            'clocked_in',
+            'attendance',
+            (int) $attendance->id,
+            ['clock_in_at' => $attendance->clock_in_at?->toIso8601String()],
+        );
+
         return back()->with('success', 'Clocked in');
     }
 
@@ -214,6 +223,15 @@ final class AttendanceController extends Controller
         }
 
         $attendance->save();
+
+        AuditLogger::log(
+            $organization,
+            $user,
+            'clocked_out',
+            'attendance',
+            (int) $attendance->id,
+            ['minutes' => $minutes, 'clock_out_at' => $attendance->clock_out_at?->toIso8601String()],
+        );
 
         return back()->with('success', 'Clocked out');
     }

@@ -2,8 +2,9 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 
-const page = usePage<{ auth?: { is_admin?: boolean } }>()
+const page = usePage<{ auth?: { is_admin?: boolean; can?: { activity?: boolean; reports?: boolean } } }>()
 const isAdmin = computed(() => !!page.props.auth?.is_admin)
+const can = computed(() => page.props.auth?.can ?? { activity: false, reports: false })
 
 const routeGlobal = (window as any).route
 const r = (name: string, params: Record<string, string> = {}) =>
@@ -26,6 +27,7 @@ type NavItem = {
   label: string
   routeName: string
   adminOnly?: boolean
+  permission?: 'activity' | 'reports'
 }
 
 const allNavItems: NavItem[] = [
@@ -34,6 +36,8 @@ const allNavItems: NavItem[] = [
   { label: 'Projects', routeName: 'projects.index' },
   { label: 'Tasks', routeName: 'tasks.board' },
   { label: 'Announcements', routeName: 'announcements.index' },
+  { label: 'Activity', routeName: 'activity.index', permission: 'activity' },
+  { label: 'Reports', routeName: 'reports.index', permission: 'reports' },
   { label: 'Employees', routeName: 'hrm.index', adminOnly: true },
   { label: 'Attendance', routeName: 'attendance.index', adminOnly: true },
   { label: 'Settings', routeName: 'settings.index', adminOnly: true },
@@ -47,9 +51,12 @@ const inputEl = ref<HTMLInputElement | null>(null)
 const listEl = ref<HTMLDivElement | null>(null)
 
 const visibleItems = computed(() => {
-  let items = allNavItems.filter(
-    (item) => !item.adminOnly || isAdmin.value,
-  )
+  let items = allNavItems.filter((item) => {
+    if (item.adminOnly && !isAdmin.value) return false
+    if (item.permission === 'activity' && !can.value.activity) return false
+    if (item.permission === 'reports' && !can.value.reports) return false
+    return true
+  })
   const q = query.value.trim().toLowerCase()
   if (q) {
     items = items.filter((item) =>

@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -35,7 +36,9 @@ final class ActivityIndexTest extends TestCase
 
         if (method_exists($user, 'assignRole')) {
             app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
-            Role::findOrCreate('Owner', config('auth.defaults.guard', 'web'));
+            Permission::firstOrCreate(['name' => 'activity.view', 'guard_name' => 'web']);
+            $owner = Role::firstOrCreate(['name' => 'Owner', 'guard_name' => 'web']);
+            $owner->givePermissionTo('activity.view');
             $user->assignRole('Owner');
         }
 
@@ -132,5 +135,52 @@ final class ActivityIndexTest extends TestCase
         foreach ($payload as $item) {
             $this->assertSame($otherUser->id, $item['actor_id']);
         }
+    }
+
+    public function test_user_without_activity_view_gets_403(): void
+    {
+        [$org, $user] = $this->makeTenant();
+
+        // Create a role without activity.view and assign to user.
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        Permission::firstOrCreate(['name' => 'tasks.view', 'guard_name' => 'web']);
+        $role = Role::create(['name' => 'NoActivityView', 'guard_name' => 'web']);
+        $role->givePermissionTo('tasks.view');
+        $user->syncRoles([$role]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('activity.index', ['organization' => $org->slug]));
+
+        $response->assertStatus(403);
+    }
+
+    public function test_client_create_emits_audit_log_with_organization_id(): void
+    {
+        [$org, $user] = $this->makeTenant();
+
+        $client = \App\Models\Client::factory()->create([
+            'organization_id' => $org->id,
+            'company_name' => 'Test Corp',
+        ]);
+
+        \App\Services\AuditLogger::log(
+            $org,
+            $user,
+            'created',
+            'client',
+            (int) $client->id,
+            ['after' => $client->getAttributes()],
+        );
+
+        $log = AuditLog::query()
+            ->where('organization_id', $org->id)
+            ->where('entity', 'client')
+            ->where('entity_id', $client->id)
+            ->where('action', 'created')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertSame((int) $org->id, (int) $log->organization_id);
     }
 }

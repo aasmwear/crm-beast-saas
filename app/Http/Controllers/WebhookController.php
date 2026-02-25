@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Services\ActivityLogger;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -81,6 +82,17 @@ final class WebhookController extends Controller
                 'Invoice paid via Stripe',
                 ['session_id' => $session->id ?? null],
             );
+
+            if ($invoice->organization_id) {
+                AuditLogger::log(
+                    (int) $invoice->organization_id,
+                    null,
+                    'paid',
+                    'invoice',
+                    (int) $invoice->id,
+                    ['session_id' => $session->id ?? null],
+                );
+            }
         }
 
         return response('OK', 200);

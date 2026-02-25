@@ -67,6 +67,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'announcements.pin',
             'reports.view',
             'reports.export',
+            'activity.view',
             'notifications.view',
             'notifications.update',
             'settings.view',
@@ -95,6 +96,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'departments.view', 'attendance.view', 'attendance.approve',
             'announcements.view', 'announcements.create', 'announcements.update',
             'reports.view', 'reports.export',
+            'activity.view',
             'notifications.view', 'notifications.update',
             'settings.view', 'settings.update',
         ]);
@@ -105,6 +107,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'attendance.view-own', 'attendance.clock-in', 'attendance.clock-out',
             'announcements.view', 'messages.create',
             'reports.view',
+            'activity.view',
             'notifications.view', 'notifications.update',
             'settings.view',
         ]);
