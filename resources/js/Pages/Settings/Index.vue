@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useForm, usePage } from '@inertiajs/vue3'
+import { router, useForm, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
 import PageHeader from '@/Components/ui/PageHeader.vue'
@@ -33,10 +33,12 @@ const props = defineProps<{
     work_hours?: WorkHours
     notifications_defaults?: NotificationDefaults
     slack_webhook_url?: string | null
+    slack_webhook_connected?: boolean
     smtp_host?: string | null
     smtp_port?: number | null
     smtp_user?: string | null
     smtp_from?: string | null
+    smtp_pass_set?: boolean
   }
   timezones: string[]
   locales?: Record<string, string>
@@ -50,6 +52,7 @@ const r = (name: string, params: Record<string, string> = {}) =>
 
 const org = computed(() => props.organization?.slug ?? 'acme')
 
+// Secrets are never in props; use empty string for form. slack_webhook_url is masked (••••••••) when connected.
 const form = useForm({
   name: props.organization.name,
   timezone: props.organization.timezone,
@@ -69,7 +72,7 @@ const form = useForm({
     },
     types: props.settings?.notifications_defaults?.types ?? {},
   } as NotificationDefaults,
-  slack_webhook_url: props.settings?.slack_webhook_url ?? '',
+  slack_webhook_url: '' as string,
   smtp_host: props.settings?.smtp_host ?? '',
   smtp_port: props.settings?.smtp_port ?? null as number | null,
   smtp_user: props.settings?.smtp_user ?? '',
@@ -80,6 +83,11 @@ const form = useForm({
 const activeTab = ref<string>('organization')
 const logoPreview = ref<string | null>(null)
 const logoDropActive = ref(false)
+const slackWebhookClear = ref(false)
+const testSlackLoading = ref(false)
+const testSlackToast = ref<{ type: 'success' | 'error'; msg: string } | null>(null)
+const testSmtpLoading = ref(false)
+const testSmtpToast = ref<{ type: 'success' | 'error'; msg: string } | null>(null)
 
 function logoUrl(path: string | null): string | null {
   if (!path) return null
@@ -124,6 +132,16 @@ function removeLogo() {
 
 const displayLogoUrl = computed(() => logoPreview.value ?? currentLogoUrl.value)
 
+form.transform((data) => {
+  if (props.settings?.slack_webhook_connected && data.slack_webhook_url === '' && !slackWebhookClear.value) {
+    delete (data as Record<string, unknown>).slack_webhook_url
+  }
+  if (slackWebhookClear.value) {
+    (data as Record<string, unknown>).slack_webhook_url = ''
+  }
+  return data
+})
+
 function submit() {
   form.post(r('settings.update', { organization: org.value }), {
     forceFormData: true,
@@ -131,8 +149,73 @@ function submit() {
       form.logo = null
       form.smtp_pass = ''
       logoPreview.value = null
+      slackWebhookClear.value = false
     },
   })
+}
+
+function clearSlackWebhook() {
+  form.slack_webhook_url = ''
+  slackWebhookClear.value = true
+}
+
+const csrfToken = () =>
+  (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? ''
+
+async function testSlack() {
+  testSlackLoading.value = true
+  testSlackToast.value = null
+  try {
+    const res = await fetch(r('settings.testSlack', { organization: org.value }), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+    })
+    const json = await res.json()
+    if (json.success) {
+      testSlackToast.value = { type: 'success', msg: json.message ?? 'Slack webhook test sent.' }
+    } else {
+      testSlackToast.value = { type: 'error', msg: json.message ?? 'Test failed.' }
+    }
+  } catch (e) {
+    testSlackToast.value = { type: 'error', msg: (e as Error).message ?? 'Request failed.' }
+  } finally {
+    testSlackLoading.value = false
+    setTimeout(() => { testSlackToast.value = null }, 4000)
+  }
+}
+
+async function testSmtp() {
+  testSmtpLoading.value = true
+  testSmtpToast.value = null
+  try {
+    const res = await fetch(r('settings.testSmtp', { organization: org.value }), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+    })
+    const json = await res.json()
+    if (json.success) {
+      testSmtpToast.value = { type: 'success', msg: json.message ?? 'SMTP connection successful.' }
+    } else {
+      testSmtpToast.value = { type: 'error', msg: json.message ?? 'Test failed.' }
+    }
+  } catch (e) {
+    testSmtpToast.value = { type: 'error', msg: (e as Error).message ?? 'Request failed.' }
+  } finally {
+    testSmtpLoading.value = false
+    setTimeout(() => { testSmtpToast.value = null }, 4000)
+  }
 }
 
 const showToast = ref(false)
@@ -389,22 +472,86 @@ const tabs = [
         <p class="text-xs text-white/50">
           Optional webhooks and SMTP for notifications and alerts.
         </p>
+
+        <!-- Slack -->
         <div>
           <label :class="labelClass">Slack webhook URL</label>
+          <div class="flex flex-wrap items-center gap-2">
+            <span
+              v-if="settings?.slack_webhook_connected"
+              class="inline-flex items-center rounded-lg bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-400"
+            >
+              Connected
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center rounded-lg bg-white/10 px-2 py-1 text-xs text-white/50"
+            >
+              Not set
+            </span>
+            <button
+              v-if="settings?.slack_webhook_connected"
+              type="button"
+              class="rounded-lg border border-white/20 px-2 py-1 text-xs text-white/60 hover:text-white/90"
+              @click="clearSlackWebhook"
+            >
+              Clear
+            </button>
+          </div>
           <input
             v-model="form.slack_webhook_url"
             type="url"
             :class="inputClass"
-            placeholder="https://hooks.slack.com/..."
+            :placeholder="settings?.slack_webhook_connected ? 'Enter new URL to replace' : 'https://hooks.slack.com/...'"
+            class="mt-2"
           >
+          <div class="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              class="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 hover:bg-white/10 disabled:opacity-50"
+              :disabled="testSlackLoading || !settings?.slack_webhook_connected"
+              @click="testSlack"
+            >
+              {{ testSlackLoading ? 'Testing…' : 'Test Slack' }}
+            </button>
+            <span
+              v-if="testSlackToast"
+              class="text-xs"
+              :class="testSlackToast.type === 'success' ? 'text-emerald-400' : 'text-red-400'"
+            >
+              {{ testSlackToast.msg }}
+            </span>
+          </div>
           <p v-if="form.errors.slack_webhook_url" class="mt-1 text-sm text-red-400">
             {{ form.errors.slack_webhook_url }}
           </p>
         </div>
+
+        <!-- SMTP -->
         <div class="border-t border-white/10 pt-4">
           <h3 class="text-xs font-medium text-white/70 mb-3">
             SMTP (optional)
           </h3>
+          <div class="mb-2 flex items-center gap-2">
+            <span
+              v-if="settings?.smtp_host"
+              class="inline-flex items-center rounded-lg bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-400"
+            >
+              Configured
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center rounded-lg bg-white/10 px-2 py-1 text-xs text-white/50"
+            >
+              Not set
+            </span>
+            <span
+              v-if="settings?.smtp_host"
+              class="text-xs text-white/50"
+            >
+              Password: {{ settings?.smtp_pass_set ? '••••••••' : 'Not set' }}
+            </span>
+          </div>
           <div class="space-y-4">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -427,6 +574,23 @@ const tabs = [
             <div>
               <label :class="labelClass">Password</label>
               <input v-model="form.smtp_pass" type="password" :class="inputClass" placeholder="Leave blank to keep current">
+            </div>
+            <div v-if="settings?.smtp_host" class="flex items-center gap-2">
+              <button
+                type="button"
+                class="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 hover:bg-white/10 disabled:opacity-50"
+                :disabled="testSmtpLoading"
+                @click="testSmtp"
+              >
+                {{ testSmtpLoading ? 'Testing…' : 'Test SMTP' }}
+              </button>
+              <span
+                v-if="testSmtpToast"
+                class="text-xs"
+                :class="testSmtpToast.type === 'success' ? 'text-emerald-400' : 'text-red-400'"
+              >
+                {{ testSmtpToast.msg }}
+              </span>
             </div>
           </div>
         </div>

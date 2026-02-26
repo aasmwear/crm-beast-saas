@@ -40,8 +40,17 @@ final class UpdateSettingsRequest extends FormRequest
             'notifications_defaults.channels.email' => ['nullable', 'boolean'],
             'notifications_defaults.types' => ['nullable', 'array'],
 
-            // Settings table: integrations
-            'slack_webhook_url' => ['nullable', 'string', 'url', 'max:500'],
+            // Settings table: integrations (empty string allowed for clearing)
+            'slack_webhook_url' => [
+                'nullable',
+                'string',
+                'max:500',
+                function ($attribute, $value, $fail): void {
+                    if ($value !== '' && $value !== null && ! filter_var($value, FILTER_VALIDATE_URL)) {
+                        $fail('The Slack webhook URL must be a valid URL.');
+                    }
+                },
+            ],
             'smtp_host' => ['nullable', 'string', 'max:255'],
             'smtp_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'smtp_user' => ['nullable', 'string', 'max:255'],

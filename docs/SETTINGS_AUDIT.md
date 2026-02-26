@@ -13,6 +13,8 @@
 |-------|--------|------|------------|------|
 | `/org/{org}/settings` | GET | settings.index | SettingsController::index | `settings.view` |
 | `/org/{org}/settings` | PUT/POST | settings.update | SettingsController::update | `settings.update` |
+| `/org/{org}/settings/test-slack` | POST | settings.testSlack | SettingsController::testSlack | `settings.update` |
+| `/org/{org}/settings/test-smtp` | POST | settings.testSmtp | SettingsController::testSmtp | `settings.update` |
 
 **Note:** `admin.settings.save`, `org.settings.update`, `notifications.settings.update` are referenced in Vue files but **routes do not exist**. Tenant settings use `settings.index` and `settings.update` only.
 
@@ -71,3 +73,26 @@
 ### Organization table (columns)
 
 - name, slug (read-only), logo_path, timezone, week_start
+
+---
+
+## Step C — Tenant Settings v2 (Audit Logging + Secret-Safe Integrations)
+
+### Audit Logging
+
+- **SettingsController::update** logs via `AuditLogger::log()` with:
+  - `entity`: `settings`
+  - `action`: `updated`
+  - `entity_id`: organization_id
+  - `changes`: `['keys' => [...]]` — changed keys only, **no raw secrets**
+
+### Secret-Safe Storage
+
+- **Encrypted at rest** (Laravel `Crypt::encryptString`): `slack_webhook_url`, `smtp_pass`
+- **Never returned to frontend**: Secrets are masked (`••••••••`) or omitted; `slack_webhook_connected` and `smtp_pass_set` booleans indicate presence
+- **Setting::putEncrypted** / **Setting::getDecrypted** for server-side use only
+
+### Test Actions
+
+- **Test Slack webhook** (`settings.testSlack`): POST, gated by `settings.update`; sends test message to configured webhook
+- **Test SMTP** (`settings.testSmtp`): POST, gated by `settings.update`; verifies SMTP connection using stored credentials

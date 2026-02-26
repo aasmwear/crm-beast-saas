@@ -18,7 +18,7 @@
 | Tasks | ✅ | Kanban, List, Assignees, drawer (fixed: JSON + status-based errors) |
 | Roles & Permissions UI | ✅ | Matrix layout, Quick Matrix + Advanced modes |
 | Attendance | 🟡 | Basic flow; upgrade pending (minutes, status) |
-| Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice |
+| Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice/Settings |
 | Reports | ✅ | Page + RBAC + export (primary_contact_email/phone) |
 | Notifications | 🟡 | Works; no RBAC |
 | Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations |
@@ -37,6 +37,14 @@
 ---
 
 ## Last PR Notes
+
+- **Tenant Settings v2 — audit logging + secret-safe integrations:**
+  - AuditLogger for SettingsController::update; logs `settings.updated` with changed keys only (no raw secrets).
+  - `slack_webhook_url` and SMTP password encrypted at rest (Laravel Crypt); masked in UI.
+  - Test Slack webhook and Test SMTP endpoints (POST `/org/{org}/settings/test-slack`, `/test-smtp`) gated by `settings.update`.
+  - Settings/Index.vue: Connected/Not set states, masked secrets, test buttons with success/error toasts.
+  - Tests: org-scoped settings, 403 unauthorized, audit log on update, secrets not leaked in props.
+  - Docs: SETTINGS_AUDIT.md, PROJECT_STATUS.md.
 
 - **UI foundation: Chrome-style tabs + consistent page header (PR):**
   - **ChromeTabs.vue** (`resources/js/Components/ui/ChromeTabs.vue`): Chrome-like overlapping tabs, dark/glass theme. Supports Inertia (Link) and local mode (v-model). Accessible: keyboard (←/→, Home/End), aria roles, focus states. Responsive: horizontal scroll on mobile.
@@ -87,8 +95,15 @@
 4. **Branding:** Logo upload (max 1 MB).
 5. **Work Hours:** Mon–Fri / Sun–Thu, start/end time (for attendance/reporting).
 6. **Notification Defaults:** In-app, email toggles (defaults for new users).
-7. **Integrations:** Slack webhook URL, SMTP (host, port, from, user, password).
+7. **Integrations:** Slack webhook URL, SMTP (host, port, from, user, password). Secrets encrypted at rest; masked in UI.
 8. **Save:** Loading state + success toast. Settings are org-scoped.
+
+### Tenant Settings v2 — QA (Audit Logging + Secret-Safe Integrations)
+
+- **Update timezone/locale → Save:** See success toast and audit entry in Activity (`entity: settings`, `action: updated`, `changes.keys`).
+- **Set Slack webhook → Save:** UI shows masked `••••••••` + "Connected". "Test Slack" button sends test message; success/error toast.
+- **Set SMTP host/user/pass → Save:** Password not visible on reload. "Test SMTP" button verifies connection; success/error toast.
+- **Verification:** `sail artisan test` and `sail npm run build`.
 
 ## Roles & Permissions — Matrix UX
 

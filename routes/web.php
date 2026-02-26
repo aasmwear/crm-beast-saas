@@ -340,6 +340,8 @@ Route::prefix('org/{organization:slug}')
         */
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::match(['put', 'post'], '/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/test-slack', [SettingsController::class, 'testSlack'])->name('settings.testSlack');
+        Route::post('/settings/test-smtp', [SettingsController::class, 'testSmtp'])->name('settings.testSmtp');
 
         /*
         |------------------------------

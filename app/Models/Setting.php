@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Factories\Factory as EloquentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Crypt;
 
 final class Setting extends Model
 {
@@ -42,6 +44,44 @@ final class Setting extends Model
             ['organization_id' => $organizationId, 'key' => $key],
             ['value' => $payload]
         );
+    }
+
+    /** Keys that are stored encrypted at rest. */
+    private const ENCRYPTED_KEYS = ['slack_webhook_url', 'smtp_pass'];
+
+    public static function putEncrypted(int $organizationId, string $key, string $value): void
+    {
+        if (! in_array($key, self::ENCRYPTED_KEYS, true)) {
+            throw new \InvalidArgumentException("Key {$key} is not an encrypted setting key.");
+        }
+        $encrypted = Crypt::encryptString($value);
+        self::put($organizationId, $key, $encrypted);
+    }
+
+    /**
+     * Get decrypted value for server-side use only. Never expose to frontend.
+     */
+    public static function getDecrypted(int $organizationId, string $key): ?string
+    {
+        $raw = self::get($organizationId, $key);
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (! in_array($key, self::ENCRYPTED_KEYS, true)) {
+            return is_string($raw) ? $raw : null;
+        }
+        try {
+            return Crypt::decryptString($raw);
+        } catch (DecryptException) {
+            return is_string($raw) ? $raw : null;
+        }
+    }
+
+    public static function isSecretSet(int $organizationId, string $key): bool
+    {
+        $raw = self::get($organizationId, $key);
+
+        return $raw !== null && $raw !== '';
     }
 
     /**
