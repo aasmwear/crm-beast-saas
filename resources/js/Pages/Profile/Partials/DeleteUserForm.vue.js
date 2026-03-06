@@ -41,10 +41,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElemen
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
-    ...{ class: "text-lg font-medium text-gray-900" },
+    ...{ class: "text-lg font-semibold text-white" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-sm text-gray-600" },
+    ...{ class: "mt-1 text-sm text-white/65" },
 });
 /** @type {[typeof DangerButton, typeof DangerButton, ]} */ ;
 // @ts-ignore
@@ -80,13 +80,13 @@ const __VLS_13 = {
 };
 __VLS_9.slots.default;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "p-6" },
+    ...{ class: "p-6 text-slate-100" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
-    ...{ class: "text-lg font-medium text-gray-900" },
+    ...{ class: "text-lg font-semibold text-white" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-sm text-gray-600" },
+    ...{ class: "mt-1 text-sm text-white/70" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "mt-6" },
@@ -111,7 +111,7 @@ const __VLS_17 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     ref: "passwordInput",
     modelValue: (__VLS_ctx.form.password),
     type: "password",
-    ...{ class: "mt-1 block w-3/4" },
+    ...{ class: "mt-1 block w-3/4 border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-rose-400 focus:ring-rose-400/35" },
     placeholder: "Password",
 }));
 const __VLS_18 = __VLS_17({
@@ -120,7 +120,7 @@ const __VLS_18 = __VLS_17({
     ref: "passwordInput",
     modelValue: (__VLS_ctx.form.password),
     type: "password",
-    ...{ class: "mt-1 block w-3/4" },
+    ...{ class: "mt-1 block w-3/4 border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-rose-400 focus:ring-rose-400/35" },
     placeholder: "Password",
 }, ...__VLS_functionalComponentArgsRest(__VLS_17));
 let __VLS_20;
@@ -186,23 +186,30 @@ var __VLS_38;
 var __VLS_9;
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-lg']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/65']} */ ;
 /** @type {__VLS_StyleScopedClasses['p-6']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-slate-100']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-lg']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/70']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['sr-only']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-3/4']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-rose-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-rose-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;

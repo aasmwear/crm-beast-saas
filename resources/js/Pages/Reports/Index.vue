@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -76,20 +77,34 @@ const cards = computed(() => [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-      <div>
-        <h1 class="text-xl font-semibold text-white">
-          Reports
-        </h1>
-        <p class="mt-1 text-sm text-white/60">
-          Overview and quick access to
-          <span class="font-medium text-white">{{ organization?.name }}</span>
-          data. Export clients to CSV below.
-        </p>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${String(orgSlug).toUpperCase()}`,
+      title: 'Reports',
+      subtitle: `Overview and quick access to ${organization?.name ?? 'your organization'} data. Export clients to CSV below.`,
+    }"
+  >
+    <template #header-actions>
+      <div v-if="canExport" class="flex items-center gap-3">
+        <a
+          :href="r('export.csv', { organization: orgSlug, entity: 'clients' })"
+          target="_blank"
+          class="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20"
+        >
+          Export CSV
+        </a>
+        <a
+          :href="r('export.csv', { organization: orgSlug, entity: 'clients' }) + '?include_deleted=1'"
+          target="_blank"
+          class="inline-flex items-center rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:text-white"
+        >
+          Include deleted
+        </a>
       </div>
-    </div>
+      <p v-else class="text-xs text-white/50">
+        You need reports.export permission to download.
+      </p>
+    </template>
 
     <!-- Quick cards -->
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -118,32 +133,12 @@ const cards = computed(() => [
 
     <!-- Export section -->
     <section class="overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-sm font-semibold text-white">
-            Export clients
-          </h2>
-          <p class="mt-1 text-xs text-white/50">
-            Download client list as CSV (company, primary contact email, primary contact phone).
-          </p>
-        </div>
-        <div v-if="canExport" class="flex items-center gap-3">
-          <a
-            :href="r('export.csv', { organization: orgSlug, entity: 'clients' })"
-            target="_blank"
-            class="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20"
-          >
-            Export CSV
-          </a>
-          <a
-            :href="r('export.csv', { organization: orgSlug, entity: 'clients' }) + '?include_deleted=1'"
-            class="inline-flex items-center rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:text-white"
-          >
-            Include deleted
-          </a>
-        </div>
-        <p v-else class="text-xs text-white/50">
-          You need reports.export permission to download.
+      <div>
+        <h2 class="text-sm font-semibold text-white">
+          Export clients
+        </h2>
+        <p class="mt-1 text-xs text-white/50">
+          Download client list as CSV (company, primary contact email, primary contact phone). Use the Export buttons above when permitted.
         </p>
       </div>
     </section>
@@ -154,5 +149,5 @@ const cards = computed(() => [
         Deeper reports (revenue by period, task completion rates, attendance summaries) are planned. Use the cards above to explore data in each module.
       </p>
     </section>
-  </div>
+  </PageShell>
 </template>

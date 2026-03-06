@@ -51,6 +51,7 @@ final class UpdateSettingsRequest extends FormRequest
                     }
                 },
             ],
+            'slack_webhook_clear' => ['nullable', 'boolean'],
             'smtp_host' => ['nullable', 'string', 'max:255'],
             'smtp_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'smtp_user' => ['nullable', 'string', 'max:255'],

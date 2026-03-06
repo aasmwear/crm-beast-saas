@@ -2,8 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
-import PageHeader from '@/Components/ui/PageHeader.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -43,6 +42,18 @@ const props = defineProps<{
   timezones: string[]
   locales?: Record<string, string>
   currencies?: Record<string, string>
+  features?: Record<string, boolean | number>
+  featureCatalog?: Array<{ key: string; label: string; description: string; type: string; default: boolean | number }>
+  canViewApiKeys?: boolean
+  apiKeys?: Array<{
+    id: number
+    name: string
+    prefix: string
+    created_at: string
+    created_by?: string
+    last_used_at?: string
+    revoked_at?: string
+  }>
 }>()
 
 const page = usePage<{ flash?: { success?: string } }>()
@@ -88,6 +99,34 @@ const testSlackLoading = ref(false)
 const testSlackToast = ref<{ type: 'success' | 'error'; msg: string } | null>(null)
 const testSmtpLoading = ref(false)
 const testSmtpToast = ref<{ type: 'success' | 'error'; msg: string } | null>(null)
+function buildFeaturesForm(): Record<string, boolean | number> {
+  const catalog = props.featureCatalog ?? []
+  const defaults: Record<string, boolean | number> = {}
+  for (const item of catalog) {
+    defaults[item.key] = item.default
+  }
+  return { ...defaults, ...(props.features ?? {}) }
+}
+const featuresForm = ref<Record<string, boolean | number>>(buildFeaturesForm())
+
+// API Keys
+const apiKeys = computed(() => props.apiKeys ?? [])
+const apiKeysCreateModalOpen = ref(false)
+const apiKeysCreateName = ref('')
+const apiKeysCreateLoading = ref(false)
+const apiKeysCreateError = ref<string | null>(null)
+const apiKeysNewToken = ref<string | null>(null)
+const apiKeysNewKeyId = ref<number | null>(null)
+const apiKeysRevokeLoading = ref<number | null>(null)
+watch(
+  () => [props.features, props.featureCatalog],
+  () => {
+    featuresForm.value = buildFeaturesForm()
+  },
+  { immediate: true },
+)
+const featuresLoading = ref(false)
+const featuresToast = ref<{ type: 'success' | 'error'; msg: string } | null>(null)
 
 function logoUrl(path: string | null): string | null {
   if (!path) return null
@@ -133,11 +172,13 @@ function removeLogo() {
 const displayLogoUrl = computed(() => logoPreview.value ?? currentLogoUrl.value)
 
 form.transform((data) => {
-  if (props.settings?.slack_webhook_connected && data.slack_webhook_url === '' && !slackWebhookClear.value) {
-    delete (data as Record<string, unknown>).slack_webhook_url
+  const d = data as Record<string, unknown>
+  if (props.settings?.slack_webhook_connected && d.slack_webhook_url === '' && !slackWebhookClear.value) {
+    delete d.slack_webhook_url
   }
   if (slackWebhookClear.value) {
-    (data as Record<string, unknown>).slack_webhook_url = ''
+    d.slack_webhook_url = ''
+    d.slack_webhook_clear = true
   }
   return data
 })
@@ -218,6 +259,104 @@ async function testSmtp() {
   }
 }
 
+async function createApiKey() {
+  if (!apiKeysCreateName.value.trim()) return
+  apiKeysCreateLoading.value = true
+  apiKeysCreateError.value = null
+  try {
+    const res = await fetch(r('settings.api-keys.store', { organization: org.value }), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ name: apiKeysCreateName.value.trim() }),
+    })
+    const json = await res.json()
+    if (json.success && json.plaintext_token) {
+      apiKeysNewToken.value = json.plaintext_token
+      apiKeysNewKeyId.value = json.api_key?.id ?? null
+      apiKeysCreateModalOpen.value = false
+      apiKeysCreateName.value = ''
+      router.reload()
+    } else {
+      apiKeysCreateError.value = json.message ?? 'Failed to create API key.'
+    }
+  } catch (e) {
+    apiKeysCreateError.value = (e as Error).message ?? 'Request failed.'
+  } finally {
+    apiKeysCreateLoading.value = false
+  }
+}
+
+function copyApiKeyToken() {
+  if (!apiKeysNewToken.value) return
+  navigator.clipboard.writeText(apiKeysNewToken.value).then(() => {
+    apiKeysNewToken.value = null
+    apiKeysNewKeyId.value = null
+  })
+}
+
+function dismissNewToken() {
+  apiKeysNewToken.value = null
+  apiKeysNewKeyId.value = null
+  router.reload()
+}
+
+async function revokeApiKey(id: number) {
+  if (!confirm('Revoke this API key? It will stop working immediately.')) return
+  apiKeysRevokeLoading.value = id
+  try {
+    const res = await fetch(r('settings.api-keys.destroy', { organization: org.value, apiKey: String(id) }), {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+    })
+    const json = await res.json()
+    if (json.success) {
+      router.reload()
+    }
+  } finally {
+    apiKeysRevokeLoading.value = null
+  }
+}
+
+async function saveFeatures() {
+  featuresLoading.value = true
+  featuresToast.value = null
+  try {
+    const res = await fetch(r('settings.features', { organization: org.value }), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ features: featuresForm.value }),
+    })
+    const json = await res.json()
+    if (json.success) {
+      featuresToast.value = { type: 'success', msg: json.message ?? 'Feature flags updated.' }
+    } else {
+      featuresToast.value = { type: 'error', msg: json.message ?? 'Update failed.' }
+    }
+  } catch (e) {
+    featuresToast.value = { type: 'error', msg: (e as Error).message ?? 'Request failed.' }
+  } finally {
+    featuresLoading.value = false
+    setTimeout(() => { featuresToast.value = null }, 4000)
+  }
+}
+
 const showToast = ref(false)
 watch(
   () => page.props.flash?.success,
@@ -236,23 +375,31 @@ const inputClass =
   'w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition'
 const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
 
-const tabs = [
-  { key: 'organization', label: 'Organization' },
-  { key: 'branding', label: 'Branding' },
-  { key: 'work_hours', label: 'Work Hours' },
-  { key: 'notifications', label: 'Notification Defaults' },
-  { key: 'integrations', label: 'Integrations' },
-]
+const visibleTabs = computed(() => {
+  const list = [
+    { key: 'organization', label: 'Organization' },
+    { key: 'branding', label: 'Branding' },
+    { key: 'work_hours', label: 'Work Hours' },
+    { key: 'notifications', label: 'Notification Defaults' },
+    { key: 'integrations', label: 'Integrations' },
+    { key: 'modules', label: 'Modules' },
+    { key: 'api_keys', label: 'API Keys' },
+  ]
+  return props.canViewApiKeys ? list : list.filter(t => t.key !== 'api_keys')
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <PageHeader
-      :breadcrumb="`Organization • ${org.toUpperCase()}`"
-      title="Settings"
-      subtitle="Configure your organization branding, localization, work hours, and integrations."
-    />
-
+  <PageShell
+    v-model="activeTab"
+    :tabs="visibleTabs"
+    :sticky="true"
+    :header="{
+      breadcrumb: `Organization • ${org.toUpperCase()}`,
+      title: 'Settings',
+      subtitle: 'Configure your organization branding, localization, work hours, and integrations.',
+    }"
+  >
     <!-- Toast -->
     <Transition
       enter-active-class="transition duration-200 ease-out"
@@ -271,12 +418,6 @@ const tabs = [
     </Transition>
 
     <form @submit.prevent="submit" class="space-y-6">
-      <ChromeTabs
-        v-model="activeTab"
-        :tabs="tabs"
-        local
-      />
-
       <!-- Organization -->
       <section v-show="activeTab === 'organization'" class="card-neo p-6 space-y-6">
         <h2 class="text-sm font-semibold text-white/80">
@@ -596,6 +737,219 @@ const tabs = [
         </div>
       </section>
 
+      <!-- Modules / Feature Flags -->
+      <section v-show="activeTab === 'modules'" class="card-neo p-6 space-y-6">
+        <h2 class="text-sm font-semibold text-white/80">
+          Modules / Feature Flags
+        </h2>
+        <p class="text-xs text-white/50">
+          Enable or disable modules and configure feature limits per organization.
+        </p>
+        <div
+          v-for="item in (featureCatalog ?? [])"
+          :key="item.key"
+          class="flex flex-col gap-2 border-b border-white/10 pb-4 last:border-0 last:pb-0"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <label :class="labelClass">{{ item.label }}</label>
+              <p class="text-xs text-white/50">
+                {{ item.description }}
+              </p>
+            </div>
+            <div v-if="item.type === 'boolean'" class="shrink-0">
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  v-model="featuresForm[item.key]"
+                  type="checkbox"
+                  class="rounded"
+                >
+                <span class="text-sm text-white/70">{{ featuresForm[item.key] ? 'On' : 'Off' }}</span>
+              </label>
+            </div>
+            <div v-else-if="item.type === 'number'" class="w-24 shrink-0">
+              <input
+                v-model.number="featuresForm[item.key]"
+                type="number"
+                min="0"
+                :class="inputClass"
+              >
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-2">
+          <button
+            type="button"
+            class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50"
+            :disabled="featuresLoading"
+            @click="saveFeatures"
+          >
+            {{ featuresLoading ? 'Saving…' : 'Save feature flags' }}
+          </button>
+          <span
+            v-if="featuresToast"
+            class="text-xs"
+            :class="featuresToast.type === 'success' ? 'text-emerald-400' : 'text-red-400'"
+          >
+            {{ featuresToast.msg }}
+          </span>
+        </div>
+      </section>
+
+      <!-- API Keys -->
+      <section v-show="activeTab === 'api_keys'" class="card-neo p-6 space-y-6">
+        <h2 class="text-sm font-semibold text-white/80">
+          API Keys
+        </h2>
+        <p class="text-xs text-white/50">
+          Create and manage API keys for integrations. Keys are shown in full only once when created.
+        </p>
+
+        <!-- One-time token display -->
+        <div
+          v-if="apiKeysNewToken"
+          class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+        >
+          <p class="text-xs font-medium text-amber-400 mb-2">
+            Copy your key now — it won't be shown again.
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <code class="flex-1 min-w-0 rounded bg-black/30 px-2 py-2 text-sm text-white/90 break-all font-mono">
+              {{ apiKeysNewToken }}
+            </code>
+            <button
+              type="button"
+              class="shrink-0 rounded-xl border border-amber-500/50 bg-amber-500/20 px-3 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/30"
+              @click="copyApiKeyToken"
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              class="shrink-0 rounded-xl border border-white/20 px-3 py-2 text-sm text-white/70 hover:text-white/90"
+              @click="dismissNewToken"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-xs text-white/50">
+            {{ apiKeys.length }} key(s)
+          </span>
+          <button
+            type="button"
+            class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90"
+            @click="apiKeysCreateModalOpen = true; apiKeysCreateError = null; apiKeysCreateName = ''"
+          >
+            Create API key
+          </button>
+        </div>
+
+        <div v-if="apiKeys.length === 0" class="rounded-xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/50">
+          No API keys yet. Create one to get started.
+        </div>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/10 text-left text-xs text-white/50">
+                <th class="pb-2 pr-4">Name</th>
+                <th class="pb-2 pr-4">Prefix</th>
+                <th class="pb-2 pr-4">Created</th>
+                <th class="pb-2 pr-4">Created by</th>
+                <th class="pb-2 pr-4">Last used</th>
+                <th class="pb-2 pr-4">Status</th>
+                <th class="pb-2 pl-2" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="k in apiKeys"
+                :key="k.id"
+                class="border-b border-white/5"
+              >
+                <td class="py-3 pr-4 font-medium text-white/90">{{ k.name }}</td>
+                <td class="py-3 pr-4 font-mono text-white/70">{{ k.prefix }}…</td>
+                <td class="py-3 pr-4 text-white/60">{{ new Date(k.created_at).toLocaleString() }}</td>
+                <td class="py-3 pr-4 text-white/60">{{ k.created_by ?? '—' }}</td>
+                <td class="py-3 pr-4 text-white/60">{{ k.last_used_at ? new Date(k.last_used_at).toLocaleString() : '—' }}</td>
+                <td class="py-3 pr-4">
+                  <span
+                    v-if="k.revoked_at"
+                    class="inline-flex rounded-lg bg-red-500/20 px-2 py-0.5 text-xs text-red-400"
+                  >
+                    Revoked
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex rounded-lg bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400"
+                  >
+                    Active
+                  </span>
+                </td>
+                <td class="py-3 pl-2">
+                  <button
+                    v-if="!k.revoked_at"
+                    type="button"
+                    class="rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    :disabled="apiKeysRevokeLoading === k.id"
+                    @click="revokeApiKey(k.id)"
+                  >
+                    {{ apiKeysRevokeLoading === k.id ? 'Revoking…' : 'Revoke' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Create API Key Modal -->
+      <Teleport to="body">
+        <div
+          v-if="apiKeysCreateModalOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          @click.self="apiKeysCreateModalOpen = false"
+        >
+          <div class="card-neo mx-4 w-full max-w-md p-6 shadow-xl">
+            <h3 class="text-sm font-semibold text-white/90 mb-4">
+              Create API Key
+            </h3>
+            <div>
+              <label :class="labelClass">Name</label>
+              <input
+                v-model="apiKeysCreateName"
+                type="text"
+                :class="inputClass"
+                placeholder="e.g. Production integration"
+                @keydown.enter.prevent="createApiKey"
+              >
+            </div>
+            <p v-if="apiKeysCreateError" class="mt-2 text-sm text-red-400">
+              {{ apiKeysCreateError }}
+            </p>
+            <div class="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-xl border border-white/20 px-4 py-2 text-sm text-white/70 hover:text-white/90"
+                @click="apiKeysCreateModalOpen = false"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50"
+                :disabled="apiKeysCreateLoading || !apiKeysCreateName.trim()"
+                @click="createApiKey"
+              >
+                {{ apiKeysCreateLoading ? 'Creating…' : 'Create' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Roles & Permissions -->
       <section class="card-neo p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white/80">
@@ -623,5 +977,5 @@ const tabs = [
         </button>
       </div>
     </form>
-  </div>
+  </PageShell>
 </template>

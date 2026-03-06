@@ -19,14 +19,14 @@ final class SubscriptionController extends Controller
     {
         abort_unless(request()->user()?->can('billing.view'), 403);
 
-        $subscription = $organization->subscription('default');
-        $onPro = $subscription && $subscription->active();
-        $onTrial = $organization->onGenericTrial() || ($subscription && $subscription->onTrial());
+        $cashierSubscription = $organization->subscription('default');
+        $onPro = $cashierSubscription && $cashierSubscription->active();
+        $onTrial = $organization->onGenericTrial() || ($cashierSubscription && $cashierSubscription->onTrial());
 
         $currentPlan = $onPro ? 'Pro Plan' : ($onTrial ? 'Free Trial' : 'Free');
         $nextPayment = null;
-        if ($subscription && $subscription->active()) {
-            $nextPayment = $subscription->currentPeriodEnd()?->format('Y-m-d');
+        if ($cashierSubscription && $cashierSubscription->active()) {
+            $nextPayment = $cashierSubscription->currentPeriodEnd()?->format('Y-m-d');
         }
         $trialEndsAt = $organization->trial_ends_at?->format('Y-m-d');
 

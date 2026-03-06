@@ -79,9 +79,23 @@ import NotificationDropdown from '@/Components/Global/NotificationDropdown.vue'
 // DO NOT REMOVE any existing code in the <script setup> block below this.
 
 /* Ziggy wrapper */
-const r = (name: string, params: any = {}, absolute = false, config?: any) =>
-  // @ts-ignore
-  (window as any).route(name, params, absolute, config)
+const routeFn = (window as any).route
+const r = (name: string, params: any = {}, absolute = false, config?: any) => {
+  if (typeof routeFn !== 'function') return '#'
+  try {
+    return routeFn(name, params, absolute, config)
+  } catch {
+    return '#'
+  }
+}
+
+const hasRoute = (name: string) => {
+  try {
+    return typeof routeFn?.has === 'function' ? !!routeFn.has(name) : true
+  } catch {
+    return false
+  }
+}
 
 /* Resolve org slug safely */
 const org = computed(() => {
@@ -123,7 +137,14 @@ const breadcrumbs = computed(() => {
   } else {
     // 2. Main Module Link (e.g., 'Clients')
     const indexRouteName = `${moduleName.toLowerCase()}.index`; // e.g., 'clients.index'
-    routePath.push({ label: moduleName, url: r(indexRouteName, { organization: orgSlug }) });
+    let moduleUrl = '#'
+    if (hasRoute(indexRouteName)) {
+      moduleUrl = r(indexRouteName, { organization: orgSlug })
+      if (moduleUrl === '#') {
+        moduleUrl = r(indexRouteName)
+      }
+    }
+    routePath.push({ label: moduleName, url: moduleUrl });
 
     // 3. Current Page Label (based on file name: Index, Create, Show, Edit, etc.)
     const nameMap: { [key: string]: string } = {

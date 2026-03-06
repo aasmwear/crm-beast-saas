@@ -26,6 +26,7 @@
 | reports     | ✓    | —      | —      | —      | —     | export                             |
 | activity    | ✓    | —      | —      | —      | —     | —                                  |
 | roles       | ✓    | —      | —      | —      | ✓     | assign                             |
+| api_keys    | ✓    | ✓      | —      | ✓      | —     | —                                  |
 
 ---
 
@@ -107,6 +108,7 @@ php artisan permissions:reconcile --assign --dry-run
 | **Settings** | | |
 | SettingsController::index | `settings.view` | View org settings |
 | SettingsController::update | `settings.update` | Update org branding/locale |
+| SettingsController::updateFeatures | `settings.update` | Update org feature flags (Modules tab) |
 | **Billing** | | |
 | SubscriptionController::index | `billing.view` | View billing page |
 | SubscriptionController::portal | `billing.view` | Stripe customer portal |
@@ -119,6 +121,10 @@ php artisan permissions:reconcile --assign --dry-run
 | **Clients Import** | | |
 | ClientsInertiaController::import | `clients.import` | View import form |
 | ClientsImportController::import | `clients.import` | POST import CSV |
+| **API Keys** | | |
+| SettingsController::index (api keys tab) | `api_keys.view` | View API keys list |
+| SettingsApiKeysController::store | `api_keys.create` | Create API key |
+| SettingsApiKeysController::destroy | `api_keys.delete` | Revoke API key |
 
 - **Billing:** Owner-only by default (Owner/Super Admin get all permissions). Manager/Employee do not get billing.view or billing.manage.
 - **Settings update:** Manager and Owner get `settings.update`; Employee gets `settings.view` only.

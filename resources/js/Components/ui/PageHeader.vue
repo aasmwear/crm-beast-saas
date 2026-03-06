@@ -11,15 +11,16 @@ defineProps<{
 
 <template>
   <section class="page-header hero-slab">
-    <div class="page-header__inner flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div class="page-header__inner flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div class="page-header__content min-w-0 flex-1">
-        <p v-if="breadcrumb" class="page-header__breadcrumb text-xs text-white/60 tracking-wide">
+        <p v-if="breadcrumb" class="page-header__breadcrumb text-xs text-white/55 tracking-wide uppercase">
           {{ breadcrumb }}
         </p>
-        <h1 class="page-header__title mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+        <h1 class="page-header__title text-xl sm:text-2xl font-semibold tracking-tight text-white"
+            :class="breadcrumb ? 'mt-0.5' : ''">
           {{ title }}
         </h1>
-        <p v-if="subtitle" class="page-header__subtitle mt-1 text-sm text-white/60">
+        <p v-if="subtitle" class="page-header__subtitle mt-0.5 text-sm text-white/55 leading-snug">
           {{ subtitle }}
         </p>
       </div>
@@ -32,7 +33,7 @@ defineProps<{
 
 <style scoped>
 .page-header {
-  padding: 1.5rem 1.75rem;
+  padding: 0.75rem 1.25rem;
 }
 
 .page-header__inner {
@@ -41,7 +42,7 @@ defineProps<{
 
 @media (min-width: 640px) {
   .page-header {
-    padding: 1.75rem 2rem;
+    padding: 1rem 1.5rem;
   }
 }
 </style>

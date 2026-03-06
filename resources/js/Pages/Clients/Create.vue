@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useForm, usePage, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -25,15 +26,15 @@ type ClientForm = {
   closer_id: number | null
   assigned_account_manager_id: number | null
 
-  google_business_profile_status: string | null
-  google_business_profile_access_status: string | null
+  gbp_status: string | null
+  gbp_access: string | null
 
   client_activation_status: string | null
   status: string | null
 
-  notes_by_sales: string | null
-  notes_by_cst: string | null
-  notes_by_tech: string | null
+  notes_sales: string | null
+  notes_cst: string | null
+  notes_tech: string | null
 }
 
 type PageProps = {
@@ -74,15 +75,15 @@ const form = useForm<ClientForm>({
   closer_id: null,   // Single user ID (strict accountability)
   assigned_account_manager_id: null,
 
-  google_business_profile_status: null,
-  google_business_profile_access_status: null,
+  gbp_status: null,
+  gbp_access: null,
 
   client_activation_status: 'lead',
   status: 'lead',
 
-  notes_by_sales: null,
-  notes_by_cst: null,
-  notes_by_tech: null,
+  notes_sales: null,
+  notes_cst: null,
+  notes_tech: null,
 })
 
 const submit = () => {
@@ -118,47 +119,35 @@ const gbpStatusOptions = [
   { value: '', label: '— Select GBP status —' },
   { value: 'not_created', label: 'Not Created' },
   { value: 'created', label: 'Created' },
+  { value: 'pending', label: 'Pending' },
   { value: 'verified', label: 'Verified' },
   { value: 'suspended', label: 'Suspended' },
-  { value: 'in_progress', label: 'In Progress' },
 ]
 
 const gbpAccessOptions = [
   { value: '', label: '— Select access level —' },
-  { value: 'none', label: 'No Access' },
-  { value: 'pending', label: 'Access Pending' },
-  { value: 'manager', label: 'Manager Access' },
-  { value: 'owner', label: 'Owner Access' },
+  { value: 'no_access', label: 'No Access' },
+  { value: 'access_pending', label: 'Access Pending' },
+  { value: 'access_granted', label: 'Access Granted' },
 ]
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Hero -->
-    <section class="hero-slab">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <div class="text-xs text-white/60">
-            Organization • {{ org.toUpperCase() }}
-          </div>
-          <h1 class="mt-1 text-3xl font-semibold tracking-tight">
-            Create Client
-          </h1>
-          <p class="mt-1 text-white/60">
-            Enter the details for a new client record.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <Link
-            :href="r('clients.index', { organization: org })"
-            class="btn-capsule text-xs"
-          >
-            Back to Clients
-          </Link>
-        </div>
-      </div>
-    </section>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${org.toUpperCase()}`,
+      title: 'Create Client',
+      subtitle: 'Enter the details for a new client record.',
+    }"
+  >
+    <template #header-actions>
+      <Link
+        :href="r('clients.index', { organization: org })"
+        class="btn-capsule text-xs"
+      >
+        Back to Clients
+      </Link>
+    </template>
 
     <!-- Form -->
     <form @submit.prevent="submit" class="card-neo p-6 space-y-8">
@@ -422,7 +411,7 @@ const gbpAccessOptions = [
           <div>
             <label :class="labelClass">GBP status</label>
             <select
-              v-model="form.google_business_profile_status"
+              v-model="form.gbp_status"
               :class="inputClass"
             >
               <option
@@ -434,17 +423,17 @@ const gbpAccessOptions = [
               </option>
             </select>
             <div
-              v-if="form.errors.google_business_profile_status"
+              v-if="form.errors.gbp_status"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.google_business_profile_status }}
+              {{ form.errors.gbp_status }}
             </div>
           </div>
 
           <div>
             <label :class="labelClass">GBP access status</label>
             <select
-              v-model="form.google_business_profile_access_status"
+              v-model="form.gbp_access"
               :class="inputClass"
             >
               <option
@@ -456,10 +445,10 @@ const gbpAccessOptions = [
               </option>
             </select>
             <div
-              v-if="form.errors.google_business_profile_access_status"
+              v-if="form.errors.gbp_access"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.google_business_profile_access_status }}
+              {{ form.errors.gbp_access }}
             </div>
           </div>
         </div>
@@ -474,43 +463,43 @@ const gbpAccessOptions = [
           <div>
             <label :class="labelClass">Sales notes</label>
             <textarea
-              v-model="form.notes_by_sales"
+              v-model="form.notes_sales"
               rows="4"
               :class="textareaClass"
             ></textarea>
             <div
-              v-if="form.errors.notes_by_sales"
+              v-if="form.errors.notes_sales"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.notes_by_sales }}
+              {{ form.errors.notes_sales }}
             </div>
           </div>
           <div>
             <label :class="labelClass">CST notes</label>
             <textarea
-              v-model="form.notes_by_cst"
+              v-model="form.notes_cst"
               rows="4"
               :class="textareaClass"
             ></textarea>
             <div
-              v-if="form.errors.notes_by_cst"
+              v-if="form.errors.notes_cst"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.notes_by_cst }}
+              {{ form.errors.notes_cst }}
             </div>
           </div>
           <div>
             <label :class="labelClass">Tech notes</label>
             <textarea
-              v-model="form.notes_by_tech"
+              v-model="form.notes_tech"
               rows="4"
               :class="textareaClass"
             ></textarea>
             <div
-              v-if="form.errors.notes_by_tech"
+              v-if="form.errors.notes_tech"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.notes_by_tech }}
+              {{ form.errors.notes_tech }}
             </div>
           </div>
         </div>
@@ -527,5 +516,5 @@ const gbpAccessOptions = [
         </button>
       </div>
     </form>
-  </div>
+  </PageShell>
 </template>

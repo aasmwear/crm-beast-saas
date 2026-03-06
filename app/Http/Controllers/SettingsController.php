@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateSettingsRequest;
 use App\Models\Organization;
+use App\Models\OrganizationApiKey;
+use App\Models\Platform\OrganizationFeature;
 use App\Models\Setting;
 use App\Services\AuditLogger;
+use App\Support\FeatureCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,6 +50,31 @@ final class SettingsController extends Controller
             : null;
         $smtpPassSet = Setting::isSecretSet($orgId, 'smtp_pass');
 
+        $of = OrganizationFeature::query()->where('organization_id', $orgId)->first();
+        $features = $of !== null ? $of->features : OrganizationFeature::DEFAULT_FEATURES;
+        $featureCatalog = FeatureCatalog::all();
+
+        $canViewApiKeys = $request->user()?->can('api_keys.view') ?? false;
+        $apiKeys = [];
+        if ($canViewApiKeys) {
+            $apiKeys = OrganizationApiKey::query()
+                ->where('organization_id', $orgId)
+                ->with('createdBy:id,name')
+                ->orderByDesc('created_at')
+                ->get(['id', 'name', 'prefix', 'created_at', 'created_by_user_id', 'last_used_at', 'revoked_at'])
+                ->map(fn ($k) => [
+                    'id' => $k->id,
+                    'name' => $k->name,
+                    'prefix' => $k->prefix,
+                    'created_at' => $k->created_at->toIso8601String(),
+                    'created_by' => $k->createdBy?->name,
+                    'last_used_at' => $k->last_used_at?->toIso8601String(),
+                    'revoked_at' => $k->revoked_at?->toIso8601String(),
+                ])
+                ->values()
+                ->toArray();
+        }
+
         return Inertia::render('Settings/Index', [
             'organization' => [
                 'id' => $organization->id,
@@ -72,7 +100,77 @@ final class SettingsController extends Controller
             'timezones' => \DateTimeZone::listIdentifiers(\DateTimeZone::ALL),
             'locales' => ['en' => 'English', 'es' => 'Spanish', 'fr' => 'French', 'de' => 'German'],
             'currencies' => ['USD' => 'USD', 'EUR' => 'EUR', 'GBP' => 'GBP'],
+            'features' => $features,
+            'featureCatalog' => $featureCatalog,
+            'apiKeys' => $apiKeys,
+            'canViewApiKeys' => $canViewApiKeys,
         ]);
+    }
+
+    /**
+     * Update organization feature flags. Gated by settings.update.
+     */
+    public function updateFeatures(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('settings.update'), 403);
+
+        /** @var Organization $organization */
+        $organization = $request->route('organization');
+        $orgId = (int) $organization->id;
+
+        $payload = $request->validate([
+            'features' => ['required', 'array'],
+            'features.*' => ['nullable'],
+        ]);
+
+        $of = OrganizationFeature::query()->where('organization_id', $orgId)->first();
+        if ($of === null) {
+            $of = OrganizationFeature::query()->create([
+                'organization_id' => $orgId,
+                'features' => OrganizationFeature::DEFAULT_FEATURES,
+                'subscription_status' => 'active',
+            ]);
+        }
+
+        $current = $of->features;
+        $changedKeys = [];
+        $allowed = array_keys(FeatureCatalog::keys());
+
+        foreach ($payload['features'] as $key => $value) {
+            if (! FeatureCatalog::isValidKey($key)) {
+                continue;
+            }
+
+            $type = FeatureCatalog::getType($key);
+            if ($type === FeatureCatalog::TYPE_BOOLEAN) {
+                $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            } elseif ($type === FeatureCatalog::TYPE_NUMBER) {
+                $normalized = is_numeric($value) ? (int) $value : ($current[$key] ?? FeatureCatalog::defaults()[$key] ?? 0);
+            } else {
+                continue;
+            }
+
+            if (($current[$key] ?? null) !== $normalized) {
+                $changedKeys[] = "features.{$key}";
+            }
+            $current[$key] = $normalized;
+        }
+
+        $of->features = $current;
+        $of->save();
+
+        if ($changedKeys !== []) {
+            AuditLogger::log(
+                $organization,
+                $request->user(),
+                'updated',
+                'settings',
+                $orgId,
+                ['keys' => $changedKeys]
+            );
+        }
+
+        return response()->json(['success' => true, 'message' => 'Feature flags updated.']);
     }
 
     /**
@@ -145,21 +243,27 @@ final class SettingsController extends Controller
 
         $integrationKeys = ['slack_webhook_url', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_from'];
         foreach ($integrationKeys as $key) {
-            if (array_key_exists($key, $validated)) {
-                if ($key === 'slack_webhook_url' && $validated[$key] !== '') {
-                    Setting::putEncrypted($orgId, $key, $validated[$key]);
+            if (! array_key_exists($key, $validated)) {
+                continue;
+            }
+            $val = $validated[$key];
+            if ($key === 'slack_webhook_url') {
+                $isEmpty = $val === null || $val === '';
+                if (! $isEmpty) {
+                    Setting::putEncrypted($orgId, $key, (string) $val);
                     $changedKeys[] = $key;
-                } elseif ($key === 'slack_webhook_url' && ($validated[$key] ?? '') === '') {
+                } elseif (! empty($validated['slack_webhook_clear'])) {
                     Setting::put($orgId, $key, null);
                     $changedKeys[] = $key;
-                } else {
-                    Setting::put($orgId, $key, $validated[$key]);
-                    $changedKeys[] = $key;
                 }
+            } else {
+                Setting::put($orgId, $key, $val);
+                $changedKeys[] = $key;
             }
         }
-        if (! empty($validated['smtp_pass'] ?? null)) {
-            Setting::putEncrypted($orgId, 'smtp_pass', $validated['smtp_pass']);
+        $smtpPass = $validated['smtp_pass'] ?? null;
+        if ($smtpPass !== null && $smtpPass !== '') {
+            Setting::putEncrypted($orgId, 'smtp_pass', (string) $smtpPass);
             $changedKeys[] = 'smtp_pass';
         }
 

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 import Card from '@/Components/ui/Card.vue'
 import EmptyState from '@/Components/ui/EmptyState.vue'
 import Modal from '@/Components/Modal.vue'
@@ -101,49 +102,45 @@ function projectUrl(project: ProjectCard): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="hero-slab">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-semibold tracking-tight text-white">
-            Projects
-          </h1>
-          <p class="mt-1 text-sm text-white/60">
-            Manage and track all organizational projects.
-          </p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <a
-            :href="r('projects.index', { organization: orgSlug })"
-            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white/10 text-white border border-white/10"
-          >
-            List
-          </a>
-          <a
-            :href="r('projects.board', { organization: orgSlug })"
-            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10 transition"
-          >
-            Board
-          </a>
-          <a
-            :href="r('projects.calendar', { organization: orgSlug })"
-            class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10 transition"
-          >
-            Calendar
-          </a>
-          <button
-            type="button"
-            @click="openCreateModal"
-            class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold bg-[var(--primary)] text-white hover:opacity-90 transition shadow-lg shadow-[var(--primary)]/20"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            New Project
-          </button>
-        </div>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${orgSlug.toUpperCase()}`,
+      title: 'Projects',
+      subtitle: 'Manage and track all organizational projects.',
+    }"
+  >
+    <template #header-actions>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a
+          :href="r('projects.index', { organization: orgSlug })"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white/10 text-white border border-white/10"
+        >
+          List
+        </a>
+        <a
+          :href="r('projects.board', { organization: orgSlug })"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10 transition"
+        >
+          Board
+        </a>
+        <a
+          :href="r('projects.calendar', { organization: orgSlug })"
+          class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10 transition"
+        >
+          Calendar
+        </a>
+        <button
+          type="button"
+          @click="openCreateModal"
+          class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold bg-[var(--primary)] text-white hover:opacity-90 transition shadow-lg shadow-[var(--primary)]/20"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          New Project
+        </button>
       </div>
-    </section>
+    </template>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <a
@@ -344,5 +341,5 @@ function projectUrl(project: ProjectCard): string {
         </form>
       </div>
     </Modal>
-  </div>
+  </PageShell>
 </template>

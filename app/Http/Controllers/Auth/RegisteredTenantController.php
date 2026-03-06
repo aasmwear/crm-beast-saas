@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Billing\SeatCounter;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,20 +67,23 @@ final class RegisteredTenantController extends Controller
                 'trial_ends_at' => now()->addDays(14),
             ]);
 
-            // 3. Attach User to Organization with is_owner = true
+            // 3. Seat limit check (staff user)
+            app(SeatCounter::class)->assertCanAddSeat($org);
+
+            // 4. Attach User to Organization with is_owner = true
             $user->organizations()->attach($org->id, ['is_owner' => true]);
 
-            // 4. Set active organization
+            // 5. Set active organization
             $user->forceFill(['active_organization_id' => $org->id])->save();
 
-            // 5. Assign Owner role (team-scoped via Spatie)
+            // 6. Assign Owner role (team-scoped via Spatie)
             $registrar = app(PermissionRegistrar::class);
             $registrar->setPermissionsTeamId($org->id);
 
             $ownerRole = \Spatie\Permission\Models\Role::findOrCreate('Owner', 'web');
             $user->syncRoles([$ownerRole]);
 
-            // 6. Seed onboarding data: 1 default Project + 1 Sample Client
+            // 7. Seed onboarding data: 1 default Project + 1 Sample Client
             $this->seedOnboardingData($org, $user);
 
             return $user;

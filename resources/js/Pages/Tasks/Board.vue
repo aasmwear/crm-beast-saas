@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 import TaskDrawer from '@/Components/tasks/TaskDrawer.vue'
 import { useRealtime } from '@/Composables/useRealtime'
 import type { TaskMovedPayload, TaskUpdatedPayload } from '@/Composables/useRealtime'
@@ -132,8 +133,21 @@ function normalizeStatus(status: string | null | undefined): ColumnKey {
   return 'todo'
 }
 
+/** Grouped map: column key → tasks. Computed once per localTasks change. */
+const tasksByColumnKey = computed(() => {
+  const map: Record<string, BoardTask[]> = {}
+  for (const key of columns.map((c) => c.key)) {
+    map[key] = []
+  }
+  for (const t of localTasks.value) {
+    const key = normalizeStatus(t.status)
+    map[key].push(t)
+  }
+  return map
+})
+
 function tasksInColumn(key: ColumnKey): BoardTask[] {
-  return localTasks.value.filter((t) => normalizeStatus(t.status) === key)
+  return tasksByColumnKey.value[key] ?? []
 }
 
 function priorityClass(priority: string | null): string {
@@ -206,36 +220,29 @@ function onColumnChange(task: BoardTask, event: Event) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header / Tabs -->
-    <div
-      class="mb-2 rounded-2xl bg-gradient-to-br from-[rgba(13,15,18,0.9)] via-[rgba(18,18,40,0.85)] to-transparent border border-white/5 px-5 py-4"
-    >
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 class="text-lg font-semibold tracking-tight text-white">
-            Task Board
-          </h1>
-          <p class="mt-1 text-sm text-white/60">
-            Kanban view of tasks across the organization.
-          </p>
-        </div>
-
-        <div class="inline-flex items-center gap-1 rounded-full bg-white/5 p-1 text-xs">
-          <Link
-            :href="route('tasks.index', { organization: orgSlug })"
-            class="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide text-white/70 hover:bg-white/10"
-          >
-            List
-          </Link>
-          <span
-            class="rounded-full bg-[var(--primary)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-[0_0_24px_rgba(139,124,255,0.65)]"
-          >
-            Board
-          </span>
-        </div>
+  <PageShell
+    :sticky="true"
+    :header="{
+      breadcrumb: `Organization • ${String(orgSlug).toUpperCase()}`,
+      title: 'Task Board',
+      subtitle: 'Kanban view of tasks across the organization.',
+    }"
+  >
+    <template #header-actions>
+      <div class="inline-flex items-center gap-1 rounded-full bg-white/5 p-1 text-xs">
+        <Link
+          :href="route('tasks.index', { organization: orgSlug })"
+          class="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide text-white/70 hover:bg-white/10"
+        >
+          List
+        </Link>
+        <span
+          class="rounded-full bg-[var(--primary)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-[0_0_24px_rgba(139,124,255,0.65)]"
+        >
+          Board
+        </span>
       </div>
-    </div>
+    </template>
 
     <!-- Columns -->
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
@@ -338,5 +345,5 @@ function onColumnChange(task: BoardTask, event: Event) {
       :organization-slug="orgSlug"
       @close="closeDrawer"
     />
-  </div>
+  </PageShell>
 </template>

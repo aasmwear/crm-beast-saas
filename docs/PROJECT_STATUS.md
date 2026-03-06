@@ -18,11 +18,11 @@
 | Tasks | ✅ | Kanban, List, Assignees, drawer (fixed: JSON + status-based errors) |
 | Roles & Permissions UI | ✅ | Matrix layout, Quick Matrix + Advanced modes |
 | Attendance | 🟡 | Basic flow; upgrade pending (minutes, status) |
-| Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice/Settings |
+| Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice/Settings/API Keys |
 | Reports | ✅ | Page + RBAC + export (primary_contact_email/phone) |
 | Notifications | 🟡 | Works; no RBAC |
-| Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations |
-| Billing | 🟡 | Works; no RBAC |
+| Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations, Modules, API Keys |
+| Billing | 🟡 | Foundation + seat enforcement (HRM, registration); portal users excluded; no Stripe sync, no RBAC |
 | HRM | 🟡 | Auth commented out |
 
 ---
@@ -33,10 +33,190 @@
 2. ~~**Reports page missing**~~ — Fixed: Reports/Index.vue created, RBAC (reports.view, reports.export), export uses primary_contact_*.
 3. **Unprotected controllers** — No authorize(): NotificationCenterController, SettingsController, SubscriptionController (billing), ClientsImportController. HRMController has auth commented out.
 4. **DB risks** — activities table has no organization_id; comments has no org_id; attendance.organization_id nullable. ~~ReportController export~~ — fixed: now uses primary_contact_email, primary_contact_phone. See docs/DB_SCHEMA.md.
+5. ~~**Public API auth**~~ — Fixed: Bearer token auth via AuthenticateOrganizationApiKey middleware; GET /api/ping protected.
 
 ---
 
 ## Last PR Notes
+
+- **Final UI stabilization: rail + profile normalization (rescue-mission):**
+  - **IconRail hover collapse hit area fixed:** rail nav scroll container now clips horizontally (`overflow-x: clip`, `overflow-x: hidden` fallback), so hidden/collapsed labels no longer extend hover hit-testing into page content.
+  - **Collapsed active pill alignment fixed:** default rail button gap removed in collapsed state; spacing now applies only in expanded state so icons remain centered inside pills when collapsed.
+  - **Bottom profile/auth area stabilized:** profile button remains pinned at rail bottom (`mt-auto`) and dropdown opens at a stable horizontal anchor based on collapsed rail width (not fluctuating expanded rail geometry).
+  - **Profile dropdown/logout hardening:** click-outside behavior preserved; logout simplified to backend-driven redirect flow without frontend fallback redirect logic.
+  - **Breadcrumb guard for non-org pages:** layout breadcrumb logic now safely checks route existence and falls back to `#` for modules without an index route (e.g. `Profile/Edit` -> `profile.index` absent), preventing route generation errors on `/profile`.
+  - **Profile page normalized to CRM layout/theme:** `/profile` now uses `PageShell` with CRM-style header and dark glass section cards; no tabs introduced and route scope unchanged.
+  - **Profile partials themed for CRM dark UI:** the three profile sections now use dark typography and local form/input styling overrides only within profile files (shared Breeze components unchanged).
+  - **Files changed:** `resources/js/Components/ui/IconRail.vue`, `resources/js/Layouts/AuthenticatedLayout.vue`, `resources/js/Pages/Profile/Edit.vue`, `resources/js/Pages/Profile/Partials/UpdateProfileInformationForm.vue`, `resources/js/Pages/Profile/Partials/UpdatePasswordForm.vue`, `resources/js/Pages/Profile/Partials/DeleteUserForm.vue`, `docs/PROJECT_STATUS.md`.
+  - **QA checklist:**
+    1. Rail expands only on hover/focus-within and collapses immediately when cursor leaves the visible rail width.
+    2. In collapsed rail state, active pill/icon alignment remains centered (no right drift from label gap).
+    3. `/profile` renders with CRM `PageShell` header + dark glass cards (no Breeze light-card layout).
+    4. Top breadcrumb renders on `/profile` without route-generation errors from missing `profile.index`.
+    5. Bottom profile menu remains usable; dropdown opens consistently and Sign out succeeds.
+
+- **Navigation + auth/profile UX regression fix (rescue-mission):**
+  - **Profile page regression fixed:** `/profile` now consistently renders the Inertia page (`Profile/Edit`) within the shared authenticated app layout. The page was updated to use `defineOptions({ layout: AuthenticatedLayout })` instead of nested Breeze-style layout markup.
+  - **Why users saw `OK` on white page:** logout redirected to `/`, and `/` is intentionally a plain `OK` health response in this app. Logout now redirects to `route('login')`, so users land on the login page reliably.
+  - **Logout frontend safety fallback:** IconRail logout now posts to `logout` and then uses an `onFinish` guard to `router.visit(login)` if the browser is not already on `/login`.
+  - **IconRail labels visible on hover/focus-within:** label reveal was hardened so text is not clipped in collapsed/expanding states (`max-width` transition + overflow-safe container). Keyboard focus still expands the rail.
+  - **Active nav highlight is SPA-reactive:** `isActive(...)` now prefers Ziggy `route().current(...)` checks and falls back to reactive `usePage().url` path matching (no `window.location`-only logic), so highlights update correctly in persistent Inertia layouts.
+  - **Ghost/missing item spacing fixed:** section separator kept as a deliberate thin divider (`rail-section-sep`) with consistent margins; removed visual appearance of a blank nav item.
+  - **Files changed:** `resources/js/Pages/Profile/Edit.vue`, `app/Http/Controllers/Auth/AuthenticatedSessionController.php`, `resources/js/Components/ui/IconRail.vue`, `tests/Feature/ProfileTest.php`, `tests/Feature/Auth/AuthenticationTest.php`.
+  - **QA checklist:**
+    1. Visit `/profile` while authenticated -> page renders Profile forms (not plain `OK`).
+    2. Click Sign out from IconRail menu -> redirected to `/login`.
+    3. Hover rail -> labels become visible beside icons; no main-content layout jump.
+    4. Keyboard Tab into rail -> rail expands and labels are readable.
+    5. Navigate between Clients/Projects/Tasks/Billing via Inertia links -> active pill updates immediately.
+    6. Divider between nav sections looks intentional (thin line), not an empty/ghost slot.
+    7. Non-admin users still do not see Settings/Billing links.
+
+- **IconRail active-state hardening + profile menu (rescue-mission):**
+  - **Root cause fixed — active state not reactive**: `isCurrent()` was reading `window.location.pathname` (not reactive). Since `AuthenticatedLayout` is a persistent Inertia layout (never unmounts on navigation), the active state never updated after first render. Fix: replaced with `page.url` from Inertia's reactive `usePage()`, which updates on every SPA navigation. All nav items (including Billing) now highlight correctly.
+  - **isActive(...routeNames) helper**: replaced `isCurrent()` / `isCurrentAny()` with a single `isActive(...routeNames: string[])` variadic helper. Each item can list its own patterns: e.g., `isActive('clients.index', 'clients.show', 'clients.create', 'clients.edit')` — highlights when on any Clients page.
+  - **Premium pill highlight**: active items now render as inset rounded pills (`margin: 0 6px; border-radius: 0.75rem`) instead of a full-bleed rectangle. Active state gets a subtle glow (`box-shadow: 0 2px 14px rgba(62,83,255,0.38)`). Icon column re-centres via `margin-left` transition so icons shift left-aligned when rail expands.
+  - **Profile / Auth menu**: a user avatar button (initials gradient circle) is pinned to the bottom of the rail via `flex-1` spacer. Clicking it opens a fixed-positioned dropdown (Teleported to body so `overflow:hidden` on the rail doesn't clip it). Dropdown contains: Profile (→ `/profile`), Settings (admin-only, → settings.index), Sign out (Inertia `router.post('/logout')`). Click-outside closes the dropdown via capture-phase `document.addEventListener`. Keyboard-accessible via `:aria-expanded`.
+  - **Nav separator**: replaced `rail-sep mx-auto` (which behaved inconsistently with `align-items:stretch`) with `rail-section-sep` — a proper full-width `1px` line with symmetric margins (`margin: 6px 12px`) that aligns with the pill buttons.
+  - **Files changed:** `resources/js/Components/ui/IconRail.vue`.
+  - **QA checklist:**
+    1. Navigate to Billing → Billing nav item should highlight (gradient pill).
+    2. Navigate Clients → Index, Show, Create, Edit → Clients item stays highlighted throughout.
+    3. Navigate via keyboard (Tab into rail items) → active item should be highlighted, focus reveals labels.
+    4. Click user avatar at bottom of rail → dropdown opens to the right.
+    5. Dropdown: click Profile → navigates to /profile; click Settings → navigates to settings; click Sign out → logs out (POST /logout).
+    6. Click anywhere outside dropdown → dropdown closes.
+    7. Non-admin user: Settings + Billing items hidden from rail; Settings hidden from dropdown.
+    8. Section separator (thin line) is visible between Announcements and Employees sections — not a blank gap.
+    9. Hover expand + label animation still work.
+
+- **UI Polish: IconRail hover-expand + compact headers (rescue-mission):**
+  - **IconRail hover-expand:**
+    - Desktop rail (`position: fixed`, `--rail-width: 76px`) now expands to `216px` on `:hover` / `:focus-within` with a `240ms cubic-bezier(0.32,0.72,0,1)` width transition.
+    - Each nav item now has an icon column (`rail-btn__icon`, fixed `76px`) and a label (`rail-btn__label`) that animates in with `opacity + translateX` once the rail expands.
+    - Labels are hidden by default (opacity 0, translateX −6px) and reveal with a staggered `160ms/180ms` transition.
+    - Keyboard focus (`focus-within`) also expands the rail — full accessibility support.
+    - `aria-current="page"` added to the active nav item for screen-reader / AT support.
+    - **No layout shift**: main content area (`bordermainradius { margin-left: 5rem }`) is untouched; expanded rail is an overlay.
+    - Active state (`current` gradient) preserved in both collapsed and expanded modes.
+  - **Compact headers:**
+    - `PageHeader.vue`: padding reduced from `1.5/1.75rem` → `0.75/1rem`; title from `text-2xl sm:text-3xl` → `text-xl sm:text-2xl`; subtitle margin tightened to `mt-0.5`.
+    - `ChromeTabs.vue`: `--chrome-tab-height` reduced from `2.25rem` → `2rem`; tab padding tightened to `0.875rem`.
+    - `PageShell.vue`: outer `space-y-6` → `space-y-4`; sticky area `space-y-6` → `space-y-3`.
+  - **Files changed:** `resources/js/Components/ui/IconRail.vue`, `PageHeader.vue`, `ChromeTabs.vue`, `PageShell.vue`.
+  - **QA checklist:**
+    1. **Hover expand**: mouse over the left rail on any authenticated page → rail should smoothly expand to ~216px showing labels beside icons.
+    2. **Label animation**: labels fade in (no flash/jump); icons do NOT move during expansion.
+    3. **Keyboard focus**: Tab into any rail item → rail expands, label is visible.
+    4. **Active state**: current page item shows the gradient bg in both collapsed and expanded states.
+    5. **No layout shift**: main content area does not move when rail expands.
+    6. **Mobile drawer**: unchanged — hamburger + drawer still works on < lg screens.
+    7. **Compact headers**: visit Settings, Clients, Projects — headers should be visibly shorter while keeping hierarchy (title > subtitle).
+    8. **Sticky headers**: visit a page with `sticky=true` PageShell — header should stick on scroll with no overlap.
+    9. **ChromeTabs**: tabs should be slightly shorter (`2rem` height) but still readable and premium.
+    10. **Build**: `npm run build` produces no errors.
+
+- **Hotfix: Billing page 500 — subscription() collision (rescue-mission):**
+  - **Cause:** Organization defined `subscription()` HasOne to OrganizationSubscription, colliding with Cashier Billable's `subscription('default')`. Code expecting Cashier Subscription received our HasOne relation, then called `->active()` → BadMethodCallException.
+  - **Fix:** Renamed relation to `billingSubscription()`. SeatCounter, EntitlementsService updated. SubscriptionController now uses Cashier `subscription('default')` correctly.
+  - **Tests:** BillingPageDoesNotCrashTest — GET billing page as user with billing.view → 200.
+  - **QA:** Visit `/org/{org}/billing` as Owner → no 500, page loads.
+
+- **Add-on semantics + plan key canonical (rescue-mission):**
+  - **Add-on modes:** `organization_addons.mode` — `augment` (adds to base; default) or `set` (overrides with value_int; multiple set → highest wins). Migration adds column with default `augment`.
+  - **EntitlementsService:** Apply addons with mode-aware logic. augment: sum; set: override with value_int, highest wins for same key.
+  - **Plan key canonical:** `organization_subscriptions.plan_key` is source of truth. Fallback: `organizations.plan` (legacy) when no subscription. `organizations.plan` is legacy/display-only.
+  - **Organization model:** Comment added that plan is legacy; fillable unchanged for backward compat.
+  - **SeatCounter:** Uses same plan resolution (subscription first, org.plan fallback).
+  - **Tests:** AddonsSemanticsTest — augment increases; set overrides; multiple set choose highest; subscription.plan_key over org.plan; org.plan fallback when no subscription; mode defaults augment.
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md (add-on modes, set conflict rule, plan key source of truth), DB_SCHEMA.md (mode column), PRODUCTION_READINESS_CHECKLIST.md (billing semantics stability).
+  - **QA checklist:**
+    1. Seed an org subscription with plan_key=starter.
+    2. Create addon storage_gb with augment +10 → EntitlementsService reports base + 10.
+    3. Create addon api_rpm with set=600 → EntitlementsService returns 600.
+    4. Ensure existing behavior: addons without mode default to augment.
+
+- **Seat limit enforcement (rescue-mission):**
+  - **Enforcement:** `SeatCounter::assertCanAddSeat(Organization $org)` throws `ValidationException` (422) with message "Seat limit reached for your plan. Upgrade or add seats to invite more users." when org is at staff seat limit.
+  - **Enforcement points:** HRMController::store (create employee), RegisteredTenantController::store (tenant registration), RegisteredUserController::store (legacy registration). PortalAccessController::store (enable portal access) — **not** enforced (portal users excluded from seat count).
+  - **Staff vs portal:** Staff = `users.client_id` IS NULL, counts toward limit. Portal = `users.client_id` set, never blocked.
+  - **Tests:** SeatEnforcementTest — allows staff when under limit; blocks staff at limit (422); allows portal when at staff limit; tenant scoping (org B limit does not affect org A).
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md (enforcement points, staff/portal definitions), QA_RELEASE_PLAYBOOK.md (seat limit QA scenario).
+  - **QA:** Run `./vendor/bin/sail artisan test tests/Feature/Billing/SeatEnforcementTest.php`. Manual: org at 2-seat limit → add employee via HRM → 422; enable portal access for contact → success.
+
+- **Billing & Entitlements foundation (rescue-mission):**
+  - **Schema:** `organization_subscriptions` (plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit) and `organization_addons` (addon_key, quantity, value_int, active, starts_at/ends_at). All tenant-scoped by organization_id.
+  - **Plan catalog:** `App\Support\PlanCatalog` — starter, pro, enterprise with default entitlements; enterprise overrides via config/billing.php.
+  - **Entitlements resolver:** `App\Services\Billing\EntitlementsService` — resolution order: plan defaults → org overrides (organization_features.features) → add-ons (augment numerics). Methods: forOrg(), enabled(), value(). Per-request cache.
+  - **Seat counting:** `App\Services\Billing\SeatCounter` — countActiveSeats() (tenant app users only; portal users with client_id set excluded), canAddSeat(). Organization::canAddSeat() delegates to SeatCounter.
+  - **Feature catalog:** Added `api_rpm` to FeatureCatalog; PlanCatalog aligned with attendance, sms, api_access, storage_gb, api_rpm.
+  - **No Stripe code** in this PR; future webhook will sync organization_subscriptions.
+  - **Tests:** EntitlementsResolutionTest (plan defaults, org overrides, addons augment, tenant scoping), SeatCounterTest (count tenant users, exclude portal users, canAddSeat under/at limit, seat_limit override, tenant scoping).
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md (pricing model, definitions, resolution order, schema, future Stripe plan), PRODUCTION_READINESS_CHECKLIST.md (billing/entitlements checklist).
+  - **QA:** Run `./vendor/bin/sail artisan test tests/Feature/Billing/`. Run full suite and `npm run build`. No UI changes; enforcement helpers available for future use.
+
+- **Public API Rate Limiting:**
+  - **Middleware:** `ThrottleOrgApi` — key `org:{orgId}:key:{apiKeyId}:ip:{ip}`, 60 req/min (config: `API_RATE_LIMIT_PER_MINUTE`).
+  - **Applied to:** `/api/*` routes with `org_api_key` + `throttle_org_api` (auth runs first; 401 does not consume quota).
+  - **429 response:** `{"message":"Too many requests.","code":"rate_limited"}` — no org/key leak.
+  - **Config:** `config/api.php` — rate_limit_per_minute.
+  - **Tests:** `ApiRateLimitTest` — within limit succeeds; exceed returns 429 with code; per-test org/key isolation.
+  - **Docs:** SECURITY_MODEL.md (Rate Limiting), INTEGRATIONS_STANDARDS.md (429 + backoff), QA_RELEASE_PLAYBOOK.md (rate limit smoke check).
+  - **QA:** Valid token → multiple requests within 60/min → 200. Exceed limit → 429 with `code: "rate_limited"`. Run `./vendor/bin/sail artisan test tests/Feature/Api/ApiRateLimitTest.php`.
+
+- **Public API Authentication (Bearer tokens):**
+  - **Middleware:** `AuthenticateOrganizationApiKey` — reads `Authorization: Bearer crmb_xxx`, validates via prefix + sha256 compare against `organization_api_keys`, rejects revoked keys, sets `app('scoped.organization')` and request attributes.
+  - **last_used_at:** Updated only when null or older than 5 minutes (throttle).
+  - **Route:** GET `/api/ping` — returns `ok`, `organization` (id, slug, name), `api_key_prefix`, `timestamp`. Protected by `org_api_key` + `throttle:org-api` middleware.
+  - **Tests:** `ApiKeyAuthTest` — 401 missing/malformed/invalid/revoked; 200 valid token; last_used throttle; no raw token in response; org A key never returns org B.
+  - **Docs:** SECURITY_MODEL.md (Public API Authentication), INTEGRATIONS_STANDARDS.md (API Keys usage), QA_RELEASE_PLAYBOOK.md (API smoke test).
+  - **QA:** Create key in Settings → API Keys. `curl -H "Authorization: Bearer <token>" /api/ping` → 200, org info. No header → 401. Revoke key → 401. Run `./vendor/bin/sail artisan test tests/Feature/Api/ApiKeyAuthTest.php`.
+  - **Next blockers:** Expand API endpoints (clients, projects, etc.); scoped permission checks for API.
+
+- **Tenant-scoped API Keys (Settings):**
+  - **DB:** Migration `organization_api_keys` — name, prefix, hashed_key (sha256), last_used_at, created_by_user_id, revoked_at. Never store plaintext.
+  - **Model:** OrganizationApiKey with organization(), createdBy(), scope active().
+  - **Permissions:** api_keys.view, api_keys.create, api_keys.delete. Owner/Manager get all three; Employee has none.
+  - **Controller:** SettingsApiKeysController — store (returns plaintext once), destroy (revoke). SettingsController::index adds apiKeys + canViewApiKeys to props when user has api_keys.view.
+  - **Routes:** POST /org/{org}/settings/api-keys, DELETE /org/{org}/settings/api-keys/{apiKey} (scopeBindings).
+  - **UI:** Settings tab "API Keys" — list (name, prefix, created_at, created_by, last_used_at, revoked_at), Create modal, one-time token display with Copy, Revoke with confirmation.
+  - **Audit:** entity api_key, actions created/revoked; changes include prefix/name only, no secrets.
+  - **Tests:** SettingsApiKeysTest — 403 without perms, org scoping (404 cross-tenant revoke), create returns token once/DB stores hashed, audit logs.
+  - **QA:** `/org/{org}/settings` → API Keys tab. Create key → copy token → verify list shows prefix → revoke with confirmation. Run `./vendor/bin/sail artisan test tests/Feature/Settings/SettingsApiKeysTest.php`.
+
+- **Client Create/Edit persistence + append-only notes (rescue-mission):**
+  - **DB alignment:** Controller and Vue now use canonical column names matching migrations: `fronter_id`, `closer_id`, `gbp_status`, `gbp_access`, `notes_sales`, `notes_cst`, `notes_tech`. Legacy aliases (`google_business_profile_status`, `notes_by_*`) accepted in validation and normalized for backward compatibility.
+  - **ClientController store:** Validates `fronter_id`, `closer_id` (not legacy `fronter`/`closer` arrays); `gbp_status`/`gbp_access` with enum rules; `notes_sales`/`notes_cst`/`notes_tech`. Maps legacy input to canonical before save. Only fillable keys passed to `Client::create()`.
+  - **ClientController update:** Same validation; supports `new_note_sales`, `new_note_cst`, `new_note_tech` for append-only. When provided, prepends `[Y-m-d H:i] User (#id): ` and appends to existing notes.
+  - **Create.vue / Edit.vue:** Use `gbp_status`, `gbp_access`, `notes_sales`, `notes_cst`, `notes_tech`. GBP options: gbp_status `not_created`, `created`, `pending`, `verified`, `suspended`; gbp_access `no_access`, `access_pending`, `access_granted`.
+  - **Edit.vue notes:** Existing notes shown read-only; separate "Add note" textareas map to `new_note_*` for timestamped append-only entries.
+  - **CSV export (ClientController index):** Fixed to use `gbp_status`, `gbp_access`, `notes_sales`, `notes_cst`, `notes_tech`.
+  - **Tests:** `ClientPersistenceTest` — fronter_id/closer_id persist and appear in edit; gbp_status/gbp_access persist; notes_sales persist; new_note_sales appends with timestamp+author.
+  - **QA:** Create client with fronter, closer, account manager, GBP status, GBP access, notes → Save → Edit page shows all values. Edit client → Add note in "Add note (append-only)" → Save → Show/Edit shows appended entry with timestamp and author prefix. Run `./vendor/bin/sail artisan test tests/Feature/Clients/`.
+
+- **Client Pipeline status validation (rescue-mission):**
+  - **Problem:** UI sends lowercase Pipeline status (`lead`, `active`, `inactive`, `paused`, `churned`) but backend expected Titlecase (`Lead`, `Active`, `Inactive`) and lacked Paused/Churned, causing "selected status is invalid".
+  - **ClientController (store + update):** Validation now accepts both lowercase and Titlecase for `status`. Allowed: `lead`, `active`, `inactive`, `paused`, `churned` (and `Lead`, `Active`, `Inactive`, `Paused`, `Churned` for legacy). Status is normalized to lowercase before save.
+  - **Tests:** `ClientStatusValidationTest` — store with `status=active` and `status=Active` succeeds and stores `active`; `status=invalid_value` returns 422; update normalization verified.
+  - **QA:** Create client at `/org/{org}/clients/create` — select Pipeline status (Lead, Active, Inactive, Paused, Churned) and save; no "selected status is invalid". Edit client — change Pipeline status and save; persisted as lowercase in DB. Run `./vendor/bin/sail artisan test tests/Feature/Clients/ClientStatusValidationTest.php`.
+
+- **Tenant isolation hardening (rescue-mission):**
+  - **DepartmentController:** Replaced `app('tenant')` with `$request->route('organization')` in store action; org must be non-null (404 otherwise); create/store always set `organization_id` from route.
+  - **TaskController::store:** Validates `project_id` with tenant-scoped `Rule::exists('projects','id')->where('organization_id', $org->id)` to prevent cross-tenant project injection; Task always uses `organization_id` from route regardless of payload.
+  - **Scoped route bindings:** Added `scopeBindings()` to projects (resource), clients (show/edit/update/destroy/pipeline), tasks (show/update/destroy/submit/review). Cross-tenant requests return 404 (no existence leak).
+  - **Organization model:** Added `tasks()` relationship for scoped binding.
+  - **TaskController::show:** Signature updated to accept `Organization $organization` for correct route-parameter order with scopeBindings.
+  - **Tests:** `TenantIsolationHardeningTest` — task store rejects cross-tenant project_id (422); department store scopes org; scoped bindings return 404 for cross-tenant task/client/project.
+  - **QA:** Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`. Verify departments create; tasks create with valid project; cross-tenant URLs (e.g. `/org/org-a/tasks/{id-of-task-in-org-b}`) return 404.
+  - **Notes:** ResolveTenant unchanged; all tenant routes remain under `/org/{organization:slug}/...`; `app('scoped.organization')` is the canonical binding.
+
+- **Modules / Feature Flags (Tenant Settings):**
+  - New "Modules" tab in Settings UI with DB-backed feature flags (organization_features table).
+  - FeatureCatalog (app/Support/FeatureCatalog.php) defines catalog: key, label, description, type (boolean/number), default.
+  - Features::enabled() and Features::value() use organization_features when org provided; config fallback when org null.
+  - POST /org/{org}/settings/features (settings.features) gated by settings.update; audit log with keys features.<key>.
+  - EnsureFeatureEnabled middleware now uses DB-backed Features::enabled (no code change; Features.php updated).
+  - Tests: 403 without settings.update, org-scoped update, audit log, index passes features/catalog, Features::enabled DB check.
 
 - **Tenant Settings v2 — audit logging + secret-safe integrations:**
   - AuditLogger for SettingsController::update; logs `settings.updated` with changed keys only (no raw secrets).
@@ -46,12 +226,19 @@
   - Tests: org-scoped settings, 403 unauthorized, audit log on update, secrets not leaked in props.
   - Docs: SETTINGS_AUDIT.md, PROJECT_STATUS.md.
 
-- **UI foundation: Chrome-style tabs + consistent page header (PR):**
-  - **ChromeTabs.vue** (`resources/js/Components/ui/ChromeTabs.vue`): Chrome-like overlapping tabs, dark/glass theme. Supports Inertia (Link) and local mode (v-model). Accessible: keyboard (←/→, Home/End), aria roles, focus states. Responsive: horizontal scroll on mobile.
-  - **PageHeader.vue** (`resources/js/Components/ui/PageHeader.vue`): Standard layout: optional breadcrumb, H1 title, optional subtitle, right-side actions slot. Uses hero-slab styling.
-  - **Applied to:** Settings/Index.vue (tabs + header), Settings/Roles.vue (Quick Matrix/Advanced toggle + header), Projects/Show.vue (Overview/Tasks/Files/Notes tabs).
-  - **QA:** Settings tabs (Organization, Branding, etc.) switch correctly; Roles Quick Matrix ↔ Advanced switch works; keyboard navigation (Tab to focus tabs, Arrow keys to move); save flow, create role, unsaved-changes bar unchanged.
-  - **Follow-ups:** Consider applying ChromeTabs to other pages (Tasks list/board, Clients, etc.); Inertia mode (tabs with href) ready for future route-based tab pages.
+- **UI foundation: ChromeTabs now top-of-page via PageShell:**
+  - **PageShell.vue** (`resources/js/Components/ui/PageShell.vue`): Reusable page shell with layout order: (1) ChromeTabs at top (if tabs provided), (2) PageHeader, (3) content slot. Props: tabs, modelValue (v-model), header (breadcrumb, title, subtitle), **sticky** (boolean, default false). Supports header-actions slot. No tabs prop = header above content only.
+  - **Sticky top bar mode (sticky=true):** When enabled, ChromeTabs (if present) and PageHeader stick to the top of the viewport while scrolling. Content scrolls normally beneath. Improves "Chrome luxury" feel on tabbed and scroll-heavy pages. Pages enabled: Settings/Index, Settings/Roles, Projects/Show, Clients/Show, Tasks/Board.
+  - **Tabbed pages:** Settings/Index, Settings/Roles, Projects/Show, Clients/Show. Tabs render above header; header-actions slot holds Edit/Delete/Create Role/etc.
+  - **Non-tab pages (PageShell without tabs):** Clients/Index, Clients/Create, Clients/Edit, Projects/Index, Projects/Create, Projects/Edit, Tasks/Index, Tasks/Board, Attendance/Index, Announcements/Index, Reports/Index. Same header structure; action buttons in header-actions.
+  - **Settings/Index.vue:** Organization, Branding, Work Hours, etc. — RBAC tab gating, unsaved-changes guard.
+  - **Settings/Roles.vue:** Quick Matrix | Advanced tabs at top; Create Role in header-actions; unsaved-changes handling unchanged.
+  - **Projects/Show.vue:** Overview | Tasks | Files | Internal notes — Back to projects, Edit, Delete in header-actions.
+  - **Clients/Show.vue:** Overview | Projects | Contacts | Notes — ← Clients, Edit, Delete in header-actions.
+  - **QA (tabbed):** (1) `/org/{org}/settings` — ChromeTabs above header; tabs switch correctly; API Keys tab when permitted. (2) `/org/{org}/settings/roles` — Quick Matrix/Advanced tabs at top; mode switch works; unsaved-changes bar and leave confirmation unchanged. (3) `/org/{org}/projects/{id}` — tabs above header; Overview/Tasks/Files/Notes switch; Back/Edit/Delete visible. (4) `/org/{org}/clients/{id}` — ChromeTabs above header; Overview/Projects/Contacts/Notes switch; ← Clients, Edit, Delete visible.
+  - **QA (sticky mode):** On Settings, Settings/Roles, Projects/Show, Clients/Show, Tasks/Board — scroll down: tabs (when present) and header remain visible at top; content scrolls beneath without overlap; header-actions buttons remain clickable; verify on small screens (mobile).
+  - **QA (non-tab):** Clients/Index — Pipeline, New Client, Import, Export in header. Clients/Create, Clients/Edit — Back to Clients. Projects/Index — List, Board, Calendar, New Project. Projects/Create, Projects/Edit — Back to Projects. Tasks/Index — List, Board, View projects. Tasks/Board — List, Board. Attendance/Index — Clock in / Clock out in header. Announcements/Index — New announcement in header. Reports/Index — Export CSV, Include deleted (when canExport), else permission message. Form validation and submit unchanged.
+  - **Tasks Board optimization:** Board.vue uses a computed `tasksByColumnKey` map instead of repeated `tasksInColumn(column.key)` filtering per column. Single O(n) pass groups tasks by status; template uses O(1) lookups. Drag/drop and status move unchanged.
 
 - **Tenant Settings (Enterprise v1):** Tabs: Organization (name, slug read-only, timezone, week_start, locale, currency), Branding (logo), Work Hours (work_week, start/end time), Notification Defaults (inapp, email), Integrations (Slack webhook, SMTP). FormRequest validation. Settings stored in organizations table + settings table (Setting::put). Org-scoped. See docs/SETTINGS_AUDIT.md.
 - **Activity module enterprise polish:** activity.view permission added; ActivityController gated by activity.view (was Task::viewAny). Nav (IconRail, CommandPalette) hides Activity if user lacks permission. AuditLogger added for: Clients import, Announcements (create/update/delete), Attendance (clock-in/out), Invoice paid (webhook). Subject links in Activity/Index.vue (client, project, task, etc.). Tests: 403 without activity.view; audit log with organization_id.
@@ -73,8 +260,8 @@
 
 1. **Reports page:** `/org/{org-slug}/reports` (e.g. `/org/acme/reports`)
    - Must be logged in with reports.view permission.
-   - Page shows quick cards (Clients, Projects, Tasks, Attendance, Invoices) with counts.
-   - Export section visible; Export CSV button requires reports.export.
+   - PageShell with breadcrumb, title, subtitle. Export CSV and Include deleted in header-actions when user has reports.export; else "You need reports.export permission" message.
+   - Quick cards (Clients, Projects, Tasks, Attendance, Invoices) with counts. Export section with description.
 2. **Export CSV:** `/org/{org-slug}/export/csv/clients`
    - Requires reports.export.
    - CSV columns: Company, Primary Contact Email, Primary Contact Phone.
@@ -90,13 +277,20 @@
 
 1. **Settings page:** `/org/{org-slug}/settings` (e.g. `/org/acme/settings`)
    - Requires `settings.view` to view, `settings.update` to save.
-2. **Tabs (ChromeTabs):** Organization, Branding, Work Hours, Notification Defaults, Integrations. Chrome-style overlapping tabs; keyboard: Tab to focus, ←/→ to switch.
+2. **Tabs (ChromeTabs via PageShell):** Tabs render at the top of the page, above the "Settings" header. Organization, Branding, Work Hours, Notification Defaults, Integrations, Modules, API Keys (when permitted). Chrome-style overlapping tabs; keyboard: Tab to focus, ←/→ to switch.
 3. **Organization:** Name, slug (read-only), timezone, week start, locale, currency.
 4. **Branding:** Logo upload (max 1 MB).
 5. **Work Hours:** Mon–Fri / Sun–Thu, start/end time (for attendance/reporting).
 6. **Notification Defaults:** In-app, email toggles (defaults for new users).
 7. **Integrations:** Slack webhook URL, SMTP (host, port, from, user, password). Secrets encrypted at rest; masked in UI.
-8. **Save:** Loading state + success toast. Settings are org-scoped.
+8. **Modules:** Feature flags (attendance, sms, api_access, storage_gb). Toggle booleans, set numeric values. Save via "Save feature flags" button.
+9. **Save:** Loading state + success toast. Settings are org-scoped.
+10. **API Keys:** Tab visible when user has api_keys.view. Create key (modal with name), plaintext shown once with Copy; list shows name, prefix, created_at, created_by, last_used_at, revoked_at. Revoke with confirmation. No secrets in props.
+
+### Blank Secret Fields — QA
+
+- **Save with Slack/SMTP secrets left blank:** Configure Slack webhook and SMTP password, save. Then change another setting (e.g. timezone) leaving Slack URL and SMTP password fields blank → Save. Returns 302, success toast. Slack and SMTP secrets remain set (`smtp_pass_set` true, Slack shows "Connected").
+- **Clear Slack:** Click "Clear" next to Slack webhook → Save. Secret is removed.
 
 ### Tenant Settings v2 — QA (Audit Logging + Secret-Safe Integrations)
 
@@ -105,9 +299,27 @@
 - **Set SMTP host/user/pass → Save:** Password not visible on reload. "Test SMTP" button verifies connection; success/error toast.
 - **Verification:** `sail artisan test` and `sail npm run build`.
 
+### API Keys — QA
+
+- **API Keys tab:** `/org/{org-slug}/settings` → API Keys tab (visible only with api_keys.view). Create key with name → plaintext token shown once → Copy → Done. List shows name, prefix, created_at, created_by, last_used_at, revoked_at. Revoke with confirmation. Verify audit entries in Activity (entity: api_key, actions: created, revoked; no secrets in changes).
+- **RBAC:** User without api_keys.view does not see API Keys tab. Without api_keys.create gets 403 on POST. Without api_keys.delete gets 403 on DELETE.
+- **Tenant isolation:** Cross-tenant revoke returns 404.
+
+### Modules / Feature Flags — QA
+
+- **Modules tab:** `/org/{org-slug}/settings` → Modules tab. Toggle attendance, sms, api_access; set storage_gb. Click "Save feature flags" → success toast.
+- **RBAC:** User without settings.update gets 403 on POST /settings/features.
+- **Audit:** Changes logged with entity settings, action updated, keys like features.sms, features.storage_gb.
+
 ## Roles & Permissions — Matrix UX
 
 - **Page:** `/org/{org}/settings/roles`
-- **Modes:** Quick Matrix (default), Advanced — now via ChromeTabs (local mode)
-- **Features:** Permission catalog, sticky bar, leave confirmation, team-scoped badges, PageHeader
-- **QA:** See Manual QA Steps in root PROJECT_STATUS.md or run through: persist, save flow, create role, unsaved flow, mode switch (ChromeTabs), search.
+- **Modes:** Quick Matrix (default), Advanced — now via PageShell ChromeTabs at top-of-page (local mode)
+- **Features:** Permission catalog, sticky bar, leave confirmation, team-scoped badges, Create Role in header-actions
+- **QA:** Tabs (Quick Matrix | Advanced) render above header; mode switch works; unsaved-changes bar and leave confirmation unchanged; Create Role, Save, Discard; persist, save flow, create role.
+
+## Tasks — QA
+
+- **Pages:** Tasks/Index (list), Tasks/Board (Kanban). Both use PageShell; List/Board switcher in header-actions.
+- **Board optimization:** Computed `tasksByColumnKey` groups tasks once; counts and v-for use O(1) lookups. No repeated filtering per column.
+- **QA:** Open `/org/{org}/tasks` (List) and `/org/{org}/tasks/board` (Board). With tasks: verify column counts match task distribution; use status dropdown to move task; confirm counts update correctly. Open task drawer; filters work on Index.

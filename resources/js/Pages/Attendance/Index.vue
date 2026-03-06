@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { router, useForm } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -206,18 +207,14 @@ function saveEdit() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-semibold text-white">
-          Attendance
-        </h1>
-        <p class="mt-1 text-sm text-white/60">
-          Track your daily check-ins and total hours.
-        </p>
-      </div>
-
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${String(org).toUpperCase()}`,
+      title: 'Attendance',
+      subtitle: 'Track your daily check-ins and total hours.',
+    }"
+  >
+    <template #header-actions>
       <div class="flex items-center gap-3">
         <button
           v-if="!props.current"
@@ -236,7 +233,7 @@ function saveEdit() {
           ⏹ Clock out
         </button>
       </div>
-    </div>
+    </template>
 
     <!-- Today status -->
     <div class="overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
@@ -589,5 +586,5 @@ function saveEdit() {
         </div>
       </div>
     </div>
-  </div>
+  </PageShell>
 </template>

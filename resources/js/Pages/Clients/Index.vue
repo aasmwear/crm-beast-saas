@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { router, usePage, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 import EmptyState from '@/Components/ui/EmptyState.vue'
 
 // Set the layout for the page
@@ -126,55 +127,47 @@ function getStatusClass(statusValue: string | null | undefined) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="hero-slab">
-      <div class="flex items-end justify-between gap-6">
-        <div>
-          <div class="text-sm text-white/60">
-            Organization • {{ org.toUpperCase() }}
-          </div>
-          <h1 class="mt-1 text-3xl font-semibold tracking-tight">
-            Client Management
-          </h1>
-          <p class="mt-1 text-white/60">
-            Search and manage your active and inactive clients.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <Link
-            :href="r('clients.pipeline', { organization: org })"
-            class="btn-capsule text-sm"
-          >
-            Pipeline
-          </Link>
-          <Link
-            :href="r('clients.create', { organization: org })"
-            class="chip"
-          >
-            New Client
-          </Link>
-          <Link
-            :href="r('clients.import', { organization: org })"
-            class="btn-capsule text-sm"
-          >
-            Import CSV
-          </Link>
-          <Link
-            :href="
-              r('export.csv', {
-                organization: org,
-                entity: 'clients',
-                include_deleted: 1,
-              })
-            "
-            class="btn-capsule text-sm"
-          >
-            Export CSV
-          </Link>
-        </div>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${org.toUpperCase()}`,
+      title: 'Client Management',
+      subtitle: 'Search and manage your active and inactive clients.',
+    }"
+  >
+    <template #header-actions>
+      <div class="flex items-center gap-3">
+        <Link
+          :href="r('clients.pipeline', { organization: org })"
+          class="btn-capsule text-sm"
+        >
+          Pipeline
+        </Link>
+        <Link
+          :href="r('clients.create', { organization: org })"
+          class="chip"
+        >
+          New Client
+        </Link>
+        <Link
+          :href="r('clients.import', { organization: org })"
+          class="btn-capsule text-sm"
+        >
+          Import CSV
+        </Link>
+        <Link
+          :href="
+            r('export.csv', {
+              organization: org,
+              entity: 'clients',
+              include_deleted: 1,
+            })
+          "
+          class="btn-capsule text-sm"
+        >
+          Export CSV
+        </Link>
       </div>
-    </section>
+    </template>
 
     <section class="space-y-4">
       <!-- Filters Row -->
@@ -311,7 +304,7 @@ function getStatusClass(statusValue: string | null | undefined) {
         </div>
       </div>
     </section>
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>

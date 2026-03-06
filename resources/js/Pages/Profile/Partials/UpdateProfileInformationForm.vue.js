@@ -20,13 +20,15 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "space-y-6" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
-    ...{ class: "text-lg font-medium text-gray-900" },
+    ...{ class: "text-lg font-semibold text-white" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-sm text-gray-600" },
+    ...{ class: "mt-1 text-sm text-white/65" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.form, __VLS_intrinsicElements.form)({
     ...{ onSubmit: (...[$event]) => {
@@ -40,17 +42,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 const __VLS_0 = __VLS_asFunctionalComponent(InputLabel, new InputLabel({
     for: "name",
     value: "Name",
+    ...{ class: "text-white/80" },
 }));
 const __VLS_1 = __VLS_0({
     for: "name",
     value: "Name",
+    ...{ class: "text-white/80" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_0));
 /** @type {[typeof TextInput, ]} */ ;
 // @ts-ignore
 const __VLS_3 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     id: "name",
     type: "text",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     modelValue: (__VLS_ctx.form.name),
     required: true,
     autofocus: true,
@@ -59,7 +63,7 @@ const __VLS_3 = __VLS_asFunctionalComponent(TextInput, new TextInput({
 const __VLS_4 = __VLS_3({
     id: "name",
     type: "text",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     modelValue: (__VLS_ctx.form.name),
     required: true,
     autofocus: true,
@@ -81,17 +85,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 const __VLS_9 = __VLS_asFunctionalComponent(InputLabel, new InputLabel({
     for: "email",
     value: "Email",
+    ...{ class: "text-white/80" },
 }));
 const __VLS_10 = __VLS_9({
     for: "email",
     value: "Email",
+    ...{ class: "text-white/80" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_9));
 /** @type {[typeof TextInput, ]} */ ;
 // @ts-ignore
 const __VLS_12 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     id: "email",
     type: "email",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     modelValue: (__VLS_ctx.form.email),
     required: true,
     autocomplete: "username",
@@ -99,7 +105,7 @@ const __VLS_12 = __VLS_asFunctionalComponent(TextInput, new TextInput({
 const __VLS_13 = __VLS_12({
     id: "email",
     type: "email",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     modelValue: (__VLS_ctx.form.email),
     required: true,
     autocomplete: "username",
@@ -117,7 +123,7 @@ const __VLS_16 = __VLS_15({
 if (__VLS_ctx.mustVerifyEmail && __VLS_ctx.user.email_verified_at === null) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "mt-2 text-sm text-gray-800" },
+        ...{ class: "mt-2 text-sm text-white/75" },
     });
     const __VLS_18 = {}.Link;
     /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
@@ -126,18 +132,18 @@ if (__VLS_ctx.mustVerifyEmail && __VLS_ctx.user.email_verified_at === null) {
         href: (__VLS_ctx.route('verification.send')),
         method: "post",
         as: "button",
-        ...{ class: "rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" },
+        ...{ class: "rounded-md text-sm text-indigo-300 underline hover:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-0" },
     }));
     const __VLS_20 = __VLS_19({
         href: (__VLS_ctx.route('verification.send')),
         method: "post",
         as: "button",
-        ...{ class: "rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" },
+        ...{ class: "rounded-md text-sm text-indigo-300 underline hover:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-0" },
     }, ...__VLS_functionalComponentArgsRest(__VLS_19));
     __VLS_21.slots.default;
     var __VLS_21;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "mt-2 text-sm font-medium text-green-600" },
+        ...{ class: "mt-2 text-sm font-medium text-emerald-300" },
     });
     __VLS_asFunctionalDirective(__VLS_directives.vShow)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.status === 'verification-link-sent') }, null, null);
 }
@@ -172,47 +178,62 @@ const __VLS_27 = __VLS_26({
 __VLS_28.slots.default;
 if (__VLS_ctx.form.recentlySuccessful) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "text-sm text-gray-600" },
+        ...{ class: "text-sm text-white/65" },
     });
 }
 var __VLS_28;
+/** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-lg']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/65']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-800']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/75']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-md']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-indigo-300']} */ ;
 /** @type {__VLS_StyleScopedClasses['underline']} */ ;
-/** @type {__VLS_StyleScopedClasses['hover:text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['hover:text-indigo-200']} */ ;
 /** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
 /** @type {__VLS_StyleScopedClasses['focus:ring-2']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-500']} */ ;
-/** @type {__VLS_StyleScopedClasses['focus:ring-offset-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-offset-0']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-green-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-emerald-300']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['gap-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/65']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {

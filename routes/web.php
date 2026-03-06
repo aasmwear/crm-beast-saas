@@ -41,6 +41,7 @@ use App\Http\Controllers\ProjectFileController;
 use App\Http\Controllers\ProjectMessagesController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\SettingsApiKeysController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Portal\DashboardController as PortalDashboardController;
 use App\Http\Controllers\Portal\InvoiceController as PortalInvoiceController;
@@ -218,13 +219,13 @@ Route::prefix('org/{organization:slug}')
         Route::get('/clients/pipeline', [ClientsPipelineController::class, 'index'])->name('clients.pipeline');
 
         // ✅ Update a single client's pipeline status (keep before /clients/{client})
-        Route::post('/clients/{client}/pipeline', [ClientsPipelineController::class, 'update'])->name('clients.pipeline.update');
+        Route::post('/clients/{client}/pipeline', [ClientsPipelineController::class, 'update'])->name('clients.pipeline.update')->scopeBindings();
 
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
-        Route::get('/clients/{client}', [ClientsInertiaController::class, 'show'])->name('clients.show');
-        Route::get('/clients/{client}/edit', [ClientsInertiaController::class, 'edit'])->name('clients.edit');
-        Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
-        Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
+        Route::get('/clients/{client}', [ClientsInertiaController::class, 'show'])->name('clients.show')->scopeBindings();
+        Route::get('/clients/{client}/edit', [ClientsInertiaController::class, 'edit'])->name('clients.edit')->scopeBindings();
+        Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update')->scopeBindings();
+        Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy')->scopeBindings();
 
         Route::post('/clients/{client}/contacts', [ClientContactController::class, 'store'])->name('clients.contacts.store');
         Route::put('/clients/{client}/contacts/{contact}', [ClientContactController::class, 'update'])->name('clients.contacts.update');
@@ -255,7 +256,9 @@ Route::prefix('org/{organization:slug}')
 
         Route::post('/projects/{project}/status', [ProjectController::class, 'updateStatus'])->name('projects.pipeline.update');
 
-        Route::resource('projects', ProjectController::class);
+        Route::scopeBindings()->group(function () {
+            Route::resource('projects', ProjectController::class);
+        });
 
         /*
         |------------------------------
@@ -268,12 +271,12 @@ Route::prefix('org/{organization:slug}')
 
             Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
             Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
-            Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
-            Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
-            Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+            Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show')->scopeBindings();
+            Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update')->scopeBindings();
+            Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy')->scopeBindings();
 
-            Route::post('/tasks/{task}/submit', [TaskController::class, 'submit'])->name('tasks.submit');
-            Route::post('/tasks/{task}/review', [TaskController::class, 'review'])->name('tasks.review');
+            Route::post('/tasks/{task}/submit', [TaskController::class, 'submit'])->name('tasks.submit')->scopeBindings();
+            Route::post('/tasks/{task}/review', [TaskController::class, 'review'])->name('tasks.review')->scopeBindings();
         });
 
         /*
@@ -342,6 +345,9 @@ Route::prefix('org/{organization:slug}')
         Route::match(['put', 'post'], '/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::post('/settings/test-slack', [SettingsController::class, 'testSlack'])->name('settings.testSlack');
         Route::post('/settings/test-smtp', [SettingsController::class, 'testSmtp'])->name('settings.testSmtp');
+        Route::post('/settings/features', [SettingsController::class, 'updateFeatures'])->name('settings.features');
+        Route::post('/settings/api-keys', [SettingsApiKeysController::class, 'store'])->name('settings.api-keys.store');
+        Route::delete('/settings/api-keys/{apiKey}', [SettingsApiKeysController::class, 'destroy'])->name('settings.api-keys.destroy')->scopeBindings();
 
         /*
         |------------------------------

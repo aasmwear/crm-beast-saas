@@ -147,9 +147,9 @@ watch(
 
 <style scoped>
 .chrome-tabs {
-  --chrome-tab-height: 2.25rem;
+  --chrome-tab-height: 2rem;
   --chrome-tab-overlap: 8px;
-  --chrome-tab-radius: 8px 8px 0 0;
+  --chrome-tab-radius: 7px 7px 0 0;
   --chrome-tab-bg: rgba(30, 32, 42, 0.9);
   --chrome-tab-bg-active: rgba(15, 18, 28, 0.98);
   --chrome-tab-border: rgba(255, 255, 255, 0.08);
@@ -165,7 +165,7 @@ watch(
   display: inline-flex;
   align-items: center;
   height: var(--chrome-tab-height);
-  padding: 0 1rem;
+  padding: 0 0.875rem;
   margin-right: calc(-1 * var(--chrome-tab-overlap));
   font-size: 0.8125rem;
   font-weight: 500;

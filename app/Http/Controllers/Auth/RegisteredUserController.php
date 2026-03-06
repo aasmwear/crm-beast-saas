@@ -54,6 +54,7 @@ class RegisteredUserController extends Controller
 
             // Attach to pivot if it exists (this was working before)
             if (\Illuminate\Support\Facades\Schema::hasTable('organization_user')) {
+                app(\App\Services\Billing\SeatCounter::class)->assertCanAddSeat($org);
                 $user->organizations()->syncWithoutDetaching([$org->id]);
             }
 

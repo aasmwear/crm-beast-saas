@@ -58,12 +58,12 @@ final class ClientController extends Controller
                     'fronter_id',
                     'closer_id',
                     'assigned_account_manager_id',
-                    'google_business_profile_status',
-                    'google_business_profile_access_status',
+                    'gbp_status',
+                    'gbp_access',
                     'client_activation_status',
-                    'notes_by_cst',
-                    'notes_by_sales',
-                    'notes_by_tech',
+                    'notes_sales',
+                    'notes_cst',
+                    'notes_tech',
                     'status',
                     'created_at',
                     'updated_at',
@@ -85,12 +85,12 @@ final class ClientController extends Controller
                         $client->fronter_id,
                         $client->closer_id,
                         $client->assigned_account_manager_id,
-                        $client->google_business_profile_status,
-                        $client->google_business_profile_access_status,
+                        $client->gbp_status,
+                        $client->gbp_access,
                         $client->client_activation_status,
-                        $client->notes_by_cst,
-                        $client->notes_by_sales,
-                        $client->notes_by_tech,
+                        $client->notes_sales,
+                        $client->notes_cst,
+                        $client->notes_tech,
                         $client->status,
                         optional($client->created_at)?->toDateTimeString(),
                         optional($client->updated_at)?->toDateTimeString(),
@@ -132,6 +132,10 @@ final class ClientController extends Controller
         ])->toResponse($request);
     }
 
+    private const GBP_STATUS_VALUES = ['not_created', 'created', 'pending', 'verified', 'suspended'];
+
+    private const GBP_ACCESS_VALUES = ['no_access', 'access_granted', 'access_pending'];
+
     public function store(Request $request): RedirectResponse
     {
         /** @var Organization $org */
@@ -152,37 +156,51 @@ final class ClientController extends Controller
             'currency' => ['nullable', 'string', 'size:3'],
 
             'tags' => ['nullable', 'array'],
-            'fronter' => ['nullable', 'array'],
-            'closer' => ['nullable', 'array'],
 
+            'fronter_id' => ['nullable', 'integer', 'exists:users,id'],
+            'closer_id' => ['nullable', 'integer', 'exists:users,id'],
             'assigned_account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
 
-            'google_business_profile_status' => ['nullable', 'string', 'max:255'],
-            'google_business_profile_access_status' => ['nullable', 'string', 'max:255'],
+            'gbp_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
+            'gbp_access' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
+            'google_business_profile_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
+            'google_business_profile_access_status' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
+
             'client_activation_status' => ['nullable', 'string', 'max:50'],
 
-            'notes_by_cst' => ['nullable', 'string'],
-            'notes_by_sales' => ['nullable', 'string'],
-            'notes_by_tech' => ['nullable', 'string'],
             'notes_sales' => ['nullable', 'string'],
             'notes_cst' => ['nullable', 'string'],
             'notes_tech' => ['nullable', 'string'],
+            'notes_by_sales' => ['nullable', 'string'],
+            'notes_by_cst' => ['nullable', 'string'],
+            'notes_by_tech' => ['nullable', 'string'],
 
-            'status' => ['nullable', 'string', Rule::in(['Lead', 'Active', 'Inactive'])],
+            'status' => ['nullable', 'string', Rule::in([
+                'lead', 'active', 'inactive', 'paused', 'churned',
+                'Lead', 'Active', 'Inactive', 'Paused', 'Churned',
+            ])],
         ]);
+
+        if (isset($data['status']) && is_string($data['status'])) {
+            $data['status'] = strtolower($data['status']);
+        }
 
         if (! isset($data['currency']) || $data['currency'] === '') {
             $data['currency'] = 'USD';
         }
 
+        $data['gbp_status'] = $data['gbp_status'] ?? $data['google_business_profile_status'] ?? null;
+        $data['gbp_access'] = $data['gbp_access'] ?? $data['google_business_profile_access_status'] ?? null;
         $data['notes_sales'] = $data['notes_sales'] ?? $data['notes_by_sales'] ?? null;
         $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
         $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
 
+        $fillable = array_flip((new Client)->getFillable());
+        $data = array_intersect_key($data, $fillable);
+        $data['organization_id'] = (int) $org->id;
+
         return DB::transaction(function () use ($data, $org, $request): RedirectResponse {
             try {
-                $data['organization_id'] = (int) $org->id;
-
                 // Log the data being inserted for debugging
                 Log::info('Creating client with data:', [
                     'organization_id' => $data['organization_id'],
@@ -268,26 +286,59 @@ final class ClientController extends Controller
             'tags' => ['nullable', 'array'],
             'fronter_id' => ['nullable', 'integer', 'exists:users,id'],
             'closer_id' => ['nullable', 'integer', 'exists:users,id'],
-
             'assigned_account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
 
-            'google_business_profile_status' => ['nullable', 'string', 'max:255'],
-            'google_business_profile_access_status' => ['nullable', 'string', 'max:255'],
+            'gbp_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
+            'gbp_access' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
+            'google_business_profile_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
+            'google_business_profile_access_status' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
+
             'client_activation_status' => ['nullable', 'string', 'max:50'],
 
-            'notes_by_cst' => ['nullable', 'string'],
-            'notes_by_sales' => ['nullable', 'string'],
-            'notes_by_tech' => ['nullable', 'string'],
             'notes_sales' => ['nullable', 'string'],
             'notes_cst' => ['nullable', 'string'],
             'notes_tech' => ['nullable', 'string'],
+            'notes_by_sales' => ['nullable', 'string'],
+            'notes_by_cst' => ['nullable', 'string'],
+            'notes_by_tech' => ['nullable', 'string'],
 
-            'status' => ['nullable', 'string', Rule::in(['Lead', 'Active', 'Inactive'])],
+            'new_note_sales' => ['nullable', 'string', 'max:5000'],
+            'new_note_cst' => ['nullable', 'string', 'max:5000'],
+            'new_note_tech' => ['nullable', 'string', 'max:5000'],
+
+            'status' => ['nullable', 'string', Rule::in([
+                'lead', 'active', 'inactive', 'paused', 'churned',
+                'Lead', 'Active', 'Inactive', 'Paused', 'Churned',
+            ])],
         ]);
 
+        if (isset($data['status']) && is_string($data['status'])) {
+            $data['status'] = strtolower($data['status']);
+        }
+
+        $data['gbp_status'] = $data['gbp_status'] ?? $data['google_business_profile_status'] ?? null;
+        $data['gbp_access'] = $data['gbp_access'] ?? $data['google_business_profile_access_status'] ?? null;
         $data['notes_sales'] = $data['notes_sales'] ?? $data['notes_by_sales'] ?? null;
         $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
         $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
+
+        $user = $request->user();
+        $prefix = '[' . now()->format('Y-m-d H:i') . '] ' . $user->name . ' (#'
+            . (int) $user->id . '): ';
+        foreach (['sales', 'cst', 'tech'] as $dept) {
+            $key = "new_note_{$dept}";
+            $note = trim((string) ($data[$key] ?? ''));
+            if ($note !== '') {
+                $notesKey = "notes_{$dept}";
+                $existing = (string) ($client->{$notesKey} ?? '');
+                $data[$notesKey] = $existing !== ''
+                    ? $existing . "\n\n" . $prefix . $note
+                    : $prefix . $note;
+            }
+        }
+
+        $fillable = array_flip((new Client)->getFillable());
+        $data = array_intersect_key($data, $fillable);
 
         return DB::transaction(function () use ($client, $data, $organization, $request): RedirectResponse {
             try {

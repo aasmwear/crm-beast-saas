@@ -58,6 +58,8 @@
 | invoice_items | id, invoice_id | via invoice | — |
 | subscriptions | (Cashier) | — | — |
 | subscription_items | (Cashier) | — | — |
+| organization_subscriptions | id, organization_id, plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit | FK, unique org | plan_key, status |
+| organization_addons | id, organization_id, addon_key, quantity, value_int, mode (augment\|set), active, starts_at, ends_at | FK, cascade | (org_id, addon_key) |
 
 ### Settings
 

@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -118,7 +119,7 @@ final class TaskController extends Controller
         $this->authorize('create', Task::class);
 
         $data = $request->validate([
-            'project_id' => 'required|integer',
+            'project_id' => ['required', 'integer', Rule::exists('projects', 'id')->where('organization_id', $org->id)],
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'assignees' => 'array',
@@ -160,17 +161,18 @@ final class TaskController extends Controller
 
     /**
      * Show a single task as JSON (for async detail panels, etc.).
+     * Organization is route-model bound for scopeBindings; task is scoped to it.
      */
-    public function show(Request $request, Task $task): JsonResponse
+    public function show(Request $request, Organization $organization, Task $task): JsonResponse
     {
         $this->authorize('view', $task);
 
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
-
-        if ((int) $task->organization_id !== (int) $org->id) {
+        if ((int) $task->organization_id !== (int) $organization->id) {
             abort(404);
         }
+
+        /** @var \App\Models\Organization $org */
+        $org = $organization;
 
         /** @var User $user */
         $user = $request->user();

@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PageShell from '@/Components/ui/PageShell.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
 // Set the layout for the page
 defineOptions({ layout: AuthenticatedLayout });
@@ -86,89 +87,90 @@ let __VLS_components;
 let __VLS_directives;
 // CSS variable injection 
 // CSS variable injection end 
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "space-y-6" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "hero-slab" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-end justify-between gap-6" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "text-sm text-white/60" },
-});
-(__VLS_ctx.org.toUpperCase());
-__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({
-    ...{ class: "mt-1 text-3xl font-semibold tracking-tight" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-white/60" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center gap-3" },
-});
-const __VLS_0 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+/** @type {[typeof PageShell, typeof PageShell, ]} */ ;
 // @ts-ignore
-const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    href: (__VLS_ctx.r('clients.pipeline', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-sm" },
+const __VLS_0 = __VLS_asFunctionalComponent(PageShell, new PageShell({
+    header: ({
+        breadcrumb: `Organization • ${__VLS_ctx.org.toUpperCase()}`,
+        title: 'Client Management',
+        subtitle: 'Search and manage your active and inactive clients.',
+    }),
 }));
-const __VLS_2 = __VLS_1({
-    href: (__VLS_ctx.r('clients.pipeline', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-sm" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_1));
-__VLS_3.slots.default;
-var __VLS_3;
-const __VLS_4 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-// @ts-ignore
-const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
-    href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-    ...{ class: "chip" },
-}));
-const __VLS_6 = __VLS_5({
-    href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-    ...{ class: "chip" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_5));
-__VLS_7.slots.default;
-var __VLS_7;
-const __VLS_8 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-// @ts-ignore
-const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
-    href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-sm" },
-}));
-const __VLS_10 = __VLS_9({
-    href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-sm" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_9));
-__VLS_11.slots.default;
-var __VLS_11;
-const __VLS_12 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-// @ts-ignore
-const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
-    href: (__VLS_ctx.r('export.csv', {
-        organization: __VLS_ctx.org,
-        entity: 'clients',
-        include_deleted: 1,
-    })),
-    ...{ class: "btn-capsule text-sm" },
-}));
-const __VLS_14 = __VLS_13({
-    href: (__VLS_ctx.r('export.csv', {
-        organization: __VLS_ctx.org,
-        entity: 'clients',
-        include_deleted: 1,
-    })),
-    ...{ class: "btn-capsule text-sm" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_13));
-__VLS_15.slots.default;
-var __VLS_15;
+const __VLS_1 = __VLS_0({
+    header: ({
+        breadcrumb: `Organization • ${__VLS_ctx.org.toUpperCase()}`,
+        title: 'Client Management',
+        subtitle: 'Search and manage your active and inactive clients.',
+    }),
+}, ...__VLS_functionalComponentArgsRest(__VLS_0));
+var __VLS_3 = {};
+__VLS_2.slots.default;
+{
+    const { 'header-actions': __VLS_thisSlot } = __VLS_2.slots;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "flex items-center gap-3" },
+    });
+    const __VLS_4 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
+        href: (__VLS_ctx.r('clients.pipeline', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-sm" },
+    }));
+    const __VLS_6 = __VLS_5({
+        href: (__VLS_ctx.r('clients.pipeline', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-sm" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_5));
+    __VLS_7.slots.default;
+    var __VLS_7;
+    const __VLS_8 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+        href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+        ...{ class: "chip" },
+    }));
+    const __VLS_10 = __VLS_9({
+        href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+        ...{ class: "chip" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+    __VLS_11.slots.default;
+    var __VLS_11;
+    const __VLS_12 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
+        href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-sm" },
+    }));
+    const __VLS_14 = __VLS_13({
+        href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-sm" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_13));
+    __VLS_15.slots.default;
+    var __VLS_15;
+    const __VLS_16 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
+        href: (__VLS_ctx.r('export.csv', {
+            organization: __VLS_ctx.org,
+            entity: 'clients',
+            include_deleted: 1,
+        })),
+        ...{ class: "btn-capsule text-sm" },
+    }));
+    const __VLS_18 = __VLS_17({
+        href: (__VLS_ctx.r('export.csv', {
+            organization: __VLS_ctx.org,
+            entity: 'clients',
+            include_deleted: 1,
+        })),
+        ...{ class: "btn-capsule text-sm" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_17));
+    __VLS_19.slots.default;
+    var __VLS_19;
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "space-y-4" },
 });
@@ -221,31 +223,31 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 if (!props.clients.data.length) {
     /** @type {[typeof EmptyState, typeof EmptyState, ]} */ ;
     // @ts-ignore
-    const __VLS_16 = __VLS_asFunctionalComponent(EmptyState, new EmptyState({
+    const __VLS_20 = __VLS_asFunctionalComponent(EmptyState, new EmptyState({
         title: "Add your first Client",
         description: "Get started by adding your first client to the CRM.",
         icon: "👤",
     }));
-    const __VLS_17 = __VLS_16({
+    const __VLS_21 = __VLS_20({
         title: "Add your first Client",
         description: "Get started by adding your first client to the CRM.",
         icon: "👤",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_16));
-    __VLS_18.slots.default;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_20));
+    __VLS_22.slots.default;
     {
-        const { action: __VLS_thisSlot } = __VLS_18.slots;
-        const __VLS_19 = {}.Link;
+        const { action: __VLS_thisSlot } = __VLS_22.slots;
+        const __VLS_23 = {}.Link;
         /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
         // @ts-ignore
-        const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({
+        const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
             href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
             ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
         }));
-        const __VLS_21 = __VLS_20({
+        const __VLS_25 = __VLS_24({
             href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
             ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_20));
-        __VLS_22.slots.default;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_24));
+        __VLS_26.slots.default;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.svg, __VLS_intrinsicElements.svg)({
             ...{ class: "w-5 h-5" },
             fill: "none",
@@ -258,9 +260,9 @@ if (!props.clients.data.length) {
             'stroke-width': "2",
             d: "M12 4v16m8-8H4",
         });
-        var __VLS_22;
+        var __VLS_26;
     }
-    var __VLS_18;
+    var __VLS_22;
 }
 else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({
@@ -314,19 +316,19 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
             ...{ class: "p-4 text-right" },
         });
-        const __VLS_23 = {}.Link;
+        const __VLS_27 = {}.Link;
         /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
         // @ts-ignore
-        const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
+        const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
             href: (__VLS_ctx.r('clients.show', { organization: __VLS_ctx.org, client: c.id })),
             ...{ class: "text-indigo-400 hover:underline" },
         }));
-        const __VLS_25 = __VLS_24({
+        const __VLS_29 = __VLS_28({
             href: (__VLS_ctx.r('clients.show', { organization: __VLS_ctx.org, client: c.id })),
             ...{ class: "text-indigo-400 hover:underline" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_24));
-        __VLS_26.slots.default;
-        var __VLS_26;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_28));
+        __VLS_30.slots.default;
+        var __VLS_30;
     }
 }
 if (props.clients.links && props.clients.links.length > 1) {
@@ -337,10 +339,10 @@ if (props.clients.links && props.clients.links.length > 1) {
         ...{ class: "flex flex-wrap items-center justify-end gap-1 text-xs" },
     });
     for (const [link] of __VLS_getVForSourceType((props.clients.links))) {
-        const __VLS_27 = {}.Link;
+        const __VLS_31 = {}.Link;
         /** @type {[typeof __VLS_components.Link, ]} */ ;
         // @ts-ignore
-        const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
+        const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
             key: (link.label + (link.url || '')),
             href: (link.url || '#'),
             ...{ class: "rounded-full px-3 py-1" },
@@ -352,7 +354,7 @@ if (props.clients.links && props.clients.links.length > 1) {
                             : 'text-white/30 cursor-default',
                 ]) },
         }));
-        const __VLS_29 = __VLS_28({
+        const __VLS_33 = __VLS_32({
             key: (link.label + (link.url || '')),
             href: (link.url || '#'),
             ...{ class: "rounded-full px-3 py-1" },
@@ -363,24 +365,11 @@ if (props.clients.links && props.clients.links.length > 1) {
                             ? 'text-white/70 hover:bg-white/10'
                             : 'text-white/30 cursor-default',
                 ]) },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_28));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_32));
         __VLS_asFunctionalDirective(__VLS_directives.vHtml)(null, { ...__VLS_directiveBindingRestFields, value: (link.label) }, null, null);
     }
 }
-/** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-slab']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-end']} */ ;
-/** @type {__VLS_StyleScopedClasses['justify-between']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-3xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['tracking-tight']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
+var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['gap-3']} */ ;
@@ -501,6 +490,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             Link: Link,
+            PageShell: PageShell,
             EmptyState: EmptyState,
             r: r,
             org: org,

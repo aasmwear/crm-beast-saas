@@ -1,6 +1,7 @@
 /// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { Link, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PageShell from '@/Components/ui/PageShell.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -153,6 +154,15 @@ function deleteContact(c) {
 }
 const contactModalTitle = computed(() => (editingContact.value ? 'Edit contact' : 'Add contact'));
 const hasProjects = () => projects.value.length > 0;
+const clientHeaderSubtitle = computed(() => {
+    const parts = [];
+    if (props.client.status)
+        parts.push(props.client.status);
+    parts.push(`Client ID: ${props.client.id}`);
+    if (props.client.website)
+        parts.push(props.client.website);
+    return parts.join(' • ');
+});
 const firstTasks = (p) => (p.tasks ?? []).slice(0, 3);
 function formatMoney(cents, currency) {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(cents / 100);
@@ -161,111 +171,81 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "min-h-screen bg-slate-950" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "border-b border-white/10 bg-slate-950/60" },
-});
+/** @type {[typeof PageShell, typeof PageShell, ]} */ ;
+// @ts-ignore
+const __VLS_0 = __VLS_asFunctionalComponent(PageShell, new PageShell({
+    modelValue: (__VLS_ctx.activeTab),
+    sticky: (true),
+    tabs: ([
+        { key: 'overview', label: 'Overview' },
+        { key: 'projects', label: 'Projects' },
+        { key: 'contacts', label: 'Contacts' },
+        { key: 'notes', label: 'Notes' },
+    ]),
+    local: (true),
+    header: ({
+        breadcrumb: 'Clients',
+        title: __VLS_ctx.client.company_name ?? 'Client',
+        subtitle: __VLS_ctx.clientHeaderSubtitle,
+    }),
+}));
+const __VLS_1 = __VLS_0({
+    modelValue: (__VLS_ctx.activeTab),
+    sticky: (true),
+    tabs: ([
+        { key: 'overview', label: 'Overview' },
+        { key: 'projects', label: 'Projects' },
+        { key: 'contacts', label: 'Contacts' },
+        { key: 'notes', label: 'Notes' },
+    ]),
+    local: (true),
+    header: ({
+        breadcrumb: 'Clients',
+        title: __VLS_ctx.client.company_name ?? 'Client',
+        subtitle: __VLS_ctx.clientHeaderSubtitle,
+    }),
+}, ...__VLS_functionalComponentArgsRest(__VLS_0));
+var __VLS_3 = {};
+__VLS_2.slots.default;
+{
+    const { 'header-actions': __VLS_thisSlot } = __VLS_2.slots;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "flex items-center gap-2" },
+    });
+    const __VLS_4 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
+        href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.organizationSlug })),
+        ...{ class: "text-white/60 hover:text-white text-sm" },
+    }));
+    const __VLS_6 = __VLS_5({
+        href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.organizationSlug })),
+        ...{ class: "text-white/60 hover:text-white text-sm" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_5));
+    __VLS_7.slots.default;
+    var __VLS_7;
+    const __VLS_8 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+        href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
+        ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
+    }));
+    const __VLS_10 = __VLS_9({
+        href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
+        ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+    __VLS_11.slots.default;
+    var __VLS_11;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.destroyClient) },
+        type: "button",
+        ...{ class: "rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/20" },
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex flex-col gap-4 md:flex-row md:items-center md:justify-between" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "min-w-0" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center gap-3 flex-wrap" },
-});
-const __VLS_0 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-// @ts-ignore
-const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.organizationSlug })),
-    ...{ class: "text-white/60 hover:text-white text-sm" },
-}));
-const __VLS_2 = __VLS_1({
-    href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.organizationSlug })),
-    ...{ class: "text-white/60 hover:text-white text-sm" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_1));
-__VLS_3.slots.default;
-var __VLS_3;
-if (__VLS_ctx.client.status) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: (__VLS_ctx.getStatusClass(__VLS_ctx.client.status)) },
-    });
-    (__VLS_ctx.client.status);
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({
-    ...{ class: "mt-2 text-2xl font-semibold text-white" },
-});
-(__VLS_ctx.client.company_name);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-sm text-white/60 flex items-center gap-2 flex-wrap" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-(__VLS_ctx.client.id);
-if (__VLS_ctx.client.website) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.a, __VLS_intrinsicElements.a)({
-        href: (__VLS_ctx.client.website),
-        target: "_blank",
-        rel: "noreferrer",
-        ...{ class: "text-indigo-300 hover:text-indigo-200" },
-    });
-    (__VLS_ctx.client.website);
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center gap-2" },
-});
-const __VLS_4 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-// @ts-ignore
-const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
-    href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
-    ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
-}));
-const __VLS_6 = __VLS_5({
-    href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
-    ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_5));
-__VLS_7.slots.default;
-var __VLS_7;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.destroyClient) },
-    type: "button",
-    ...{ class: "rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/20" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
-    ...{ class: "flex gap-1 -mb-px" },
-});
-for (const [t] of __VLS_getVForSourceType(([
-    { id: 'overview', label: 'Overview' },
-    { id: 'projects', label: 'Projects' },
-    { id: 'contacts', label: 'Contacts' },
-    { id: 'notes', label: 'Notes' },
-]))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.activeTab = t.id;
-            } },
-        key: (t.id),
-        type: "button",
-        ...{ class: ([
-                'px-4 py-3 text-sm font-medium border-b-2 transition',
-                __VLS_ctx.activeTab === t.id
-                    ? 'border-indigo-500 text-indigo-300'
-                    : 'border-transparent text-white/60 hover:text-white/80 hover:border-white/20'
-            ]) },
-    });
-    (t.label);
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "space-y-6" },
@@ -389,19 +369,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
     ...{ class: "text-lg font-medium text-white" },
 });
-const __VLS_8 = {}.Link;
+const __VLS_12 = {}.Link;
 /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
 // @ts-ignore
-const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
     href: (__VLS_ctx.r('projects.index', { organization: __VLS_ctx.organizationSlug })),
     ...{ class: "text-sm text-indigo-300 hover:text-indigo-200" },
 }));
-const __VLS_10 = __VLS_9({
+const __VLS_14 = __VLS_13({
     href: (__VLS_ctx.r('projects.index', { organization: __VLS_ctx.organizationSlug })),
     ...{ class: "text-sm text-indigo-300 hover:text-indigo-200" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_9));
-__VLS_11.slots.default;
-var __VLS_11;
+}, ...__VLS_functionalComponentArgsRest(__VLS_13));
+__VLS_15.slots.default;
+var __VLS_15;
 if (!__VLS_ctx.hasProjects()) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "text-sm text-white/60" },
@@ -439,19 +419,19 @@ else {
             ...{ class: "mt-1 text-xs text-white/50" },
         });
         (project.id);
-        const __VLS_12 = {}.Link;
+        const __VLS_16 = {}.Link;
         /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
         // @ts-ignore
-        const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
+        const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
             href: (__VLS_ctx.r('projects.show', { organization: __VLS_ctx.organizationSlug, project: project.id })),
             ...{ class: "text-sm text-indigo-300 hover:text-indigo-200 whitespace-nowrap" },
         }));
-        const __VLS_14 = __VLS_13({
+        const __VLS_18 = __VLS_17({
             href: (__VLS_ctx.r('projects.show', { organization: __VLS_ctx.organizationSlug, project: project.id })),
             ...{ class: "text-sm text-indigo-300 hover:text-indigo-200 whitespace-nowrap" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_13));
-        __VLS_15.slots.default;
-        var __VLS_15;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_17));
+        __VLS_19.slots.default;
+        var __VLS_19;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "mt-3" },
         });
@@ -742,23 +722,23 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)(
 (__VLS_ctx.client.notes_tech || 'No notes yet');
 /** @type {[typeof Modal, typeof Modal, ]} */ ;
 // @ts-ignore
-const __VLS_16 = __VLS_asFunctionalComponent(Modal, new Modal({
+const __VLS_20 = __VLS_asFunctionalComponent(Modal, new Modal({
     ...{ 'onClose': {} },
     show: (__VLS_ctx.editingNotes),
     maxWidth: "2xl",
 }));
-const __VLS_17 = __VLS_16({
+const __VLS_21 = __VLS_20({
     ...{ 'onClose': {} },
     show: (__VLS_ctx.editingNotes),
     maxWidth: "2xl",
-}, ...__VLS_functionalComponentArgsRest(__VLS_16));
-let __VLS_19;
-let __VLS_20;
-let __VLS_21;
-const __VLS_22 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_20));
+let __VLS_23;
+let __VLS_24;
+let __VLS_25;
+const __VLS_26 = {
     onClose: (__VLS_ctx.closeNotesEditor)
 };
-__VLS_18.slots.default;
+__VLS_22.slots.default;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "p-6" },
 });
@@ -791,62 +771,62 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 /** @type {[typeof SecondaryButton, typeof SecondaryButton, ]} */ ;
 // @ts-ignore
-const __VLS_23 = __VLS_asFunctionalComponent(SecondaryButton, new SecondaryButton({
+const __VLS_27 = __VLS_asFunctionalComponent(SecondaryButton, new SecondaryButton({
     ...{ 'onClick': {} },
     type: "button",
 }));
-const __VLS_24 = __VLS_23({
+const __VLS_28 = __VLS_27({
     ...{ 'onClick': {} },
     type: "button",
-}, ...__VLS_functionalComponentArgsRest(__VLS_23));
-let __VLS_26;
-let __VLS_27;
-let __VLS_28;
-const __VLS_29 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_27));
+let __VLS_30;
+let __VLS_31;
+let __VLS_32;
+const __VLS_33 = {
     onClick: (__VLS_ctx.closeNotesEditor)
 };
-__VLS_25.slots.default;
-var __VLS_25;
+__VLS_29.slots.default;
+var __VLS_29;
 /** @type {[typeof PrimaryButton, typeof PrimaryButton, ]} */ ;
 // @ts-ignore
-const __VLS_30 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
+const __VLS_34 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
     ...{ 'onClick': {} },
     type: "button",
     disabled: (__VLS_ctx.notesForm.processing),
 }));
-const __VLS_31 = __VLS_30({
+const __VLS_35 = __VLS_34({
     ...{ 'onClick': {} },
     type: "button",
     disabled: (__VLS_ctx.notesForm.processing),
-}, ...__VLS_functionalComponentArgsRest(__VLS_30));
-let __VLS_33;
-let __VLS_34;
-let __VLS_35;
-const __VLS_36 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_34));
+let __VLS_37;
+let __VLS_38;
+let __VLS_39;
+const __VLS_40 = {
     onClick: (__VLS_ctx.saveNotes)
 };
-__VLS_32.slots.default;
-var __VLS_32;
-var __VLS_18;
+__VLS_36.slots.default;
+var __VLS_36;
+var __VLS_22;
 /** @type {[typeof Modal, typeof Modal, ]} */ ;
 // @ts-ignore
-const __VLS_37 = __VLS_asFunctionalComponent(Modal, new Modal({
+const __VLS_41 = __VLS_asFunctionalComponent(Modal, new Modal({
     ...{ 'onClose': {} },
     show: (__VLS_ctx.contactModalOpen),
     maxWidth: "lg",
 }));
-const __VLS_38 = __VLS_37({
+const __VLS_42 = __VLS_41({
     ...{ 'onClose': {} },
     show: (__VLS_ctx.contactModalOpen),
     maxWidth: "lg",
-}, ...__VLS_functionalComponentArgsRest(__VLS_37));
-let __VLS_40;
-let __VLS_41;
-let __VLS_42;
-const __VLS_43 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_41));
+let __VLS_44;
+let __VLS_45;
+let __VLS_46;
+const __VLS_47 = {
     onClose: (__VLS_ctx.closeContactModal)
 };
-__VLS_39.slots.default;
+__VLS_43.slots.default;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "p-6" },
 });
@@ -944,77 +924,43 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 /** @type {[typeof SecondaryButton, typeof SecondaryButton, ]} */ ;
 // @ts-ignore
-const __VLS_44 = __VLS_asFunctionalComponent(SecondaryButton, new SecondaryButton({
+const __VLS_48 = __VLS_asFunctionalComponent(SecondaryButton, new SecondaryButton({
     ...{ 'onClick': {} },
     type: "button",
 }));
-const __VLS_45 = __VLS_44({
+const __VLS_49 = __VLS_48({
     ...{ 'onClick': {} },
     type: "button",
-}, ...__VLS_functionalComponentArgsRest(__VLS_44));
-let __VLS_47;
-let __VLS_48;
-let __VLS_49;
-const __VLS_50 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_48));
+let __VLS_51;
+let __VLS_52;
+let __VLS_53;
+const __VLS_54 = {
     onClick: (__VLS_ctx.closeContactModal)
 };
-__VLS_46.slots.default;
-var __VLS_46;
+__VLS_50.slots.default;
+var __VLS_50;
 /** @type {[typeof PrimaryButton, typeof PrimaryButton, ]} */ ;
 // @ts-ignore
-const __VLS_51 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
+const __VLS_55 = __VLS_asFunctionalComponent(PrimaryButton, new PrimaryButton({
     type: "submit",
     disabled: (__VLS_ctx.contactForm.processing),
 }));
-const __VLS_52 = __VLS_51({
+const __VLS_56 = __VLS_55({
     type: "submit",
     disabled: (__VLS_ctx.contactForm.processing),
-}, ...__VLS_functionalComponentArgsRest(__VLS_51));
-__VLS_53.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_55));
+__VLS_57.slots.default;
 (__VLS_ctx.contactForm.processing ? 'Saving…' : 'Save');
-var __VLS_53;
-var __VLS_39;
-/** @type {__VLS_StyleScopedClasses['min-h-screen']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-slate-950']} */ ;
-/** @type {__VLS_StyleScopedClasses['border-b']} */ ;
-/** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-slate-950/60']} */ ;
-/** @type {__VLS_StyleScopedClasses['mx-auto']} */ ;
-/** @type {__VLS_StyleScopedClasses['max-w-7xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['px-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['py-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['sm:px-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['lg:px-8']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['md:flex-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['md:items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['md:justify-between']} */ ;
-/** @type {__VLS_StyleScopedClasses['min-w-0']} */ ;
+var __VLS_57;
+var __VLS_43;
+var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-3']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
 /** @type {__VLS_StyleScopedClasses['hover:text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-2xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex-wrap']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-indigo-300']} */ ;
-/** @type {__VLS_StyleScopedClasses['hover:text-indigo-200']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-xl']} */ ;
 /** @type {__VLS_StyleScopedClasses['border']} */ ;
 /** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
@@ -1036,15 +982,7 @@ var __VLS_39;
 /** @type {__VLS_StyleScopedClasses['mx-auto']} */ ;
 /** @type {__VLS_StyleScopedClasses['max-w-7xl']} */ ;
 /** @type {__VLS_StyleScopedClasses['px-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['sm:px-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['lg:px-8']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['-mb-px']} */ ;
-/** @type {__VLS_StyleScopedClasses['mx-auto']} */ ;
-/** @type {__VLS_StyleScopedClasses['max-w-7xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['px-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['py-8']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['sm:px-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['lg:px-8']} */ ;
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
@@ -1501,6 +1439,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             Link: Link,
+            PageShell: PageShell,
             Modal: Modal,
             PrimaryButton: PrimaryButton,
             SecondaryButton: SecondaryButton,
@@ -1516,7 +1455,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             saveNotes: saveNotes,
             r: r,
             destroyClient: destroyClient,
-            getStatusClass: getStatusClass,
             contacts: contacts,
             projects: projects,
             contactModalOpen: contactModalOpen,
@@ -1529,6 +1467,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             deleteContact: deleteContact,
             contactModalTitle: contactModalTitle,
             hasProjects: hasProjects,
+            clientHeaderSubtitle: clientHeaderSubtitle,
             firstTasks: firstTasks,
             formatMoney: formatMoney,
         };

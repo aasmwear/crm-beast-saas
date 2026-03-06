@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 import EmptyState from '@/Components/ui/EmptyState.vue'
 import TaskDrawer from '@/Components/tasks/TaskDrawer.vue'
 
@@ -208,18 +209,14 @@ function closeDrawer() {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto py-6 space-y-6">
-    <!-- Page header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-semibold text-white">
-          Tasks
-        </h1>
-        <p class="mt-1 text-sm text-white/60">
-          Browse and filter tasks across all projects in this organization.
-        </p>
-      </div>
-
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${String(org).toUpperCase()}`,
+      title: 'Tasks',
+      subtitle: 'Browse and filter tasks across all projects in this organization.',
+    }"
+  >
+    <template #header-actions>
       <div class="flex flex-wrap items-center gap-2">
         <div class="inline-flex items-center gap-1 rounded-full bg-white/5 p-1 text-xs">
           <span
@@ -242,8 +239,9 @@ function closeDrawer() {
           View projects
         </Link>
       </div>
-    </div>
+    </template>
 
+    <div class="max-w-6xl mx-auto space-y-6">
     <!-- Filters -->
     <div class="rounded-2xl border border-white/10 bg-slate-950/80 p-4 space-y-4">
       <div class="grid gap-3 md:grid-cols-4">
@@ -485,5 +483,6 @@ function closeDrawer() {
       :organization-slug="org"
       @close="closeDrawer"
     />
-  </div>
+    </div>
+  </PageShell>
 </template>

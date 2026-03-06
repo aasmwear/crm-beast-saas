@@ -218,9 +218,10 @@ final class RolePermissionController extends Controller
             ['key' => 'departments', 'label' => 'Departments', 'icon' => '🏬', 'sortOrder' => 11],
             ['key' => 'reports', 'label' => 'Reports', 'icon' => '📊', 'sortOrder' => 12],
             ['key' => 'roles', 'label' => 'Roles', 'icon' => '🎭', 'sortOrder' => 13],
-            ['key' => 'financials', 'label' => 'Financials', 'icon' => '💰', 'sortOrder' => 14],
-            ['key' => 'contacts', 'label' => 'Contacts', 'icon' => '📇', 'sortOrder' => 15],
-            ['key' => 'messages', 'label' => 'Messages', 'icon' => '💬', 'sortOrder' => 16],
+            ['key' => 'api_keys', 'label' => 'API Keys', 'icon' => '🔑', 'sortOrder' => 14],
+            ['key' => 'financials', 'label' => 'Financials', 'icon' => '💰', 'sortOrder' => 15],
+            ['key' => 'contacts', 'label' => 'Contacts', 'icon' => '📇', 'sortOrder' => 16],
+            ['key' => 'messages', 'label' => 'Messages', 'icon' => '💬', 'sortOrder' => 17],
         ];
 
         $actions = [
@@ -246,6 +247,7 @@ final class RolePermissionController extends Controller
             'departments' => ['view' => 'departments.view', 'create' => 'departments.create', 'update' => 'departments.update', 'delete' => 'departments.delete'],
             'reports' => ['view' => 'reports.view'],
             'roles' => ['view' => 'roles.view', 'manage' => 'roles.manage'],
+            'api_keys' => ['view' => 'api_keys.view', 'create' => 'api_keys.create', 'delete' => 'api_keys.delete'],
             'financials' => ['view' => 'financials.view'],
             'contacts' => ['manage' => 'contacts.manage'],
             'messages' => ['create' => 'messages.create'],

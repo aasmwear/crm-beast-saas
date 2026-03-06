@@ -2,8 +2,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useForm, usePage, router } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import ChromeTabs from '@/Components/ui/ChromeTabs.vue'
-import PageHeader from '@/Components/ui/PageHeader.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 import PermissionMatrix from '@/Components/Permissions/PermissionMatrix.vue'
 import type { PermissionCatalog, Permission } from '@/lib/permissionCatalog'
 import { getRecognizedPermissionNames } from '@/lib/permissionCatalog'
@@ -377,22 +376,29 @@ const catalogSelectedCount = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <PageHeader
-      :breadcrumb="`Settings • ${org}`"
-      title="Roles & Permissions"
-      subtitle="Manage granular permissions for each role in your organization."
-    >
-      <template #actions>
-        <button
-          type="button"
-          @click="openCreateModal"
-          class="px-4 py-2 rounded-lg font-medium transition bg-white/10 text-white border border-white/20 hover:bg-white/20"
-        >
-          Create Role
-        </button>
-      </template>
-    </PageHeader>
+  <PageShell
+    v-model="editorMode"
+    :sticky="true"
+    :tabs="[
+      { key: 'matrix', label: 'Quick Matrix' },
+      { key: 'advanced', label: 'Advanced' },
+    ]"
+    :local="true"
+    :header="{
+      breadcrumb: `Settings • ${org}`,
+      title: 'Roles & Permissions',
+      subtitle: 'Manage granular permissions for each role in your organization.',
+    }"
+  >
+    <template #header-actions>
+      <button
+        type="button"
+        @click="openCreateModal"
+        class="px-4 py-2 rounded-lg font-medium transition bg-white/10 text-white border border-white/20 hover:bg-white/20"
+      >
+        Create Role
+      </button>
+    </template>
 
     <div
       v-if="flash?.success"
@@ -442,7 +448,7 @@ const catalogSelectedCount = computed(() => {
       <!-- Right: Editor -->
       <div class="col-span-12 lg:col-span-9">
         <div class="glass-card p-6 space-y-6">
-          <!-- Mode toggle + header -->
+          <!-- Editor header (mode-specific actions) -->
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 class="text-lg font-semibold text-white">
@@ -458,14 +464,6 @@ const catalogSelectedCount = computed(() => {
               </p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <ChromeTabs
-                v-model="editorMode"
-                :tabs="[
-                  { key: 'matrix', label: 'Quick Matrix' },
-                  { key: 'advanced', label: 'Advanced' },
-                ]"
-                local
-              />
               <template v-if="editorMode === 'matrix'">
                 <button
                   type="button"
@@ -747,7 +745,7 @@ const catalogSelectedCount = computed(() => {
         </div>
       </div>
     </Teleport>
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>

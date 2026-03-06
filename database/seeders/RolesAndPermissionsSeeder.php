@@ -74,6 +74,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'settings.update',
             'billing.view',
             'billing.manage',
+            'api_keys.view',
+            'api_keys.create',
+            'api_keys.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -99,6 +102,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'activity.view',
             'notifications.view', 'notifications.update',
             'settings.view', 'settings.update',
+            'api_keys.view', 'api_keys.create', 'api_keys.delete',
         ]);
 
         $employee = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'web']);

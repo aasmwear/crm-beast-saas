@@ -28,7 +28,7 @@ final class DepartmentController extends Controller
         $this->authorize('create', Department::class);
 
         /** @var \App\Models\Organization|null $org */
-        $org = app('tenant');
+        $org = $request->route('organization');
         abort_if(! $org, 404, 'Organization not resolved');
 
         // Schema-aware rules (your table has no 'description')

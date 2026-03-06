@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Billing\SeatCounter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -93,6 +94,8 @@ final class HRMController extends Controller
             'roles.*' => ['string'],
             'department_id' => ['nullable', 'integer'],
         ]);
+
+        app(SeatCounter::class)->assertCanAddSeat($organization);
 
         $user = new User;
         $user->name = $validated['name'];

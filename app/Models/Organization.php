@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Platform\OrganizationFeature;
+use App\Services\Billing\SeatCounter;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,7 +45,7 @@ class Organization extends Model
     protected $fillable = [
         'name',
         'slug',
-        'plan',
+        'plan', // Legacy/display-only. Canonical plan_key is organization_subscriptions.plan_key; org.plan used as fallback when no subscription.
         'settings',
         'logo_path',
         'timezone',
@@ -106,6 +107,17 @@ class Organization extends Model
     }
 
     /**
+     * @return HasMany<\App\Models\Task, \App\Models\Organization>
+     */
+    public function tasks(): HasMany
+    {
+        /** @var HasMany<\App\Models\Task, \App\Models\Organization> $rel */
+        $rel = $this->hasMany(Task::class);
+
+        return $rel;
+    }
+
+    /**
      * @return BelongsToMany<\App\Models\User, \App\Models\Organization, \Illuminate\Database\Eloquent\Relations\Pivot, 'pivot'>
      */
     public function users(): BelongsToMany
@@ -127,6 +139,45 @@ class Organization extends Model
         $rel = $this->hasOne(OrganizationFeature::class);
 
         return $rel;
+    }
+
+    /**
+     * @return HasMany<OrganizationApiKey, \App\Models\Organization>
+     */
+    public function apiKeys(): HasMany
+    {
+        /** @var HasMany<OrganizationApiKey, \App\Models\Organization> $rel */
+        $rel = $this->hasMany(OrganizationApiKey::class);
+
+        return $rel;
+    }
+
+    /**
+     * Our billing subscription (plan_key, status, seats, etc.).
+     * Named billingSubscription to avoid colliding with Cashier Billable::subscription('default').
+     *
+     * @return HasOne<OrganizationSubscription, \App\Models\Organization>
+     */
+    public function billingSubscription(): HasOne
+    {
+        return $this->hasOne(OrganizationSubscription::class, 'organization_id');
+    }
+
+    /**
+     * @return HasMany<OrganizationAddon, \App\Models\Organization>
+     */
+    public function addons(): HasMany
+    {
+        return $this->hasMany(OrganizationAddon::class, 'organization_id');
+    }
+
+    /**
+     * Whether the org can add another seat (under seat limit).
+     * No UI blocking in this PR; used by enforcement helpers.
+     */
+    public function canAddSeat(): bool
+    {
+        return app(SeatCounter::class)->canAddSeat($this);
     }
 
     protected static function newFactory(): OrganizationFactory

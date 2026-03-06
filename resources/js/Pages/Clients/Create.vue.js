@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useForm, usePage, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PageShell from '@/Components/ui/PageShell.vue';
 defineOptions({ layout: AuthenticatedLayout });
 // ---------- Route & props ----------
 const routeGlobal = window.route;
@@ -27,13 +28,13 @@ const form = useForm({
     fronter_id: null, // Single user ID (strict accountability)
     closer_id: null, // Single user ID (strict accountability)
     assigned_account_manager_id: null,
-    google_business_profile_status: null,
-    google_business_profile_access_status: null,
+    gbp_status: null,
+    gbp_access: null,
     client_activation_status: 'lead',
     status: 'lead',
-    notes_by_sales: null,
-    notes_by_cst: null,
-    notes_by_tech: null,
+    notes_sales: null,
+    notes_cst: null,
+    notes_tech: null,
 });
 const submit = () => {
     form.post(r('clients.store', { organization: org.value }));
@@ -60,57 +61,54 @@ const gbpStatusOptions = [
     { value: '', label: '— Select GBP status —' },
     { value: 'not_created', label: 'Not Created' },
     { value: 'created', label: 'Created' },
+    { value: 'pending', label: 'Pending' },
     { value: 'verified', label: 'Verified' },
     { value: 'suspended', label: 'Suspended' },
-    { value: 'in_progress', label: 'In Progress' },
 ];
 const gbpAccessOptions = [
     { value: '', label: '— Select access level —' },
-    { value: 'none', label: 'No Access' },
-    { value: 'pending', label: 'Access Pending' },
-    { value: 'manager', label: 'Manager Access' },
-    { value: 'owner', label: 'Owner Access' },
+    { value: 'no_access', label: 'No Access' },
+    { value: 'access_pending', label: 'Access Pending' },
+    { value: 'access_granted', label: 'Access Granted' },
 ];
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "space-y-6" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "hero-slab" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center justify-between gap-4" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "text-xs text-white/60" },
-});
-(__VLS_ctx.org.toUpperCase());
-__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({
-    ...{ class: "mt-1 text-3xl font-semibold tracking-tight" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-white/60" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center gap-2" },
-});
-const __VLS_0 = {}.Link;
-/** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+/** @type {[typeof PageShell, typeof PageShell, ]} */ ;
 // @ts-ignore
-const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-xs" },
+const __VLS_0 = __VLS_asFunctionalComponent(PageShell, new PageShell({
+    header: ({
+        breadcrumb: `Organization • ${__VLS_ctx.org.toUpperCase()}`,
+        title: 'Create Client',
+        subtitle: 'Enter the details for a new client record.',
+    }),
 }));
-const __VLS_2 = __VLS_1({
-    href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.org })),
-    ...{ class: "btn-capsule text-xs" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_1));
-__VLS_3.slots.default;
-var __VLS_3;
+const __VLS_1 = __VLS_0({
+    header: ({
+        breadcrumb: `Organization • ${__VLS_ctx.org.toUpperCase()}`,
+        title: 'Create Client',
+        subtitle: 'Enter the details for a new client record.',
+    }),
+}, ...__VLS_functionalComponentArgsRest(__VLS_0));
+var __VLS_3 = {};
+__VLS_2.slots.default;
+{
+    const { 'header-actions': __VLS_thisSlot } = __VLS_2.slots;
+    const __VLS_4 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
+        href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-xs" },
+    }));
+    const __VLS_6 = __VLS_5({
+        href: (__VLS_ctx.r('clients.index', { organization: __VLS_ctx.org })),
+        ...{ class: "btn-capsule text-xs" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_5));
+    __VLS_7.slots.default;
+    var __VLS_7;
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.form, __VLS_intrinsicElements.form)({
     ...{ onSubmit: (__VLS_ctx.submit) },
     ...{ class: "card-neo p-6 space-y-8" },
@@ -405,7 +403,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements
     ...{ class: (__VLS_ctx.labelClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-    value: (__VLS_ctx.form.google_business_profile_status),
+    value: (__VLS_ctx.form.gbp_status),
     ...{ class: (__VLS_ctx.inputClass) },
 });
 for (const [opt] of __VLS_getVForSourceType((__VLS_ctx.gbpStatusOptions))) {
@@ -415,18 +413,18 @@ for (const [opt] of __VLS_getVForSourceType((__VLS_ctx.gbpStatusOptions))) {
     });
     (opt.label);
 }
-if (__VLS_ctx.form.errors.google_business_profile_status) {
+if (__VLS_ctx.form.errors.gbp_status) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "mt-1 text-sm text-red-400" },
     });
-    (__VLS_ctx.form.errors.google_business_profile_status);
+    (__VLS_ctx.form.errors.gbp_status);
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
     ...{ class: (__VLS_ctx.labelClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-    value: (__VLS_ctx.form.google_business_profile_access_status),
+    value: (__VLS_ctx.form.gbp_access),
     ...{ class: (__VLS_ctx.inputClass) },
 });
 for (const [opt] of __VLS_getVForSourceType((__VLS_ctx.gbpAccessOptions))) {
@@ -436,11 +434,11 @@ for (const [opt] of __VLS_getVForSourceType((__VLS_ctx.gbpAccessOptions))) {
     });
     (opt.label);
 }
-if (__VLS_ctx.form.errors.google_business_profile_access_status) {
+if (__VLS_ctx.form.errors.gbp_access) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "mt-1 text-sm text-red-400" },
     });
-    (__VLS_ctx.form.errors.google_business_profile_access_status);
+    (__VLS_ctx.form.errors.gbp_access);
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "border-t border-white/10 pt-6 space-y-4" },
@@ -456,45 +454,45 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements
     ...{ class: (__VLS_ctx.labelClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea, __VLS_intrinsicElements.textarea)({
-    value: (__VLS_ctx.form.notes_by_sales),
+    value: (__VLS_ctx.form.notes_sales),
     rows: "4",
     ...{ class: (__VLS_ctx.textareaClass) },
 });
-if (__VLS_ctx.form.errors.notes_by_sales) {
+if (__VLS_ctx.form.errors.notes_sales) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "mt-1 text-sm text-red-400" },
     });
-    (__VLS_ctx.form.errors.notes_by_sales);
+    (__VLS_ctx.form.errors.notes_sales);
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
     ...{ class: (__VLS_ctx.labelClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea, __VLS_intrinsicElements.textarea)({
-    value: (__VLS_ctx.form.notes_by_cst),
+    value: (__VLS_ctx.form.notes_cst),
     rows: "4",
     ...{ class: (__VLS_ctx.textareaClass) },
 });
-if (__VLS_ctx.form.errors.notes_by_cst) {
+if (__VLS_ctx.form.errors.notes_cst) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "mt-1 text-sm text-red-400" },
     });
-    (__VLS_ctx.form.errors.notes_by_cst);
+    (__VLS_ctx.form.errors.notes_cst);
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
     ...{ class: (__VLS_ctx.labelClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea, __VLS_intrinsicElements.textarea)({
-    value: (__VLS_ctx.form.notes_by_tech),
+    value: (__VLS_ctx.form.notes_tech),
     rows: "4",
     ...{ class: (__VLS_ctx.textareaClass) },
 });
-if (__VLS_ctx.form.errors.notes_by_tech) {
+if (__VLS_ctx.form.errors.notes_tech) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "mt-1 text-sm text-red-400" },
     });
-    (__VLS_ctx.form.errors.notes_by_tech);
+    (__VLS_ctx.form.errors.notes_tech);
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "pt-4 flex justify-end" },
@@ -505,23 +503,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     disabled: (__VLS_ctx.form.processing),
 });
 (__VLS_ctx.form.processing ? 'Saving…' : 'Create client');
-/** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-slab']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['justify-between']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-3xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['tracking-tight']} */ ;
-/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-white/60']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
+var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['btn-capsule']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 /** @type {__VLS_StyleScopedClasses['card-neo']} */ ;
@@ -656,6 +638,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             Link: Link,
+            PageShell: PageShell,
             r: r,
             org: org,
             form: form,

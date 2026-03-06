@@ -59,7 +59,6 @@ class AuthenticatedSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Tests expect a redirect to "/"
-        return redirect('/');
+        return redirect()->route('login');
     }
 }

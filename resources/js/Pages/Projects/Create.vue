@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useForm, usePage, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -71,32 +72,21 @@ const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Hero -->
-    <section class="hero-slab">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <div class="text-xs text-white/60">
-            Organization • {{ org.toUpperCase() }}
-          </div>
-          <h1 class="mt-1 text-3xl font-semibold tracking-tight">
-            Create Project
-          </h1>
-          <p class="mt-1 text-white/60">
-            Enter the details for a new project.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <Link
-            :href="r('projects.index', { organization: org })"
-            class="btn-capsule text-xs"
-          >
-            Back to Projects
-          </Link>
-        </div>
-      </div>
-    </section>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${org.toUpperCase()}`,
+      title: 'Create Project',
+      subtitle: 'Enter the details for a new project.',
+    }"
+  >
+    <template #header-actions>
+      <Link
+        :href="r('projects.index', { organization: org })"
+        class="btn-capsule text-xs"
+      >
+        Back to Projects
+      </Link>
+    </template>
 
     <!-- Form -->
     <form @submit.prevent="submit" class="card-neo p-6 space-y-8">
@@ -249,5 +239,5 @@ const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
         </button>
       </div>
     </form>
-  </div>
+  </PageShell>
 </template>

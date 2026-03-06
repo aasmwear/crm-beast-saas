@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({
   layout: AuthenticatedLayout,
@@ -146,18 +147,14 @@ function formatDate(value: string | null) {
 <template>
   <Head title="Announcements" />
 
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between gap-3">
-      <div>
-        <h1 class="text-lg font-semibold text-white">
-          Announcements
-        </h1>
-        <p class="mt-1 text-sm text-white/60">
-          Share important updates with everyone in {{ organization.name }}.
-        </p>
-      </div>
-
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${String(orgSlug).toUpperCase()}`,
+      title: 'Announcements',
+      subtitle: `Share important updates with everyone in ${organization.name}.`,
+    }"
+  >
+    <template #header-actions>
       <button
         type="button"
         class="inline-flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
@@ -166,7 +163,7 @@ function formatDate(value: string | null) {
         <span class="mr-1.5">+</span>
         <span>New announcement</span>
       </button>
-    </div>
+    </template>
 
     <!-- List -->
     <div class="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm">
@@ -311,5 +308,5 @@ function formatDate(value: string | null) {
         </form>
       </div>
     </div>
-  </div>
+  </PageShell>
 </template>

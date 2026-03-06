@@ -35,13 +35,15 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "space-y-6" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
-    ...{ class: "text-lg font-medium text-gray-900" },
+    ...{ class: "text-lg font-semibold text-white" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "mt-1 text-sm text-gray-600" },
+    ...{ class: "mt-1 text-sm text-white/65" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.form, __VLS_intrinsicElements.form)({
     ...{ onSubmit: (__VLS_ctx.updatePassword) },
@@ -53,10 +55,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 const __VLS_0 = __VLS_asFunctionalComponent(InputLabel, new InputLabel({
     for: "current_password",
     value: "Current Password",
+    ...{ class: "text-white/80" },
 }));
 const __VLS_1 = __VLS_0({
     for: "current_password",
     value: "Current Password",
+    ...{ class: "text-white/80" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_0));
 /** @type {[typeof TextInput, ]} */ ;
 // @ts-ignore
@@ -65,7 +69,7 @@ const __VLS_3 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     ref: "currentPasswordInput",
     modelValue: (__VLS_ctx.form.current_password),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "current-password",
 }));
 const __VLS_4 = __VLS_3({
@@ -73,7 +77,7 @@ const __VLS_4 = __VLS_3({
     ref: "currentPasswordInput",
     modelValue: (__VLS_ctx.form.current_password),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "current-password",
 }, ...__VLS_functionalComponentArgsRest(__VLS_3));
 /** @type {typeof __VLS_ctx.currentPasswordInput} */ ;
@@ -95,10 +99,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 const __VLS_11 = __VLS_asFunctionalComponent(InputLabel, new InputLabel({
     for: "password",
     value: "New Password",
+    ...{ class: "text-white/80" },
 }));
 const __VLS_12 = __VLS_11({
     for: "password",
     value: "New Password",
+    ...{ class: "text-white/80" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_11));
 /** @type {[typeof TextInput, ]} */ ;
 // @ts-ignore
@@ -107,7 +113,7 @@ const __VLS_14 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     ref: "passwordInput",
     modelValue: (__VLS_ctx.form.password),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "new-password",
 }));
 const __VLS_15 = __VLS_14({
@@ -115,7 +121,7 @@ const __VLS_15 = __VLS_14({
     ref: "passwordInput",
     modelValue: (__VLS_ctx.form.password),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "new-password",
 }, ...__VLS_functionalComponentArgsRest(__VLS_14));
 /** @type {typeof __VLS_ctx.passwordInput} */ ;
@@ -137,10 +143,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 const __VLS_22 = __VLS_asFunctionalComponent(InputLabel, new InputLabel({
     for: "password_confirmation",
     value: "Confirm Password",
+    ...{ class: "text-white/80" },
 }));
 const __VLS_23 = __VLS_22({
     for: "password_confirmation",
     value: "Confirm Password",
+    ...{ class: "text-white/80" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_22));
 /** @type {[typeof TextInput, ]} */ ;
 // @ts-ignore
@@ -148,14 +156,14 @@ const __VLS_25 = __VLS_asFunctionalComponent(TextInput, new TextInput({
     id: "password_confirmation",
     modelValue: (__VLS_ctx.form.password_confirmation),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "new-password",
 }));
 const __VLS_26 = __VLS_25({
     id: "password_confirmation",
     modelValue: (__VLS_ctx.form.password_confirmation),
     type: "password",
-    ...{ class: "mt-1 block w-full" },
+    ...{ class: "mt-1 block w-full border-white/15 bg-slate-950/45 text-white placeholder:text-white/35 focus:border-indigo-400 focus:ring-indigo-400/35" },
     autocomplete: "new-password",
 }, ...__VLS_functionalComponentArgsRest(__VLS_25));
 /** @type {[typeof InputError, ]} */ ;
@@ -199,35 +207,57 @@ const __VLS_36 = __VLS_35({
 __VLS_37.slots.default;
 if (__VLS_ctx.form.recentlySuccessful) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "text-sm text-gray-600" },
+        ...{ class: "text-sm text-white/65" },
     });
 }
 var __VLS_37;
+/** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-lg']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-900']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/65']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['block']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/15']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-slate-950/45']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-white/35']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:border-indigo-400']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-indigo-400/35']} */ ;
 /** @type {__VLS_StyleScopedClasses['mt-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['gap-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-gray-600']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/65']} */ ;
 // @ts-ignore
 var __VLS_7 = __VLS_6, __VLS_18 = __VLS_17;
 var __VLS_dollars;
