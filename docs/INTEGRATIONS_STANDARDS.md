@@ -7,7 +7,9 @@
 - Implemented: Stripe customer creation/linking + subscription initiation from tenant billing page.
 - Implemented: plan-key to Stripe price mapping via `config/billing.php` (`stripe_prices`).
 - Implemented: webhook reconciliation of subscription lifecycle into canonical `organization_subscriptions` with idempotency.
-- Not yet implemented: invoice sync UI/features, billing portal redesign, dunning/retry workflows.
+- Implemented: Stripe billing portal redirect (`/org/{org}/billing/portal`) for `billing.manage` users.
+- Implemented: Billing page invoice history normalization from Cashier invoice data and safe Stripe-hosted links (hosted invoice, PDF, receipt when available).
+- Not yet implemented: dunning/retry workflows, usage metering expansion, major portal UI redesign.
 
 ### Configuration
 
@@ -20,6 +22,13 @@ Required runtime config:
 - `STRIPE_PRICE_ENTERPRISE_MONTHLY` (optional/manual by default)
 
 If Stripe key/secret or plan price mapping is missing, billing initiation returns a safe 422 response and the UI shows Stripe as unavailable.
+
+Portal access also requires:
+
+- `cashier.secret` and `services.stripe.key`
+- Existing Stripe customer on organization (`organizations.stripe_id`)
+
+If requirements are missing, portal action redirects back with a safe error message.
 
 ### Canonical model rule
 

@@ -16,10 +16,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Illuminate\Support\Carbon;
 
 final class SubscriptionController extends Controller
 {
@@ -41,21 +43,7 @@ final class SubscriptionController extends Controller
         }
         $trialEndsAt = $organization->trial_ends_at?->format('Y-m-d');
 
-        $invoices = [];
-        if ($organization->hasStripeId()) {
-            try {
-                $invoices = $organization->invoices()->map(fn ($inv) => [
-                    'id' => $inv->id,
-                    'date' => $inv->date()?->format('Y-m-d'),
-                    'invoice_number' => $inv->number ?? $inv->id,
-                    'amount' => $inv->rawTotal() / 100,
-                    'status' => $inv->isPaid() ? 'Paid' : 'Pending',
-                    'pdf_url' => $inv->invoice_pdf ?? '#',
-                ])->toArray();
-            } catch (\Throwable $e) {
-                Log::warning('Failed to fetch invoices for org', ['org' => $organization->id, 'error' => $e->getMessage()]);
-            }
-        }
+        $invoices = $this->fetchBillingInvoices($organization);
 
         $stripePriceMap = collect((array) config('billing.stripe_prices', []))
             ->map(fn ($value) => is_string($value) ? trim($value) : null)
@@ -473,14 +461,192 @@ final class SubscriptionController extends Controller
      */
     public function portal(Request $request, Organization $organization): JsonResponse|\Illuminate\Http\RedirectResponse
     {
-        abort_unless($request->user()?->can('billing.view'), 403);
+        abort_unless($request->user()?->can('billing.manage'), 403);
 
-        if (empty(config('cashier.secret'))) {
+        if (empty(config('cashier.secret')) || empty(config('services.stripe.key'))) {
             return back()->with('error', 'Stripe is not configured.');
+        }
+
+        if (! $organization->hasStripeId()) {
+            return back()->with('error', 'No Stripe billing customer is linked to this organization yet.');
         }
 
         $returnUrl = route('billing.index', ['organization' => $organization->slug]);
 
-        return $organization->redirectToBillingPortal($returnUrl);
+        try {
+            return $organization->redirectToBillingPortal($returnUrl);
+        } catch (\Throwable $e) {
+            Log::warning('Stripe billing portal launch failed', [
+                'organization_id' => $organization->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Unable to open billing portal right now. Please try again.');
+        }
+    }
+
+    /**
+     * Build tenant-safe invoice history data for Billing page UI.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function fetchBillingInvoices(Organization $organization): array
+    {
+        $overrideInvoices = config('billing.invoice_overrides');
+        if (is_array($overrideInvoices)) {
+            return collect($overrideInvoices)
+                ->filter(fn ($row) => is_array($row))
+                ->map(fn (array $row) => $this->normalizeBillingInvoiceRow($row))
+                ->values()
+                ->all();
+        }
+
+        if (! $organization->hasStripeId()) {
+            return [];
+        }
+
+        try {
+            return $organization->invoices()
+                ->map(fn ($invoice) => $this->normalizeBillingInvoice($invoice))
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            Log::warning('Failed to fetch Stripe/Cashier invoices for org', [
+                'organization_id' => $organization->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * @param  mixed  $invoice
+     * @return array<string, mixed>
+     */
+    protected function normalizeBillingInvoice(mixed $invoice): array
+    {
+        $stripeInvoice = method_exists($invoice, 'asStripeInvoice') ? $invoice->asStripeInvoice() : null;
+
+        $id = (string) ($invoice->id ?? $stripeInvoice->id ?? '');
+        $number = (string) ($invoice->number ?? $id);
+        $status = (string) ($stripeInvoice->status ?? '');
+        if ($status === '' && method_exists($invoice, 'isPaid')) {
+            $status = $invoice->isPaid() ? 'paid' : 'open';
+        }
+
+        $currency = (string) ($stripeInvoice->currency ?? config('cashier.currency', 'usd'));
+        if ($currency === '') {
+            $currency = 'usd';
+        }
+
+        $createdAt = null;
+        if (method_exists($invoice, 'date')) {
+            $createdAt = $invoice->date()?->toIso8601String();
+        } elseif (is_numeric($stripeInvoice->created ?? null)) {
+            $createdAt = Carbon::createFromTimestampUTC((int) $stripeInvoice->created)->toIso8601String();
+        }
+
+        $totalMinor = method_exists($invoice, 'rawTotal')
+            ? (int) $invoice->rawTotal()
+            : (is_numeric($stripeInvoice->total ?? null) ? (int) $stripeInvoice->total : null);
+
+        $subtotalMinor = is_numeric($stripeInvoice->subtotal ?? null)
+            ? (int) $stripeInvoice->subtotal
+            : null;
+
+        $hostedInvoiceUrl = $this->sanitizeStripeUrl($stripeInvoice->hosted_invoice_url ?? null);
+        $invoicePdfUrl = $this->sanitizeStripeUrl($stripeInvoice->invoice_pdf ?? null);
+        $receiptUrl = $this->resolveReceiptUrl($stripeInvoice);
+
+        return [
+            'id' => $id,
+            'number' => $number,
+            'total_minor' => $totalMinor,
+            'subtotal_minor' => $subtotalMinor,
+            'currency' => strtoupper($currency),
+            'status' => $status !== '' ? Str::headline($status) : 'Unknown',
+            'created_at' => $createdAt,
+            'period_start' => is_numeric($stripeInvoice->period_start ?? null) ? Carbon::createFromTimestampUTC((int) $stripeInvoice->period_start)->toIso8601String() : null,
+            'period_end' => is_numeric($stripeInvoice->period_end ?? null) ? Carbon::createFromTimestampUTC((int) $stripeInvoice->period_end)->toIso8601String() : null,
+            'hosted_invoice_url' => $hostedInvoiceUrl,
+            'invoice_pdf' => $invoicePdfUrl,
+            'receipt_url' => $receiptUrl,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $invoice
+     * @return array<string, mixed>
+     */
+    protected function normalizeBillingInvoiceRow(array $invoice): array
+    {
+        $rawStatus = (string) ($invoice['status'] ?? '');
+        $rawCurrency = (string) ($invoice['currency'] ?? 'USD');
+
+        return [
+            'id' => (string) ($invoice['id'] ?? ''),
+            'number' => (string) ($invoice['number'] ?? $invoice['id'] ?? ''),
+            'total_minor' => isset($invoice['total_minor']) && is_numeric($invoice['total_minor']) ? (int) $invoice['total_minor'] : null,
+            'subtotal_minor' => isset($invoice['subtotal_minor']) && is_numeric($invoice['subtotal_minor']) ? (int) $invoice['subtotal_minor'] : null,
+            'currency' => strtoupper($rawCurrency !== '' ? $rawCurrency : 'USD'),
+            'status' => $rawStatus !== '' ? Str::headline($rawStatus) : 'Unknown',
+            'created_at' => is_string($invoice['created_at'] ?? null) ? $invoice['created_at'] : null,
+            'period_start' => is_string($invoice['period_start'] ?? null) ? $invoice['period_start'] : null,
+            'period_end' => is_string($invoice['period_end'] ?? null) ? $invoice['period_end'] : null,
+            'hosted_invoice_url' => $this->sanitizeStripeUrl($invoice['hosted_invoice_url'] ?? null),
+            'invoice_pdf' => $this->sanitizeStripeUrl($invoice['invoice_pdf'] ?? null),
+            'receipt_url' => $this->sanitizeStripeUrl($invoice['receipt_url'] ?? null),
+        ];
+    }
+
+    /**
+     * @param  mixed  $stripeInvoice
+     */
+    protected function resolveReceiptUrl(mixed $stripeInvoice): ?string
+    {
+        if (! is_object($stripeInvoice)) {
+            return null;
+        }
+
+        $charge = $stripeInvoice->charge ?? null;
+        if (is_object($charge) && is_string($charge->receipt_url ?? null)) {
+            return $this->sanitizeStripeUrl($charge->receipt_url);
+        }
+
+        $paymentIntent = $stripeInvoice->payment_intent ?? null;
+        if (is_object($paymentIntent)) {
+            $charges = $paymentIntent->charges->data ?? null;
+            if (is_array($charges) && isset($charges[0]) && is_object($charges[0]) && is_string($charges[0]->receipt_url ?? null)) {
+                return $this->sanitizeStripeUrl($charges[0]->receipt_url);
+            }
+        }
+
+        return null;
+    }
+
+    protected function sanitizeStripeUrl(mixed $url): ?string
+    {
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $candidate = trim($url);
+        $parts = parse_url($candidate);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if ($scheme !== 'https' || $host === '') {
+            return null;
+        }
+
+        if (! Str::endsWith($host, ['stripe.com', 'stripe.network'])) {
+            return null;
+        }
+
+        return $candidate;
     }
 }

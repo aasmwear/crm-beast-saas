@@ -7,12 +7,18 @@ import PageShell from '@/Components/ui/PageShell.vue'
 defineOptions({ layout: AuthenticatedLayout })
 
 type Invoice = {
-  id: number
-  date: string
-  invoice_number: string
-  amount: number
+  id: string
+  number: string
+  total_minor: number | null
+  subtotal_minor: number | null
+  currency: string
   status: string
-  pdf_url: string
+  created_at: string | null
+  period_start: string | null
+  period_end: string | null
+  hosted_invoice_url: string | null
+  invoice_pdf: string | null
+  receipt_url: string | null
 }
 
 type Plan = {
@@ -233,12 +239,34 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+function formatMoneyMinor(minor: number | null, currency: string): string {
+  if (minor === null || Number.isNaN(minor)) return '—'
+  const safeCurrency = currency && currency.length === 3 ? currency.toUpperCase() : 'USD'
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: safeCurrency,
+  }).format(minor / 100)
+}
+
+function invoiceDate(inv: Invoice): string | null {
+  return inv.created_at ?? inv.period_end ?? inv.period_start
+}
+
+function displayInvoiceDate(inv: Invoice): string {
+  const value = invoiceDate(inv)
+  return value ? formatDate(value) : '—'
+}
+
 function statusClass(status: string): string {
-  if (status === 'Paid') {
+  const normalized = (status || '').toLowerCase()
+  if (normalized === 'paid') {
     return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
   }
-  if (status === 'Pending') {
+  if (normalized === 'pending' || normalized === 'open' || normalized === 'draft') {
     return 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+  }
+  if (normalized === 'void' || normalized === 'uncollectible' || normalized === 'failed') {
+    return 'bg-rose-500/15 text-rose-300 border border-rose-500/40'
   }
   return 'bg-white/10 text-white/70 border border-white/20'
 }
@@ -298,14 +326,14 @@ function statusClass(status: string): string {
           </div>
           <div class="flex gap-3 shrink-0">
             <a
-              v-if="hasActiveSubscription && stripeEnabled"
+              v-if="canManageBilling && stripeEnabled"
               :href="r('billing.portal', { organization: org })"
               class="btn-capsule border border-white/20 bg-white/5 text-white/90 hover:bg-white/10"
             >
-              Manage subscription
+              Manage billing
             </a>
             <button
-              v-else-if="!hasActiveSubscription && stripeEnabled && canManageBilling"
+              v-if="!hasActiveSubscription && stripeEnabled && canManageBilling"
               type="button"
               class="btn-capsule bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
               :disabled="processingCheckout"
@@ -672,11 +700,11 @@ function statusClass(status: string): string {
           <table class="min-w-full text-left text-sm">
             <thead class="bg-white/5 text-xs font-semibold uppercase tracking-wide text-white/60">
               <tr>
-                <th class="px-6 py-3">Date</th>
                 <th class="px-6 py-3">Invoice #</th>
-                <th class="px-6 py-3">Amount</th>
+                <th class="px-6 py-3">Date</th>
+                <th class="px-6 py-3">Total</th>
                 <th class="px-6 py-3">Status</th>
-                <th class="px-6 py-3 text-right">Action</th>
+                <th class="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-white/5">
@@ -685,14 +713,14 @@ function statusClass(status: string): string {
                 :key="inv.id"
                 class="hover:bg-white/[0.02] transition"
               >
-                <td class="px-6 py-4 text-white/80">
-                  {{ formatDate(inv.date) }}
-                </td>
                 <td class="px-6 py-4 font-mono text-white/90">
-                  {{ inv.invoice_number }}
+                  {{ inv.number || inv.id }}
+                </td>
+                <td class="px-6 py-4 text-white/80">
+                  {{ displayInvoiceDate(inv) }}
                 </td>
                 <td class="px-6 py-4 text-white/90">
-                  {{ formatCurrency(inv.amount) }}
+                  {{ formatMoneyMinor(inv.total_minor, inv.currency) }}
                 </td>
                 <td class="px-6 py-4">
                   <span
@@ -702,13 +730,40 @@ function statusClass(status: string): string {
                     {{ inv.status }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-6 py-4 text-right space-x-3">
                   <a
-                    :href="inv.pdf_url"
+                    v-if="inv.hosted_invoice_url"
+                    :href="inv.hosted_invoice_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-sky-400 hover:text-sky-300 text-xs font-medium"
+                  >
+                    View invoice
+                  </a>
+                  <a
+                    v-if="inv.invoice_pdf"
+                    :href="inv.invoice_pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     class="text-violet-400 hover:text-violet-300 text-xs font-medium"
                   >
                     Download PDF
                   </a>
+                  <a
+                    v-if="inv.receipt_url"
+                    :href="inv.receipt_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-emerald-400 hover:text-emerald-300 text-xs font-medium"
+                  >
+                    View receipt
+                  </a>
+                  <span
+                    v-if="!inv.hosted_invoice_url && !inv.invoice_pdf && !inv.receipt_url"
+                    class="text-xs text-white/40"
+                  >
+                    No links
+                  </span>
                 </td>
               </tr>
             </tbody>

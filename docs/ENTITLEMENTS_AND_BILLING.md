@@ -1,6 +1,6 @@
 # Entitlements & Billing
 
-> Billing & entitlements foundation (no Stripe integration in initial PR). Defines schema, resolution order, seat counting, and future webhook plan.
+> Billing & entitlements foundation with Stripe/Cashier self-serve flows. Defines schema, resolution order, seat counting, billing portal access, and invoice UX data model.
 
 ---
 
@@ -134,6 +134,7 @@ Stripe is now used to initiate paid subscriptions, while `organization_subscript
 | Method | Route | Permission | Purpose |
 |--------|-------|------------|---------|
 | POST | `/org/{org}/billing/checkout` | `billing.manage` | Start/switch Stripe-backed subscription for a selected `plan_key` |
+| GET | `/org/{org}/billing/portal` | `billing.manage` | Open Stripe-hosted billing portal for customer self-serve |
 
 ### Plan mapping
 
@@ -152,6 +153,20 @@ Stripe is now used to initiate paid subscriptions, while `organization_subscript
    - No active subscription + default payment method exists: create subscription directly.
 5. Upsert canonical `organization_subscriptions` with `plan_key`, `status`, `seats_included`, and period/trial fields when available.
 6. Audit log written as `subscription_initiated` on `subscription`.
+
+### Billing portal + invoice history UX
+
+- The tenant billing page now exposes a **Manage billing** action for users with `billing.manage`.
+- Portal access is guarded by:
+  - Stripe runtime config presence (`cashier.secret`, `services.stripe.key`)
+  - Existing Stripe customer linkage (`organizations.stripe_id`)
+- Safe failures redirect back to Billing with a user-facing error flash instead of throwing.
+- Invoice history is sourced from Cashier invoices and normalized for UI:
+  - `id`, `number`, `currency`, `status`
+  - `total_minor`, `subtotal_minor`
+  - `created_at`, `period_start`, `period_end`
+  - Optional Stripe-hosted links: `hosted_invoice_url`, `invoice_pdf`, `receipt_url`
+- Missing Stripe fields are tolerated; UI remains readable when links/amounts/dates are absent.
 
 ### Canonical state vs Stripe state
 

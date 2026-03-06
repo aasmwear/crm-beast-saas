@@ -22,7 +22,7 @@
 | Reports | ✅ | Page + RBAC + export (primary_contact_email/phone) |
 | Notifications | 🟡 | Works; no RBAC |
 | Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations, Modules, API Keys |
-| Billing | 🟡 | Foundation + seat enforcement (HRM, registration); portal users excluded; no Stripe sync, no RBAC |
+| Billing | 🟡 | Stripe/Cashier self-serve in place (checkout, webhook sync, portal access, invoice history UX); keep iterating on operational hardening |
 | HRM | 🟡 | Auth commented out |
 
 ---
@@ -38,6 +38,23 @@
 ---
 
 ## Last PR Notes
+
+- **Tenant self-serve billing portal + invoice/receipt UX (rescue-mission):**
+  - **Portal authorization + safety:** `GET /org/{org}/billing/portal` now requires `billing.manage` (not `billing.view`), validates Stripe runtime config (`cashier.secret`, `services.stripe.key`), and requires a linked Stripe customer (`organizations.stripe_id`).
+  - **Portal execution:** Action uses Cashier billing portal redirect and catches failures, returning a safe flash error instead of breaking billing page flow.
+  - **Invoice normalization:** Billing page now receives canonicalized Cashier-backed invoice payload with defensive fallbacks: `id`, `number`, `currency`, `status`, `total_minor`, `subtotal_minor`, date fields, and optional hosted links (`hosted_invoice_url`, `invoice_pdf`, `receipt_url`).
+  - **Safe link handling:** Invoice/receipt links are sanitized to HTTPS Stripe hosts before being exposed to UI.
+  - **Billing UI updates:** `Billing/Index.vue` adds compact **Manage billing** action for authorized users and an enriched invoice history table with conditional actions for view/download/receipt links while preserving existing canonical billing sections.
+  - **Tests:** Added `BillingPortalAndInvoicesTest` for portal auth, safe failures (missing config/customer), normalized invoice payload exposure, and empty invoice list handling.
+  - **Docs:** Updated `ENTITLEMENTS_AND_BILLING.md`, `INTEGRATIONS_STANDARDS.md`, `QA_RELEASE_PLAYBOOK.md`, and this status file.
+  - **QA checklist:**
+    1. User without `billing.manage` cannot access `/org/{org}/billing/portal` (403).
+    2. Missing Stripe config -> Manage billing redirects back with safe error flash.
+    3. No Stripe customer (`stripe_id` missing) -> Manage billing redirects back with safe error flash.
+    4. Configured org with Stripe customer -> Manage billing redirects to Stripe portal.
+    5. Billing invoice history shows number/date/total/status and only valid link actions.
+    6. Org without invoices shows clean empty state.
+    7. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
 
 - **Stripe webhook lifecycle sync + idempotent canonical reconciliation (rescue-mission):**
   - **Webhook ingress:** Extended existing `POST /webhooks/stripe` endpoint (no new webhook path) with Stripe signature verification and safe malformed/invalid handling.

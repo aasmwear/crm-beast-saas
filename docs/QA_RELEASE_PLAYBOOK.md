@@ -50,3 +50,21 @@
 7. **Checkout completed (subscription mode):** Send `checkout.session.completed` with `mode=subscription` and plan metadata.
    - Expect canonical `plan_key/status` upsert.
 8. **Verify idempotency table:** `stripe_webhook_events` contains one row per unique Stripe event ID with processed status.
+
+---
+
+## Billing portal + invoice history QA
+
+1. **Permission gate (portal):** Log in as user without `billing.manage` and open `/org/{org}/billing/portal`.
+   - Expect `403`.
+2. **Stripe config missing:** Unset Stripe runtime config (`STRIPE_SECRET` and/or `STRIPE_KEY`) and click **Manage billing**.
+   - Expect redirect back to Billing with safe flash error; no crash.
+3. **No Stripe customer:** Keep Stripe keys configured but use org with no `stripe_id`. Click **Manage billing**.
+   - Expect redirect back with safe flash error about missing billing customer.
+4. **Happy path portal redirect:** Use org with `stripe_id` and configured Stripe keys. Click **Manage billing**.
+   - Expect redirect to Stripe billing portal URL.
+5. **Invoice table render:** Open `/org/{org}/billing` for org with Cashier invoices.
+   - Expect invoice rows show number, date, total, and status.
+   - Action links render only when URLs exist: **View invoice**, **Download PDF**, **View receipt**.
+6. **Empty state:** Org with no Stripe invoices should show Billing page normally with "No invoices yet."
+7. **Verification commands:** Run `./vendor/bin/sail artisan test tests/Feature/Billing/BillingPortalAndInvoicesTest.php`, then full `./vendor/bin/sail artisan test`, and `./vendor/bin/sail npm run build`.
