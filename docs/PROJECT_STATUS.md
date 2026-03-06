@@ -39,6 +39,27 @@
 
 ## Last PR Notes
 
+- **Stripe webhook lifecycle sync + idempotent canonical reconciliation (rescue-mission):**
+  - **Webhook ingress:** Extended existing `POST /webhooks/stripe` endpoint (no new webhook path) with Stripe signature verification and safe malformed/invalid handling.
+  - **CSRF:** Existing exemption for `webhooks/stripe` retained in `bootstrap/app.php`.
+  - **Idempotency store:** Added `stripe_webhook_events` table + model with unique `stripe_event_id`, processing status, notes, payload snapshot, and `processed_at`.
+  - **Event coverage:** `customer.subscription.created|updated|deleted`, `checkout.session.completed` (subscription mode), `invoice.payment_succeeded`, `invoice.payment_failed`.
+  - **Canonical sync:** Added `StripeWebhookSyncService` to reconcile Stripe lifecycle into `organization_subscriptions` (`plan_key`, `status`, `trial_ends_at`, `current_period_ends_at`, `seats_included`) while keeping `organizations.plan` untouched.
+  - **Plan reconciliation:** Reverse mapping from Stripe `price.id` back to internal `plan_key` uses `config/billing.php` (`stripe_prices`). Unknown price IDs are logged/audited (`webhook_plan_mismatch`) without crashing status sync.
+  - **Audit logging:** Added webhook-driven billing audit events: `subscription_status_changed`, `subscription_canceled`, `payment_succeeded`, `payment_failed`, and mismatch notes.
+  - **Backward compatibility:** Preserved legacy invoice checkout webhook behavior (`checkout.session.completed` with `invoice_id` metadata) so portal invoice payments continue to work.
+  - **Tests:** Added `StripeWebhookSyncTest` covering invalid signature, duplicate event idempotency, subscription update/delete sync, payment failure status sync, and subscription checkout completion sync.
+  - **Docs updated:** `ENTITLEMENTS_AND_BILLING.md`, `INTEGRATIONS_STANDARDS.md`, `SECURITY_MODEL.md`, `QA_RELEASE_PLAYBOOK.md`.
+  - **QA checklist:**
+    1. Send webhook with invalid signature → `400`, no canonical changes.
+    2. Send same event ID twice → second delivery acknowledged with no duplicate mutation.
+    3. Send `customer.subscription.updated` for mapped price → canonical status/period/plan sync.
+    4. Send `customer.subscription.deleted` → canonical status becomes `canceled`.
+    5. Send `invoice.payment_failed` → canonical status becomes `past_due` (non-terminal states).
+    6. Send `checkout.session.completed` in subscription mode with `plan_key` metadata → canonical record upserts.
+    7. Verify `stripe_webhook_events` row status is `processed`.
+    8. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Stripe subscription initiation + canonical sync (rescue-mission):**
   - **Goal delivered:** Authorized tenant admins can initiate Stripe-backed subscriptions by internal `plan_key` while preserving `organization_subscriptions` as canonical billing state.
   - **Config:** Added `config/billing.php` `stripe_prices` map (`starter`, `pro`, `enterprise`) and env entries for plan price IDs.

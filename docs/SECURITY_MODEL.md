@@ -52,3 +52,19 @@ Per-organization and per-key scoping prevents one tenant from consuming quota of
 ```
 
 Rate limiting runs after authentication; unauthenticated requests (401) do not consume quota.
+
+## Stripe Webhook Security
+
+Stripe webhook ingress is protected by signature verification and replay-safe idempotency.
+
+### Signature verification
+
+- Webhook endpoint: `POST /webhooks/stripe`.
+- CSRF is explicitly exempted for this route in `bootstrap/app.php`.
+- Request signatures are verified using Stripe's `Stripe-Signature` header and `STRIPE_WEBHOOK_SECRET`.
+- Invalid signature or malformed payload is rejected (`400`/`422`) and not processed.
+
+### Replay and duplicate protection
+
+- Processed events are persisted in `stripe_webhook_events` with unique `stripe_event_id`.
+- Duplicate event IDs are acknowledged and ignored safely (no double mutation of canonical billing state).

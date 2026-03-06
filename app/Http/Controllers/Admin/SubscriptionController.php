@@ -411,7 +411,7 @@ final class SubscriptionController extends Controller
             $result = $stripeBilling->startForPlan($organization, $priceId, [
                 'success_url' => $successUrl,
                 'cancel_url' => $cancelUrl,
-            ]);
+            ], $planKey);
         } catch (\Throwable $e) {
             Log::warning('Stripe subscription initiation failed', [
                 'organization_id' => $organization->id,

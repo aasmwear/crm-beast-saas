@@ -6,7 +6,8 @@
 
 - Implemented: Stripe customer creation/linking + subscription initiation from tenant billing page.
 - Implemented: plan-key to Stripe price mapping via `config/billing.php` (`stripe_prices`).
-- Not yet implemented: webhook reconciliation, invoices sync, billing portal redesign, dunning/retry flows.
+- Implemented: webhook reconciliation of subscription lifecycle into canonical `organization_subscriptions` with idempotency.
+- Not yet implemented: invoice sync UI/features, billing portal redesign, dunning/retry workflows.
 
 ### Configuration
 
@@ -24,7 +25,15 @@ If Stripe key/secret or plan price mapping is missing, billing initiation return
 
 - Stripe is the external billing processor.
 - CRM Beast canonical enforcement must continue to use `organization_subscriptions` (`plan_key`, `status`, seats/period fields).
-- Subscription initiation updates canonical state immediately; webhook sync will harden this in a follow-up PR.
+- Subscription initiation updates canonical state immediately; webhook sync reconciles and hardens canonical state.
+
+### Webhook handling standards
+
+- Endpoint: `POST /webhooks/stripe`.
+- Signature verification is mandatory via `STRIPE_WEBHOOK_SECRET`.
+- Event idempotency is mandatory via unique `stripe_event_id` persistence in `stripe_webhook_events`.
+- Duplicate events must return `200` and skip reprocessing.
+- Unknown Stripe price IDs must not crash processing; log/audit mismatch and continue safe status sync.
 
 ## API Keys
 

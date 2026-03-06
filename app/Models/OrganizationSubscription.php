@@ -28,6 +28,10 @@ class OrganizationSubscription extends Model
 
     public const STATUS_PAST_DUE = 'past_due';
 
+    public const STATUS_INCOMPLETE = 'incomplete';
+
+    public const STATUS_UNPAID = 'unpaid';
+
     public const STATUS_CANCELED = 'canceled';
 
     protected $table = 'organization_subscriptions';

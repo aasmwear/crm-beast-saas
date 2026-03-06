@@ -21,7 +21,7 @@ class StripeSubscriptionService
      *   current_period_ends_at: CarbonInterface|null
      * }
      */
-    public function startForPlan(Organization $organization, string $priceId, array $urls): array
+    public function startForPlan(Organization $organization, string $priceId, array $urls, ?string $planKey = null): array
     {
         $organization->createOrGetStripeCustomer();
 
@@ -44,6 +44,16 @@ class StripeSubscriptionService
             $checkout = $organization->newSubscription('default', $priceId)->checkout([
                 'success_url' => $urls['success_url'],
                 'cancel_url' => $urls['cancel_url'],
+                'metadata' => [
+                    'organization_id' => (string) $organization->id,
+                    'plan_key' => $planKey,
+                ],
+                'subscription_data' => [
+                    'metadata' => [
+                        'organization_id' => (string) $organization->id,
+                        'plan_key' => $planKey,
+                    ],
+                ],
             ]);
 
             return [

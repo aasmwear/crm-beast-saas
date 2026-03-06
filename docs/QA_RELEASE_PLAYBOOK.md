@@ -30,3 +30,23 @@
 3. **Allow portal add:** With same org at seat limit, go to a client → Contacts → Enable portal access for a contact with valid email.
    - Expect success; portal user created and attached. Portal users do not count toward seat limit.
 4. **Tenant scoping:** Org A at limit; Org B under limit. As admin of Org B, add employee to Org B → success. Org B is independent.
+
+---
+
+## Stripe webhook sync smoke test
+
+1. **Prepare Stripe config:** Set `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, and plan price IDs in `config/billing.php` env values.
+2. **Invalid signature test:** POST to `/webhooks/stripe` with bad `Stripe-Signature`.
+   - Expect `400` and no canonical subscription mutation.
+3. **Duplicate delivery test:** Send same Stripe event (`id` identical) twice.
+   - First request processes normally (`200`).
+   - Second request returns `200` and does not re-apply changes.
+4. **Subscription updated:** Send `customer.subscription.updated` for known Stripe customer + known price ID.
+   - Expect `organization_subscriptions` status/period fields synced.
+5. **Subscription deleted:** Send `customer.subscription.deleted`.
+   - Expect canonical status `canceled`.
+6. **Payment failed:** Send `invoice.payment_failed`.
+   - Expect canonical status transitions to `past_due` (unless already terminal by design).
+7. **Checkout completed (subscription mode):** Send `checkout.session.completed` with `mode=subscription` and plan metadata.
+   - Expect canonical `plan_key/status` upsert.
+8. **Verify idempotency table:** `stripe_webhook_events` contains one row per unique Stripe event ID with processed status.

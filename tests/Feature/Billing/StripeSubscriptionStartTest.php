@@ -65,7 +65,7 @@ class StripeSubscriptionStartTest extends TestCase
 
         app()->bind(StripeSubscriptionService::class, fn () => new class extends StripeSubscriptionService
         {
-            public function startForPlan(Organization $organization, string $priceId, array $urls): array
+            public function startForPlan(Organization $organization, string $priceId, array $urls, ?string $planKey = null): array
             {
                 if (empty($organization->stripe_id)) {
                     $organization->forceFill(['stripe_id' => 'cus_test_123'])->save();

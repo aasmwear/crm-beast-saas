@@ -157,7 +157,43 @@ Stripe is now used to initiate paid subscriptions, while `organization_subscript
 
 - **Canonical in-app:** `organization_subscriptions` (`plan_key`, `status`, seat metadata, period/trial dates).
 - **External system of record for payment events:** Stripe.
-- This PR updates canonical state immediately at initiation; webhook-based hard sync remains a follow-up PR.
+- Subscription initiation writes a provisional canonical state immediately; webhook reconciliation hardens canonical state afterward.
+
+---
+
+## Stripe webhook sync (canonical reconciliation)
+
+Stripe webhook processing runs on `POST /webhooks/stripe` and reconciles external lifecycle events back into `organization_subscriptions`.
+
+### Idempotency
+
+- Every Stripe event is recorded in `stripe_webhook_events` with unique `stripe_event_id`.
+- Duplicate deliveries are acknowledged (`200 OK`) and skipped without re-applying state mutations.
+- Event processing status is tracked (`received`, `processed`, `failed`) with timestamps/notes.
+
+### Event coverage
+
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `checkout.session.completed` (subscription mode only)
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+
+### Reconciliation rules
+
+1. **Tenant mapping:** Stripe `customer` is mapped to org via `organizations.stripe_id`.
+2. **Plan mapping:** Stripe `price.id` is mapped back to internal `plan_key` using `config/billing.php` (`stripe_prices`).
+3. **Unknown price IDs:** Do not crash; status/period sync still runs using safe plan fallback (existing canonical plan or default), and mismatch is logged/audited.
+4. **Canonical upsert fields:** `plan_key`, `status`, `current_period_ends_at`, `trial_ends_at`, `seats_included`.
+5. **Legacy field policy:** `organizations.plan` remains untouched (legacy fallback only).
+
+### Audit behavior for webhooks
+
+- `subscription_status_changed` when canonical status transitions.
+- `subscription_canceled` for deletion lifecycle.
+- `payment_succeeded` / `payment_failed` for invoice payment outcomes.
+- `webhook_plan_mismatch` when Stripe price cannot be mapped to an internal plan key.
 
 ### Audit behavior
 
@@ -198,15 +234,11 @@ When adding **staff users** (not portal users), controllers call `SeatCounter::a
 
 ---
 
-## Future: Stripe webhook plan
+## Next hardening (post-webhook baseline)
 
-When Stripe is wired:
-
-1. **Webhook handler** (e.g. `customer.subscription.updated`, `customer.subscription.deleted`) should:
-   - Identify the org (e.g. via `metadata.organization_id` or Stripe customer → org mapping).
-   - Upsert `organization_subscriptions`: set `plan_key` from product/price metadata, `status` from Stripe status, `current_period_ends_at`, `trial_ends_at`, and `seats_included` from plan catalog or Stripe quantity.
-2. **Seat limit:** Optionally sync `seat_limit` from Stripe quantity or keep it as an admin override.
-3. **No duplicate logic:** Entitlement resolution stays in `EntitlementsService`; webhook only updates `organization_subscriptions` (and optionally `organization_addons` if sold as Stripe products).
+1. **Seat limits from Stripe quantity:** decide whether `seat_limit` should sync from Stripe quantity or remain manual override.
+2. **Extended lifecycle coverage:** add `customer.subscription.paused/resumed` and any required edge-status mapping.
+3. **Operational replay tooling:** add admin-safe replay/inspect tools for failed webhook events.
 
 ---
 
