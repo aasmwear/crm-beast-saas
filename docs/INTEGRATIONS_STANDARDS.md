@@ -1,5 +1,31 @@
 # CRM Beast — Integrations Standards
 
+## Stripe Billing (Cashier)
+
+### Scope of current integration
+
+- Implemented: Stripe customer creation/linking + subscription initiation from tenant billing page.
+- Implemented: plan-key to Stripe price mapping via `config/billing.php` (`stripe_prices`).
+- Not yet implemented: webhook reconciliation, invoices sync, billing portal redesign, dunning/retry flows.
+
+### Configuration
+
+Required runtime config:
+
+- `STRIPE_KEY`
+- `STRIPE_SECRET`
+- `STRIPE_PRICE_STARTER_MONTHLY` (optional)
+- `STRIPE_PRICE_PRO_MONTHLY` (recommended)
+- `STRIPE_PRICE_ENTERPRISE_MONTHLY` (optional/manual by default)
+
+If Stripe key/secret or plan price mapping is missing, billing initiation returns a safe 422 response and the UI shows Stripe as unavailable.
+
+### Canonical model rule
+
+- Stripe is the external billing processor.
+- CRM Beast canonical enforcement must continue to use `organization_subscriptions` (`plan_key`, `status`, seats/period fields).
+- Subscription initiation updates canonical state immediately; webhook sync will harden this in a follow-up PR.
+
 ## API Keys
 
 ### Creating Keys

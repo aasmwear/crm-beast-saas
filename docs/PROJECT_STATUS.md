@@ -39,6 +39,55 @@
 
 ## Last PR Notes
 
+- **Stripe subscription initiation + canonical sync (rescue-mission):**
+  - **Goal delivered:** Authorized tenant admins can initiate Stripe-backed subscriptions by internal `plan_key` while preserving `organization_subscriptions` as canonical billing state.
+  - **Config:** Added `config/billing.php` `stripe_prices` map (`starter`, `pro`, `enterprise`) and env entries for plan price IDs.
+  - **Backend:** `SubscriptionController::checkout` now validates `plan_key`, enforces `billing.manage`, verifies Stripe config/mapping, starts/switches subscription through `StripeSubscriptionService`, and upserts canonical `organization_subscriptions` (`plan_key`, `status`, `seats_included`, period/trial fields when available).
+  - **Cashier integration:** Service creates/links Stripe customer if missing, swaps active/trialing subscriptions (no proration), creates direct subscription when a default payment method exists, and falls back to Stripe Checkout when payment method is missing.
+  - **Audit:** Added `subscription_initiated` audit event on `subscription`.
+  - **Frontend:** Billing plans now expose `has_stripe_price`; UI shows `Subscribe` / `Switch to plan` actions for users with `billing.manage`, disables self-serve plans without Stripe price, and shows a clear Stripe-not-configured message.
+  - **Tests:** Added `StripeSubscriptionStartTest` covering 403 unauthorized, safe 422 on missing Stripe config/price, canonical upsert + customer-link behavior via mocked billing service, and billing page plan-action availability flags.
+  - **Docs:** Updated `ENTITLEMENTS_AND_BILLING.md` (Stripe initiation section + canonical clarification) and `INTEGRATIONS_STANDARDS.md` (Stripe integration standards/scope).
+  - **QA checklist:**
+    1. Owner with `billing.manage`: open billing page and confirm Subscribe/Switch actions appear only on plans with configured Stripe prices.
+    2. Remove Stripe config or plan price mapping and attempt Subscribe → safe 422/message and no crash.
+    3. Org without `stripe_id`: start Pro subscription → Stripe initiation returns checkout URL or immediate success; canonical `organization_subscriptions` reflects selected `plan_key` and status.
+    4. Employee without `billing.manage`: POST `/org/{org}/billing/checkout` returns 403.
+    5. Run `./vendor/bin/sail artisan test tests/Feature/Billing/StripeSubscriptionStartTest.php`.
+    6. Run full checks: `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Billing write model: internal control-plane for plan/addons (rescue-mission):**
+  - **Permission:** Added `billing.update`; Owner/Super Admin get it via all-permissions; wired in Roles matrix.
+  - **Routes:** PATCH billing/plan, POST billing/addons, PATCH/DELETE billing/addons/{addon} with scopeBindings.
+  - **Controller:** updatePlan (create/update organization_subscriptions), storeAddon, updateAddon, destroyAddon (deactivate via active=false). Validation: plan_key from PlanCatalog; addon_key from FeatureCatalog numeric keys; mode augment/set.
+  - **Audit:** plan_changed, addon created/updated/deactivated via AuditLogger.
+  - **Frontend:** When canUpdateBilling, Billing page shows plan selector + Save, add-on form, add-on table with Edit/Deactivate. Read-only when user lacks billing.update.
+  - **Tests:** BillingWriteModelTest — plan change, 403 unauthorized, addon create/update/deactivate, entitlements resolution, org scoping (404 cross-tenant).
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md (internal control plane, write model rules, audit), PERMISSIONS.md (billing.update).
+  - **Files changed:** `database/seeders/RolesAndPermissionsSeeder.php`, `routes/web.php`, `app/Http/Controllers/Admin/SubscriptionController.php`, `app/Http/Controllers/RolePermissionController.php`, `app/Support/FeatureCatalog.php`, `resources/js/Pages/Billing/Index.vue`, `tests/Feature/Billing/BillingWriteModelTest.php`, `docs/ENTITLEMENTS_AND_BILLING.md`, `docs/PERMISSIONS.md`, `docs/PROJECT_STATUS.md`.
+  - **QA checklist:**
+    1. Owner visits billing → sees plan selector, Save plan, + Add add-on, Edit/Deactivate on add-ons.
+    2. Change plan → Save → redirect with success toast; entitlements/seats reflect new plan.
+    3. Create add-on (storage_gb, augment, value 10) → appears in table; entitlements.storage_gb increases.
+    4. Edit addon mode/value → Save → table and entitlements update.
+    5. Deactivate addon → row shows Active: No; entitlements no longer include that addon.
+    6. Employee (no billing.update) → page is read-only, no admin controls.
+    7. Cross-org: org B owner cannot PATCH org B billing/addons/{addon-of-org-A} → 404.
+    8. Run `./vendor/bin/sail artisan test tests/Feature/Billing/` and `npm run build`.
+
+- **Billing page: expose canonical billing/entitlements (read-only UI) (rescue-mission):**
+  - **Backend:** SubscriptionController now enriches the Billing page payload with canonical data from `organization_subscriptions`, `SeatCounter`, `EntitlementsService`, and `organization_addons`. Props: `subscription` (plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit), `seats` (active_count, can_add_seat), `entitlements` (resolved map), `addons` (list with mode, value_int, active, dates). Plan key resolution: subscription.plan_key → org.plan → default. Fallbacks preserved.
+  - **Frontend:** Billing/Index.vue refactored to use PageShell with read-only sections: Current Plan & Status (canonical), Seats (active/included/limit/can_add_seat), Effective Entitlements (table), Add-ons (table with mode/value/active/period). Existing Stripe blocks (Manage subscription, Upgrade, Available plans, Invoice history) unchanged. CRM card-neo styling.
+  - **Tests:** BillingPageDataTest — canonical subscription data, subscription.plan_key over org.plan, active seat count, entitlements and addons, 403 unauthorized.
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md — added "Billing Admin Read Model" section.
+  - **Files changed:** `app/Http/Controllers/Admin/SubscriptionController.php`, `resources/js/Pages/Billing/Index.vue`, `tests/Feature/Billing/BillingPageDataTest.php`, `docs/ENTITLEMENTS_AND_BILLING.md`, `docs/PROJECT_STATUS.md`.
+  - **QA checklist:**
+    1. Visit `/org/{org}/billing` as Owner → page shows Plan (canonical), Status, Period ends, Seats card, Entitlements table, Add-ons table.
+    2. Org with organization_subscriptions row → plan_key/status/seats from subscription; org with only org.plan → fallback to org.plan.
+    3. Org with addons → Add-ons table shows key, mode, value, active, period; entitlements reflect augment/set.
+    4. User without billing.view (e.g. Employee) → 403.
+    5. Run `./vendor/bin/sail artisan test tests/Feature/Billing/` and `./vendor/bin/sail npm run build`.
+
 - **Final UI stabilization: rail + profile normalization (rescue-mission):**
   - **IconRail hover collapse hit area fixed:** rail nav scroll container now clips horizontally (`overflow-x: clip`, `overflow-x: hidden` fallback), so hidden/collapsed labels no longer extend hover hit-testing into page content.
   - **Collapsed active pill alignment fixed:** default rail button gap removed in collapsed state; spacing now applies only in expanded state so icons remain centered inside pills when collapsed.

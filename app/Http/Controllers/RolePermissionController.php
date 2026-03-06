@@ -242,7 +242,7 @@ final class RolePermissionController extends Controller
             'notifications' => ['view' => 'notifications.view', 'update' => 'notifications.update'],
             'activity' => ['view' => 'activity.view'],
             'settings' => ['view' => 'settings.view', 'update' => 'settings.update'],
-            'billing' => ['view' => 'billing.view', 'manage' => 'billing.manage'],
+            'billing' => ['view' => 'billing.view', 'manage' => 'billing.manage', 'update' => 'billing.update'],
             'users' => ['view' => 'users.view', 'create' => 'users.create', 'update' => 'users.update', 'delete' => 'users.delete', 'manage' => 'users.manage'],
             'departments' => ['view' => 'departments.view', 'create' => 'departments.create', 'update' => 'departments.update', 'delete' => 'departments.delete'],
             'reports' => ['view' => 'reports.view'],

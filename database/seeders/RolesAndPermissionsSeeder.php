@@ -74,6 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'settings.update',
             'billing.view',
             'billing.manage',
+            'billing.update',
             'api_keys.view',
             'api_keys.create',
             'api_keys.delete',

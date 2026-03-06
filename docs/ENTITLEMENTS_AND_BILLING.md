@@ -88,6 +88,88 @@ Stripe fields (e.g. `stripe_id`, `stripe_price`) can be added in a later PR.
 
 ---
 
+## Billing Admin Read Model
+
+The tenant Billing page (`/org/{org}/billing`) exposes a read-only view of canonical billing data. Authorized users (`billing.view`) see:
+
+| Data | Source | Description |
+|------|--------|-------------|
+| **subscription** | `organization_subscriptions` (or fallbacks) | `plan_key`, `status`, `trial_ends_at`, `current_period_ends_at`, `seats_included`, `seat_limit` |
+| **seats** | `SeatCounter` | `active_count`, `can_add_seat` |
+| **entitlements** | `EntitlementsService::forOrg()` | Resolved map of key → bool\|int |
+| **addons** | `organization_addons` | List of add-on rows: `addon_key`, `mode`, `quantity`, `value_int`, `active`, `starts_at`, `ends_at` |
+
+Plan key resolution follows the same rules as `EntitlementsService`: subscription.plan_key → organizations.plan → default (starter). Stripe-specific UI (Manage subscription, Upgrade, invoices) remains unchanged and is separate from this read model.
+
+---
+
+## Internal control plane (write model)
+
+Tenant admins with `billing.update` can change plan and manage add-ons via the Billing page.
+
+### Routes
+
+| Method | Route | Action |
+|--------|-------|--------|
+| PATCH | `/org/{org}/billing/plan` | Update plan_key |
+| POST | `/org/{org}/billing/addons` | Create add-on |
+| PATCH | `/org/{org}/billing/addons/{addon}` | Update add-on |
+| DELETE | `/org/{org}/billing/addons/{addon}` | Deactivate add-on (active=false) |
+
+### Write model rules
+
+- **Plan update:** Creates `organization_subscriptions` row if missing; updates `plan_key` and `seats_included` from PlanCatalog. `organizations.plan` remains legacy fallback only.
+- **Add-on create:** Validates `addon_key` against FeatureCatalog numeric keys (`storage_gb`, `api_rpm`); `mode` must be `augment` or `set`.
+- **Add-on deactivation:** Uses `active=false` (soft deactivation), not hard delete. Entitlements resolution ignores inactive add-ons.
+- **Org scoping:** All routes use tenant-scoped route model binding; cross-org mutations return 404.
+
+---
+
+## Stripe subscription initiation (first monetization step)
+
+Stripe is now used to initiate paid subscriptions, while `organization_subscriptions` remains the app's canonical billing state.
+
+### Permission and route
+
+| Method | Route | Permission | Purpose |
+|--------|-------|------------|---------|
+| POST | `/org/{org}/billing/checkout` | `billing.manage` | Start/switch Stripe-backed subscription for a selected `plan_key` |
+
+### Plan mapping
+
+- Internal plan keys remain unchanged (`starter`, `pro`, `enterprise`).
+- Stripe mapping is configured in `config/billing.php` under `stripe_prices`.
+- Missing/empty plan price mapping returns a safe 422 response (`This plan is not available for Stripe self-serve subscription yet.`).
+
+### Initiation flow
+
+1. Validate `plan_key` against `PlanCatalog`.
+2. Require Stripe config (`cashier.secret` and `services.stripe.key`).
+3. Create/link Stripe customer for the org (`Organization` Cashier `Billable` flow).
+4. Start or switch subscription:
+   - Existing active/trialing default subscription: `swap(...)` (no proration).
+   - No active subscription + no default payment method: create Stripe Checkout session and return URL.
+   - No active subscription + default payment method exists: create subscription directly.
+5. Upsert canonical `organization_subscriptions` with `plan_key`, `status`, `seats_included`, and period/trial fields when available.
+6. Audit log written as `subscription_initiated` on `subscription`.
+
+### Canonical state vs Stripe state
+
+- **Canonical in-app:** `organization_subscriptions` (`plan_key`, `status`, seat metadata, period/trial dates).
+- **External system of record for payment events:** Stripe.
+- This PR updates canonical state immediately at initiation; webhook-based hard sync remains a follow-up PR.
+
+### Audit behavior
+
+| Action | Entity | Action string | Changes logged |
+|--------|--------|---------------|----------------|
+| Plan change | subscription | plan_changed | from, to |
+| Add-on create | addon | created | addon_key, mode, value_int |
+| Add-on update | addon | updated | addon_key, changed keys |
+| Add-on deactivate | addon | deactivated | addon_key |
+
+---
+
 ## Code references
 
 - **Plan catalog:** `App\Support\PlanCatalog` — defines `starter`, `pro`, `enterprise` and their default entitlements. Enterprise can be overridden via `config/billing.php`.

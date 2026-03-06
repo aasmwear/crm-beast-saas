@@ -3,6 +3,19 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Stripe price mapping by internal plan key
+    |--------------------------------------------------------------------------
+    | Internal plan keys remain canonical in-app. Stripe price IDs are used
+    | only for external billing initiation. Null means manual/non-self-serve.
+    */
+    'stripe_prices' => [
+        'starter' => env('STRIPE_PRICE_STARTER_MONTHLY'),
+        'pro' => env('STRIPE_PRICE_PRO_MONTHLY'),
+        'enterprise' => env('STRIPE_PRICE_ENTERPRISE_MONTHLY'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Enterprise plan overrides
     |--------------------------------------------------------------------------
     | Optional config for enterprise seats and entitlements (PlanCatalog uses these).

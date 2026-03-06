@@ -113,6 +113,7 @@ php artisan permissions:reconcile --assign --dry-run
 | SubscriptionController::index | `billing.view` | View billing page |
 | SubscriptionController::portal | `billing.view` | Stripe customer portal |
 | SubscriptionController::checkout | `billing.manage` | Checkout / plan changes |
+| SubscriptionController::updatePlan, storeAddon, updateAddon, destroyAddon | `billing.update` | Internal control-plane: change plan_key, create/update/deactivate add-ons |
 | **HRM** | | |
 | HRMController::index | UserPolicy::viewAny | `users.view` or `users.manage` |
 | HRMController::store | UserPolicy::create | `users.create` |
@@ -126,7 +127,7 @@ php artisan permissions:reconcile --assign --dry-run
 | SettingsApiKeysController::store | `api_keys.create` | Create API key |
 | SettingsApiKeysController::destroy | `api_keys.delete` | Revoke API key |
 
-- **Billing:** Owner-only by default (Owner/Super Admin get all permissions). Manager/Employee do not get billing.view or billing.manage.
+- **Billing:** Owner-only by default (Owner/Super Admin get all permissions). Manager/Employee do not get billing.view, billing.manage, or billing.update.
 - **Settings update:** Manager and Owner get `settings.update`; Employee gets `settings.view` only.
 
 ---

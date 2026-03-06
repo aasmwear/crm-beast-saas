@@ -101,4 +101,21 @@ final class FeatureCatalog
 
         return null;
     }
+
+    /**
+     * Keys that support numeric add-ons (storage_gb, api_rpm, etc.).
+     *
+     * @return array<string>
+     */
+    public static function addonNumericKeys(): array
+    {
+        $keys = [];
+        foreach (self::all() as $item) {
+            if ($item['type'] === self::TYPE_NUMBER) {
+                $keys[] = $item['key'];
+            }
+        }
+
+        return $keys;
+    }
 }

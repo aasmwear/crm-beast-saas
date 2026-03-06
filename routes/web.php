@@ -301,6 +301,10 @@ Route::prefix('org/{organization:slug}')
         Route::get('/billing', [SubscriptionController::class, 'index'])->name('billing.index');
         Route::post('/billing/checkout', [SubscriptionController::class, 'checkout'])->name('billing.checkout');
         Route::get('/billing/portal', [SubscriptionController::class, 'portal'])->name('billing.portal');
+        Route::patch('/billing/plan', [SubscriptionController::class, 'updatePlan'])->name('billing.plan.update');
+        Route::post('/billing/addons', [SubscriptionController::class, 'storeAddon'])->name('billing.addons.store');
+        Route::patch('/billing/addons/{addon}', [SubscriptionController::class, 'updateAddon'])->name('billing.addons.update')->scopeBindings();
+        Route::delete('/billing/addons/{addon}', [SubscriptionController::class, 'destroyAddon'])->name('billing.addons.destroy')->scopeBindings();
 
         /*
         |------------------------------
