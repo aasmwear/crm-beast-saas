@@ -39,6 +39,21 @@
 
 ## Last PR Notes
 
+- **Runtime usage/limits enforcement layer (rescue-mission):**
+  - **API RPM from canonical entitlements:** `ThrottleOrgApi` now resolves per-org limit from `EntitlementsService::value('api_rpm', $org)` while preserving existing keying (`org + api key + IP`) and safe fallback to `config('api.rate_limit_per_minute')`.
+  - **Unauthorized API behavior unchanged:** invalid/missing API key requests still fail in `AuthenticateOrganizationApiKey` with `401` before rate-limit handling.
+  - **Storage quota foundation:** added `StorageUsageService` as canonical storage read model (`currentUsageBytes`, `currentUsageGb`, `limitGb`, `isOverLimit`) using current known source `project_files.size` joined by org projects.
+  - **Export limit proof hook:** added `DailyExportLimitService` and enforced `exports_per_day` on `ReportController::exportCsv`; over-limit requests now return safe `429` with message.
+  - **New numeric entitlement key:** `exports_per_day` added cleanly to `FeatureCatalog`, `PlanCatalog`, and enterprise billing config defaults.
+  - **Tests:** added `ApiRpmEntitlementTest`, `StorageUsageServiceTest`, `ExportLimitEnforcementTest`; updated `ApiRateLimitTest` to pin deterministic entitlement limit.
+  - **Files changed:** `app/Http/Middleware/ThrottleOrgApi.php`, `app/Http/Controllers/ReportController.php`, `app/Services/Billing/StorageUsageService.php`, `app/Services/Billing/DailyExportLimitService.php`, `app/Support/FeatureCatalog.php`, `app/Support/PlanCatalog.php`, `app/Models/Platform/OrganizationFeature.php`, `config/billing.php`, `tests/Feature/Billing/ApiRpmEntitlementTest.php`, `tests/Feature/Billing/StorageUsageServiceTest.php`, `tests/Feature/Billing/ExportLimitEnforcementTest.php`, `tests/Feature/Api/ApiRateLimitTest.php`, docs updates.
+  - **QA checklist:**
+    1. Create two org API keys with different `api_rpm` feature override values and verify each org hits its own minute limit independently.
+    2. Verify unauthorized API request still returns `401` and is not converted to `429`.
+    3. Add project file rows for an org and confirm `StorageUsageService` usage + over-limit logic align with `storage_gb`.
+    4. Set `exports_per_day=1`, run `/org/{org}/export/csv/clients` twice: first succeeds, second returns `429`.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Tenant self-serve billing portal + invoice/receipt UX (rescue-mission):**
   - **Portal authorization + safety:** `GET /org/{org}/billing/portal` now requires `billing.manage` (not `billing.view`), validates Stripe runtime config (`cashier.secret`, `services.stripe.key`), and requires a linked Stripe customer (`organizations.stripe_id`).
   - **Portal execution:** Action uses Cashier billing portal redirect and catches failures, returning a safe flash error instead of breaking billing page flow.

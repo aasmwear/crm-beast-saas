@@ -65,6 +65,8 @@ class OrganizationFeature extends Model
         'sms' => false,
         'api_access' => false,
         'storage_gb' => 5,
+        'api_rpm' => 60,
+        'exports_per_day' => 5,
     ];
 
     /**

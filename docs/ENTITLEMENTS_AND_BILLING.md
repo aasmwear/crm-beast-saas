@@ -257,6 +257,41 @@ When adding **staff users** (not portal users), controllers call `SeatCounter::a
 
 ---
 
+## Runtime enforcement (incremental)
+
+This PR introduces the first practical runtime limits hooks tied to canonical entitlements.
+
+### 1) API RPM enforcement (live)
+
+- Public API middleware `ThrottleOrgApi` now resolves limit from canonical entitlements:
+  - `EntitlementsService::value('api_rpm', $org)`
+- Existing limiter key shape is unchanged:
+  - `org:{orgId}:key:{apiKeyId}:ip:{ip}`
+- If entitlement lookup fails or is missing, middleware safely falls back to `config('api.rate_limit_per_minute')`.
+- Unauthorized/invalid API key behavior remains unchanged in `AuthenticateOrganizationApiKey` (`401` before throttling).
+
+### 2) Storage quota read model (foundation)
+
+- New canonical helper: `App\Services\Billing\StorageUsageService`.
+- Methods:
+  - `currentUsageBytes(Organization $org): int`
+  - `currentUsageGb(Organization $org): float`
+  - `limitGb(Organization $org): int|float`
+  - `isOverLimit(Organization $org): bool`
+- Current usage source is intentionally minimal and safe:
+  - sums `project_files.size` joined through `projects.organization_id`.
+- This is the agreed hook for future upload/file enforcement in controllers.
+
+### 3) Export limit hook (proof pattern)
+
+- Added numeric entitlement key: `exports_per_day`.
+- `ReportController::exportCsv` now applies `DailyExportLimitService` before streaming.
+- When limit is exceeded, request is blocked with safe `429` response:
+  - `Daily export limit reached for your plan.`
+- Scope intentionally limited to one export path to prove pattern without broad refactor.
+
+---
+
 ## Multi-tenancy
 
 All billing and entitlement data is scoped by `organization_id`. Queries must always filter by the current tenant org.

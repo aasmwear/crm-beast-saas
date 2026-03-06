@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Organization;
+use App\Services\Billing\DailyExportLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as BaseResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -48,8 +50,13 @@ class ReportController extends Controller
         Request $request,
         Organization $organization,
         string $entity
-    ): StreamedResponse {
+    ): StreamedResponse|BaseResponse {
         abort_unless($request->user()?->can('reports.export'), 403);
+
+        $exportLimiter = app(DailyExportLimitService::class);
+        if (! $exportLimiter->allowAndRecord($organization)) {
+            return response('Daily export limit reached for your plan.', 429);
+        }
 
         $normalized = \Illuminate\Support\Str::of($entity)->lower()->trim()->rtrim('s')->value();
 

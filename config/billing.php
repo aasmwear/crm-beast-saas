@@ -28,5 +28,6 @@ return [
         'api_access' => true,
         'storage_gb' => (int) env('BILLING_ENTERPRISE_STORAGE_GB', 500),
         'api_rpm' => (int) env('BILLING_ENTERPRISE_API_RPM', 2000),
+        'exports_per_day' => (int) env('BILLING_ENTERPRISE_EXPORTS_PER_DAY', 500),
     ],
 ];

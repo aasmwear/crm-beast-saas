@@ -6,6 +6,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Organization;
 use App\Models\OrganizationApiKey;
+use App\Models\Platform\OrganizationFeature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,6 +31,19 @@ final class ApiRateLimitTest extends TestCase
             'prefix' => substr($this->validToken, 0, 8),
             'hashed_key' => hash('sha256', $this->validToken),
             'created_by_user_id' => null,
+        ]);
+
+        OrganizationFeature::query()->create([
+            'organization_id' => $this->org->id,
+            'features' => [
+                'attendance' => true,
+                'sms' => false,
+                'api_access' => true,
+                'storage_gb' => 5,
+                'api_rpm' => 3,
+                'exports_per_day' => 5,
+            ],
+            'subscription_status' => 'active',
         ]);
     }
 

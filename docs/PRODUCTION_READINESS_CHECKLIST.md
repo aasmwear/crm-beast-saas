@@ -16,6 +16,10 @@
 - [ ] **Stripe (future)** — Webhook handler to sync organization_subscriptions from Stripe (customer.subscription.*); no Stripe code in foundation PR.
 - [ ] **Docs** — ENTITLEMENTS_AND_BILLING.md describes pricing model, resolution order, and webhook plan.
 - [ ] **Billing semantics stability** — Add-on modes (augment vs set), plan key canonical (subscription first, org.plan fallback), set conflict rule (highest wins).
+- [ ] **API runtime limit enforcement** — `ThrottleOrgApi` uses canonical `api_rpm` entitlement per org with safe config fallback.
+- [ ] **Storage quota read model** — `StorageUsageService` reports usage/limit/over-limit from canonical entitlements and known storage sources.
+- [ ] **Export quota hook** — `ReportController::exportCsv` enforces `exports_per_day` limit via `DailyExportLimitService`.
+- [ ] **Tests** — ApiRpmEntitlementTest, StorageUsageServiceTest, and ExportLimitEnforcementTest pass.
 
 ---
 

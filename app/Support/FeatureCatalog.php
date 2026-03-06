@@ -57,6 +57,13 @@ final class FeatureCatalog
                 'type' => self::TYPE_NUMBER,
                 'default' => 60,
             ],
+            [
+                'key' => 'exports_per_day',
+                'label' => 'Exports per day',
+                'description' => 'Maximum CSV exports allowed per day.',
+                'type' => self::TYPE_NUMBER,
+                'default' => 5,
+            ],
         ];
     }
 

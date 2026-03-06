@@ -34,6 +34,7 @@ final class PlanCatalog
                     'api_access' => false,
                     'storage_gb' => 5,
                     'api_rpm' => 60,
+                    'exports_per_day' => 5,
                 ],
             ],
             self::PLAN_PRO => [
@@ -44,6 +45,7 @@ final class PlanCatalog
                     'api_access' => true,
                     'storage_gb' => 50,
                     'api_rpm' => 300,
+                    'exports_per_day' => 50,
                 ],
             ],
             self::PLAN_ENTERPRISE => [
@@ -64,6 +66,7 @@ final class PlanCatalog
             'api_access' => true,
             'storage_gb' => 500,
             'api_rpm' => 2000,
+            'exports_per_day' => 500,
         ]);
     }
 
