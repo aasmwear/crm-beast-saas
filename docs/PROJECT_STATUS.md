@@ -39,6 +39,20 @@
 
 ## Last PR Notes
 
+- **Platform Admin org subscriptions overview (rescue-mission):**
+  - **Route:** `GET /admin/organizations/subscriptions` — platform admin only (`auth:platform`).
+  - **Controller:** `SubscriptionsController::index` — paginated read-only billing overview with search, status, plan filters.
+  - **Data:** organization name/slug, `has_stripe_id`, canonical `plan_key`/`status` from `organization_subscriptions` (fallback to `org.plan` when no subscription row), seats included/limit/active count, add-ons summary, key entitlements (api_rpm, storage_gb, exports_per_day).
+  - **Frontend:** `Platform/Organizations/SubscriptionsIndex.vue` — table with filters, Card layout, link to org show. Nav: "Org Subscriptions" in PlatformLayout sidebar.
+  - **Tests:** `OrgSubscriptionsOverviewTest` — platform admin access, tenant/guest blocked, canonical billing data, fallback when no subscription, pagination, search, status filter, addons/entitlements.
+  - **Files changed:** `app/Http/Controllers/Platform/Organizations/SubscriptionsController.php` (new), `routes/platform.php`, `resources/js/Pages/Platform/Organizations/SubscriptionsIndex.vue` (new), `resources/js/Layouts/PlatformLayout.vue`, `tests/Feature/Platform/OrgSubscriptionsOverviewTest.php` (new), `docs/PROJECT_STATUS.md`, `docs/OBSERVABILITY_AND_RUNBOOK.md`, `docs/PRODUCTION_READINESS_CHECKLIST.md`.
+  - **QA checklist:**
+    1. Log in as platform admin → open Org Subscriptions → table shows all orgs with billing data.
+    2. Search by name/slug, filter by status/plan → results update.
+    3. Org with no subscription row → shows plan from org.plan, status "none".
+    4. Org with addons → addons summary and entitlements displayed.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Production observability & runbook layer (rescue-mission):**
   - **Readiness endpoint:** Added `GET /_readiness` (no auth) returning compact JSON with DB connectivity, cache availability, and queue config validation. Returns 200 `healthy` or 503 `degraded`. Designed for load-balancer probes; protected via reverse-proxy in production.
   - **Webhook observability hardened:** `WebhookController` failure logs upgraded from `Log::warning` to `Log::error` with structured context: `stripe_event_id`, `event_type`, `organization_id` (best-effort resolved from Stripe customer), `exception_class`. Signature/payload failures use namespaced log messages (`stripe.webhook.signature_invalid`, `stripe.webhook.payload_invalid`, `stripe.webhook.config_missing`) with request IP.

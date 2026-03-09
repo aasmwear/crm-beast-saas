@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Platform\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Platform\DashboardController;
+use App\Http\Controllers\Platform\Organizations\SubscriptionsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +52,9 @@ Route::middleware('auth:platform')->group(function () {
 
     // Organizations Management
     Route::prefix('/organizations')->name('organizations.')->group(function () {
+        Route::get('/subscriptions', [SubscriptionsController::class, 'index'])
+            ->name('subscriptions');
+
         Route::get('/', function () {
             return inertia('Platform/Organizations/Index');
         })->name('index');

@@ -38,6 +38,7 @@
 - [ ] **Log aggregation** — No centralized log platform yet. Relies on `storage/logs/laravel.log` + database audit tables.
 - [ ] **Uptime monitoring** — No external uptime monitor configured. `/_readiness` endpoint ready for integration.
 - [ ] **Queue worker monitoring** — No worker health/heartbeat check. Queue driver is `database`; workers must be managed externally (Supervisor/systemd).
+- [x] **Platform org billing overview** — Read-only `/admin/organizations/subscriptions` for Super Admin / platform staff. Shows plan, status, Stripe linkage, seats, add-ons, entitlements. Search and filter by status/plan. No edit/override yet.
 
 ---
 
