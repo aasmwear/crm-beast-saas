@@ -12,7 +12,15 @@ Super Admins and Support staff can view a **read-only org subscriptions overview
 - Filter by search (name/slug), status, or plan.
 - Link to the platform org detail page (`/admin/organizations/{slug}`) for further inspection.
 
-This page does not yet support editing/overrides or webhook replay — it is an observability aid for triage.
+### Platform-admin manual billing overrides
+
+Super Admins and Support staff can perform **manual billing overrides** from the Org Subscriptions page (`/admin/organizations/subscriptions`):
+
+- **Subscription overrides:** Change canonical `plan_key`, `status`, and `seat_limit` for any org. Uses `organization_subscriptions` as the write target; `organizations.plan` is not mutated (legacy fallback only).
+- **Add-on overrides:** Create, update, or deactivate organization add-ons (e.g. `storage_gb`, `api_rpm`). Deactivation sets `active=false`; entitlements resolve immediately.
+- **Audit:** Every override action is logged in `audit_logs` with `platform_subscription_override`, `platform_addon_created`, `platform_addon_updated`, or `platform_addon_deactivated`.
+
+**Important:** These are internal operator/support overrides. They do **not** mutate Stripe subscriptions. For Stripe reconciliation, use webhook replay or Stripe Dashboard actions; canonical state will sync on the next webhook delivery.
 
 ---
 

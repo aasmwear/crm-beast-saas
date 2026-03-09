@@ -38,7 +38,8 @@
 - [ ] **Log aggregation** — No centralized log platform yet. Relies on `storage/logs/laravel.log` + database audit tables.
 - [ ] **Uptime monitoring** — No external uptime monitor configured. `/_readiness` endpoint ready for integration.
 - [ ] **Queue worker monitoring** — No worker health/heartbeat check. Queue driver is `database`; workers must be managed externally (Supervisor/systemd).
-- [x] **Platform org billing overview** — Read-only `/admin/organizations/subscriptions` for Super Admin / platform staff. Shows plan, status, Stripe linkage, seats, add-ons, entitlements. Search and filter by status/plan. No edit/override yet.
+- [x] **Platform org billing overview** — Read-only `/admin/organizations/subscriptions` for Super Admin / platform staff. Shows plan, status, Stripe linkage, seats, add-ons, entitlements. Search and filter by status/plan.
+- [x] **Platform-admin manual billing overrides** — Super Admin/Support can override plan_key, seat_limit, and add-ons from Org Subscriptions page. Internal operator controls; do **not** mutate Stripe. All actions audited. Changes reflected immediately in entitlements and tenant billing read model.
 
 ---
 

@@ -125,6 +125,28 @@ Tenant admins with `billing.update` can change plan and manage add-ons via the B
 
 ---
 
+## Platform-admin manual billing overrides (internal control plane)
+
+Platform admins (Super Admin, Support) can override billing state for any organization from `/admin/organizations/subscriptions`. This is an **internal operator/support feature** — it does **not** mutate Stripe subscriptions.
+
+### Routes
+
+| Method | Route | Action |
+|--------|-------|--------|
+| PATCH | `/admin/organizations/{organization}/subscription` | Override plan_key, status, seat_limit |
+| POST | `/admin/organizations/{organization}/addons` | Create add-on |
+| PATCH | `/admin/organizations/{organization}/addons/{addon}` | Update add-on |
+| DELETE | `/admin/organizations/{organization}/addons/{addon}` | Deactivate add-on (active=false) |
+
+### Override rules
+
+- **Subscription override:** Writes to `organization_subscriptions` (upserts if missing). Validates `plan_key` against PlanCatalog, `addon_key` against FeatureCatalog numeric keys. `organizations.plan` is not mutated.
+- **Add-on create/update:** Same validation as tenant billing (addon_key, mode augment\|set, quantity, value_int, active, starts_at, ends_at). Deactivation preferred over hard delete.
+- **Audit:** All actions logged in `audit_logs` with distinct action names (`platform_subscription_override`, `platform_addon_created`, etc.) and organization/actor IDs. No noisy payload dumps.
+- **Immediate effect:** Entitlements and tenant billing read model reflect changes on next request (cache cleared after mutations).
+
+---
+
 ## Stripe subscription initiation (first monetization step)
 
 Stripe is now used to initiate paid subscriptions, while `organization_subscriptions` remains the app's canonical billing state.

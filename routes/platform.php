@@ -63,13 +63,25 @@ Route::middleware('auth:platform')->group(function () {
             return inertia('Platform/Organizations/Show');
         })->name('show');
 
+        Route::patch('/{organization}/subscription', [SubscriptionsController::class, 'updateSubscription'])
+            ->name('subscription.update')
+            ->scopeBindings();
+
+        Route::post('/{organization}/addons', [SubscriptionsController::class, 'storeAddon'])
+            ->name('addons.store')
+            ->scopeBindings();
+
+        Route::patch('/{organization}/addons/{addon}', [SubscriptionsController::class, 'updateAddon'])
+            ->name('addons.update')
+            ->scopeBindings();
+
+        Route::delete('/{organization}/addons/{addon}', [SubscriptionsController::class, 'destroyAddon'])
+            ->name('addons.destroy')
+            ->scopeBindings();
+
         Route::patch('/{organization}/features', function () {
             // TODO: Implement feature toggle logic
         })->name('features.update');
-
-        Route::patch('/{organization}/subscription', function () {
-            // TODO: Implement subscription management logic
-        })->name('subscription.update');
     });
 
     // System Settings

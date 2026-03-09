@@ -39,6 +39,22 @@
 
 ## Last PR Notes
 
+- **Platform-admin manual billing overrides (rescue-mission):**
+  - **Goal:** Internal operator control-plane for Super Admin/Support to override billing state without mutating Stripe.
+  - **Routes:** PATCH `/admin/organizations/{organization}/subscription`, POST/PATCH/DELETE `/admin/organizations/{organization}/addons[/{addon}]` — platform-only (`auth:platform`), scopeBindings.
+  - **Subscription overrides:** plan_key (PlanCatalog), status, seat_limit (nullable). Upserts `organization_subscriptions`; `organizations.plan` untouched.
+  - **Add-on overrides:** Create/update/deactivate via validated addon_key (FeatureCatalog), mode (augment|set), quantity, value_int, active, dates. Deactivation = `active=false`.
+  - **Audit:** `platform_subscription_override`, `platform_addon_created`, `platform_addon_updated`, `platform_addon_deactivated` in audit_logs.
+  - **Frontend:** SubscriptionsIndex.vue — Override modal (plan selector, seat_limit, add-on create/edit/deactivate). Compact controls, success/error feedback.
+  - **Tests:** PlatformBillingOverridesTest — 13 tests (plan override, seat limit set/clear, addon CRUD, tenant blocked, upsert, entitlements, org scoping, audit).
+  - **Docs:** OBSERVABILITY_AND_RUNBOOK.md, ENTITLEMENTS_AND_BILLING.md, PRODUCTION_READINESS_CHECKLIST.md updated.
+  - **QA checklist:**
+    1. Platform admin → Org Subscriptions → Override → change plan/seat_limit/addons → changes reflect in table and tenant billing.
+    2. Tenant user cannot PATCH/POST/DELETE platform override routes (403).
+    3. Cross-org: cannot mutate another org's addon (404).
+    4. Audit logs show platform_subscription_override, platform_addon_* actions.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Platform Admin org subscriptions overview (rescue-mission):**
   - **Route:** `GET /admin/organizations/subscriptions` — platform admin only (`auth:platform`).
   - **Controller:** `SubscriptionsController::index` — paginated read-only billing overview with search, status, plan filters.
