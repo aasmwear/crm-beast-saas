@@ -39,6 +39,24 @@
 
 ## Last PR Notes
 
+- **Production observability & runbook layer (rescue-mission):**
+  - **Readiness endpoint:** Added `GET /_readiness` (no auth) returning compact JSON with DB connectivity, cache availability, and queue config validation. Returns 200 `healthy` or 503 `degraded`. Designed for load-balancer probes; protected via reverse-proxy in production.
+  - **Webhook observability hardened:** `WebhookController` failure logs upgraded from `Log::warning` to `Log::error` with structured context: `stripe_event_id`, `event_type`, `organization_id` (best-effort resolved from Stripe customer), `exception_class`. Signature/payload failures use namespaced log messages (`stripe.webhook.signature_invalid`, `stripe.webhook.payload_invalid`, `stripe.webhook.config_missing`) with request IP.
+  - **Billing failure logging improved:** `SubscriptionController` checkout, portal, and invoice-fetch failure logs now include `organization_slug`, `stripe_customer_id`, `exception_class` alongside existing `organization_id`. Log messages use structured dot-notation keys (`stripe.subscription.initiation_failed`, `stripe.portal.launch_failed`, `stripe.invoices.fetch_failed`).
+  - **Docs created/updated:**
+    - `docs/OBSERVABILITY_AND_RUNBOOK.md` (new): webhook failure triage, billing failure triage, export limit troubleshooting, API rate-limit troubleshooting, failed jobs inspection/retry, log reference, triage flowchart.
+    - `docs/PRODUCTION_READINESS_CHECKLIST.md`: added Observability & Operations section with status for readiness, logging, alerting, and queue monitoring.
+    - `docs/QA_RELEASE_PLAYBOOK.md`: added Health & Readiness smoke test and Webhook Failure Observability smoke test sections.
+  - **Tests:** `ReadinessEndpointTest` (readiness returns healthy structure, database check), `WebhookObservabilityTest` (signature failure returns 400, processing failure logs context and marks event failed in DB).
+  - **Files changed:** `app/Http/Controllers/HealthCheckController.php` (new), `app/Http/Controllers/WebhookController.php`, `app/Http/Controllers/Admin/SubscriptionController.php`, `routes/web.php`, `tests/Feature/Observability/ReadinessEndpointTest.php` (new), `tests/Feature/Observability/WebhookObservabilityTest.php` (new), `docs/OBSERVABILITY_AND_RUNBOOK.md` (new), `docs/PRODUCTION_READINESS_CHECKLIST.md`, `docs/QA_RELEASE_PLAYBOOK.md`, `docs/PROJECT_STATUS.md`.
+  - **QA checklist:**
+    1. `curl http://localhost:8080/_readiness` → 200 JSON `{"status":"healthy"}` with all checks passing.
+    2. `curl http://localhost:8080/up` → 200 (unchanged).
+    3. POST `/webhooks/stripe` with bad signature → 400; `stripe.webhook.signature_invalid` in logs.
+    4. Trigger webhook processing failure → `Stripe webhook processing failed` in logs with `stripe_event_id`, `organization_id`, `exception_class`; `stripe_webhook_events.status = failed`.
+    5. Checkout with missing Stripe config → 422; `stripe.subscription.initiation_failed` in logs.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Runtime usage/limits enforcement layer (rescue-mission):**
   - **API RPM from canonical entitlements:** `ThrottleOrgApi` now resolves per-org limit from `EntitlementsService::value('api_rpm', $org)` while preserving existing keying (`org + api key + IP`) and safe fallback to `config('api.rate_limit_per_minute')`.
   - **Unauthorized API behavior unchanged:** invalid/missing API key requests still fail in `AuthenticateOrganizationApiKey` with `401` before rate-limit handling.

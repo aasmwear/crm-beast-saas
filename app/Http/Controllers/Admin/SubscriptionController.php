@@ -401,10 +401,13 @@ final class SubscriptionController extends Controller
                 'cancel_url' => $cancelUrl,
             ], $planKey);
         } catch (\Throwable $e) {
-            Log::warning('Stripe subscription initiation failed', [
+            Log::error('stripe.subscription.initiation_failed', [
                 'organization_id' => $organization->id,
+                'organization_slug' => $organization->slug,
                 'plan_key' => $planKey,
+                'stripe_customer_id' => $organization->stripe_id,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
 
             return response()->json([
@@ -476,9 +479,12 @@ final class SubscriptionController extends Controller
         try {
             return $organization->redirectToBillingPortal($returnUrl);
         } catch (\Throwable $e) {
-            Log::warning('Stripe billing portal launch failed', [
+            Log::error('stripe.portal.launch_failed', [
                 'organization_id' => $organization->id,
+                'organization_slug' => $organization->slug,
+                'stripe_customer_id' => $organization->stripe_id,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
 
             return back()->with('error', 'Unable to open billing portal right now. Please try again.');
@@ -511,8 +517,9 @@ final class SubscriptionController extends Controller
                 ->values()
                 ->all();
         } catch (\Throwable $e) {
-            Log::warning('Failed to fetch Stripe/Cashier invoices for org', [
+            Log::warning('stripe.invoices.fetch_failed', [
                 'organization_id' => $organization->id,
+                'stripe_customer_id' => $organization->stripe_id,
                 'error' => $e->getMessage(),
             ]);
 

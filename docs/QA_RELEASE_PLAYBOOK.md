@@ -68,3 +68,26 @@
    - Action links render only when URLs exist: **View invoice**, **Download PDF**, **View receipt**.
 6. **Empty state:** Org with no Stripe invoices should show Billing page normally with "No invoices yet."
 7. **Verification commands:** Run `./vendor/bin/sail artisan test tests/Feature/Billing/BillingPortalAndInvoicesTest.php`, then full `./vendor/bin/sail artisan test`, and `./vendor/bin/sail npm run build`.
+
+---
+
+## Health & Readiness Smoke Test
+
+1. **Liveness (`/up`):** `curl http://localhost:8080/up` → 200 with HTML.
+2. **Readiness (`/_readiness`):** `curl http://localhost:8080/_readiness` → 200 JSON with `"status":"healthy"`, all three checks (`database`, `cache`, `queue`) show `"ok":true`.
+3. **Degraded state:** Stop PostgreSQL (`sail stop pgsql`), then `curl http://localhost:8080/_readiness` → 503 JSON with `"status":"degraded"`, `database.ok` is `false`. Restart PostgreSQL afterward.
+4. **Root health:** `curl http://localhost:8080/` → 200 `OK`.
+
+---
+
+## Webhook Failure Observability Smoke Test
+
+1. **Invalid signature logging:** POST to `/webhooks/stripe` with a fake `Stripe-Signature` header.
+   - Expect 400 response.
+   - Check `storage/logs/laravel.log` for `stripe.webhook.signature_invalid` with `ip` field.
+2. **Processing failure logging:** Trigger a webhook event that will fail processing (e.g., unknown Stripe customer).
+   - Check log for `Stripe webhook processing failed` with `stripe_event_id`, `event_type`, `organization_id` (null if unresolvable), `exception_class`.
+   - Check `stripe_webhook_events` table: row exists with `status=failed` and `notes` containing error.
+3. **Billing initiation failure:** Attempt checkout with missing Stripe config.
+   - Check log for `stripe.subscription.initiation_failed` with org context fields.
+4. **Verification:** Run `./vendor/bin/sail artisan test tests/Feature/Observability/`.

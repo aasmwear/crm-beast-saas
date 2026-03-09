@@ -48,6 +48,7 @@ use App\Http\Controllers\Portal\InvoiceController as PortalInvoiceController;
 use App\Http\Controllers\Portal\PaymentController as PortalPaymentController;
 use App\Http\Controllers\Portal\ProjectController as PortalProjectController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserManagementController;
@@ -134,6 +135,15 @@ if (app()->environment('local')) {
 | A plain 200 OK keeps smoke tests happy and avoids auth redirects on `/`.
 */
 Route::get('/', fn () => response('OK', 200))->name('root');
+
+/*
+|--------------------------------------------------------------------------
+| Internal Readiness Probe
+|--------------------------------------------------------------------------
+| Verifies DB, cache, queue config. Internal-only — protect via
+| reverse-proxy / firewall in production.
+*/
+Route::get('/_readiness', HealthCheckController::class)->name('readiness');
 
 /*
 |--------------------------------------------------------------------------

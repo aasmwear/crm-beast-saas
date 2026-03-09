@@ -23,6 +23,24 @@
 
 ---
 
+## Observability & Operations
+
+- [x] **Liveness endpoint** — `GET /up` returns 200 (Laravel built-in).
+- [x] **Readiness endpoint** — `GET /_readiness` verifies DB, cache, queue config. Returns 200/503 JSON.
+- [x] **Readiness protection** — Endpoint unauthenticated by design; document reverse-proxy restriction for production.
+- [x] **Webhook failure logging** — `WebhookController` logs `stripe_event_id`, `event_type`, `organization_id` (when resolvable), `error`, `exception_class` on processing failures.
+- [x] **Webhook idempotency** — `stripe_webhook_events` table stores every received event with status tracking.
+- [x] **Billing initiation logging** — Checkout and portal failures log `organization_id`, `plan_key`, `stripe_customer_id`, `exception_class`.
+- [x] **Invoice fetch logging** — Cashier invoice fetch failures logged with org/customer context (non-fatal).
+- [x] **Failed jobs table** — `failed_jobs` migration in place; driver `database-uuids`; standard `queue:failed` / `queue:retry` commands available.
+- [x] **Runbook** — `docs/OBSERVABILITY_AND_RUNBOOK.md` covers webhook triage, billing failures, export limits, API rate-limits, failed jobs, log reference.
+- [ ] **Alerting** — No external alerting integration yet (Sentry/Bugsnag/PagerDuty). Log-based monitoring only.
+- [ ] **Log aggregation** — No centralized log platform yet. Relies on `storage/logs/laravel.log` + database audit tables.
+- [ ] **Uptime monitoring** — No external uptime monitor configured. `/_readiness` endpoint ready for integration.
+- [ ] **Queue worker monitoring** — No worker health/heartbeat check. Queue driver is `database`; workers must be managed externally (Supervisor/systemd).
+
+---
+
 ## Other sections
 
-_Add additional checklist sections (Security, Performance, Observability, etc.) as needed. This file initially focuses on billing/entitlements per PR scope._
+_Add additional checklist sections (Security, Performance, etc.) as needed._

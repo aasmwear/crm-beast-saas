@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
+use App\Models\Organization;
 use App\Models\StripeWebhookEvent;
 use App\Services\ActivityLogger;
 use App\Services\AuditLogger;
@@ -29,7 +30,9 @@ final class WebhookController extends Controller
         $webhookSecret = config('services.stripe.webhook_secret');
 
         if (empty($webhookSecret)) {
-            Log::warning('Stripe webhook secret not configured');
+            Log::error('stripe.webhook.config_missing', [
+                'detail' => 'STRIPE_WEBHOOK_SECRET not configured',
+            ]);
 
             return response('Webhook secret not configured', 422);
         }
@@ -37,11 +40,16 @@ final class WebhookController extends Controller
         try {
             $event = Webhook::constructEvent($payload, $sigHeader, $webhookSecret);
         } catch (SignatureVerificationException $e) {
-            Log::warning('Stripe webhook signature verification failed', ['error' => $e->getMessage()]);
+            Log::warning('stripe.webhook.signature_invalid', [
+                'error' => $e->getMessage(),
+                'ip' => $request->ip(),
+            ]);
 
             return response('Invalid signature', 400);
         } catch (\UnexpectedValueException $e) {
-            Log::warning('Stripe webhook payload invalid', ['error' => $e->getMessage()]);
+            Log::warning('stripe.webhook.payload_invalid', [
+                'error' => $e->getMessage(),
+            ]);
 
             return response('Invalid payload', 400);
         }
@@ -73,7 +81,6 @@ final class WebhookController extends Controller
         try {
             $notes = [];
 
-            // Preserve existing invoice payment webhook behavior for portal invoice checkouts.
             if ($eventType === 'checkout.session.completed') {
                 $legacyInvoice = $this->processLegacyInvoiceCheckout($eventArray);
                 if ($legacyInvoice['handled']) {
@@ -92,10 +99,14 @@ final class WebhookController extends Controller
                 'notes' => count($notes) > 0 ? implode('; ', $notes) : 'acknowledged',
             ]);
         } catch (\Throwable $e) {
-            Log::warning('Stripe webhook processing failed', [
-                'event_id' => $eventId,
+            $organizationId = $this->resolveOrganizationIdFromEvent($eventArray);
+
+            Log::error('Stripe webhook processing failed', [
+                'stripe_event_id' => $eventId,
                 'event_type' => $eventType,
+                'organization_id' => $organizationId,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
 
             $eventLog->update([
@@ -161,5 +172,31 @@ final class WebhookController extends Controller
         }
 
         return ['handled' => true, 'notes' => 'legacy invoice marked paid'];
+    }
+
+    /**
+     * Best-effort extraction of organization_id from a Stripe event payload.
+     * Returns null if the customer cannot be resolved — never throws.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    private function resolveOrganizationIdFromEvent(array $event): ?int
+    {
+        try {
+            $object = (array) ($event['data']['object'] ?? []);
+            $customerId = is_string($object['customer'] ?? null) ? trim($object['customer']) : null;
+
+            if ($customerId === null || $customerId === '') {
+                return null;
+            }
+
+            $orgId = Organization::query()
+                ->where('stripe_id', $customerId)
+                ->value('id');
+
+            return $orgId !== null ? (int) $orgId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
