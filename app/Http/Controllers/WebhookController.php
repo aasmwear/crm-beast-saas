@@ -66,12 +66,15 @@ final class WebhookController extends Controller
             return response('OK', 200);
         }
 
+        $organizationId = $this->resolveOrganizationIdFromEvent($eventArray);
+
         try {
             $eventLog = StripeWebhookEvent::query()->create([
                 'stripe_event_id' => $eventId,
                 'type' => $eventType,
                 'status' => 'received',
                 'payload_json' => $eventArray,
+                'organization_id' => $organizationId,
             ]);
         } catch (QueryException $e) {
             // Unique key race / duplicate delivery.
@@ -99,8 +102,6 @@ final class WebhookController extends Controller
                 'notes' => count($notes) > 0 ? implode('; ', $notes) : 'acknowledged',
             ]);
         } catch (\Throwable $e) {
-            $organizationId = $this->resolveOrganizationIdFromEvent($eventArray);
-
             Log::error('Stripe webhook processing failed', [
                 'stripe_event_id' => $eventId,
                 'event_type' => $eventType,

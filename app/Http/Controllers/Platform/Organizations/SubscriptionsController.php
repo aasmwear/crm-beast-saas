@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationAddon;
 use App\Models\OrganizationSubscription;
+use App\Models\StripeWebhookEvent;
 use App\Services\AuditLogger;
 use App\Services\Billing\EntitlementsService;
 use App\Services\Billing\SeatCounter;
@@ -70,7 +71,12 @@ final class SubscriptionsController extends Controller
         $paginator = $query->paginate(perPage: min((int) $request->input('per_page', 15), 50))
             ->withQueryString();
 
-        $organizations = $paginator->getCollection()->map(fn (Organization $org) => $this->mapOrgToBillingOverview($org));
+        $orgIds = $paginator->getCollection()->pluck('id')->all();
+        $webhookStats = $this->loadWebhookSupportStats($orgIds);
+
+        $organizations = $paginator->getCollection()->map(function (Organization $org) use ($webhookStats) {
+            return $this->mapOrgToBillingOverview($org, $webhookStats[$org->id] ?? []);
+        });
 
         $paginator->setCollection($organizations);
 
@@ -96,9 +102,58 @@ final class SubscriptionsController extends Controller
     }
 
     /**
+     * Load webhook support indicators for the given org IDs (batched, avoids N+1).
+     *
+     * @param  array<int>  $orgIds
+     * @return array<int, array{last_type: string|null, last_processed_at: string|null, last_status: string|null, recent_failed_count: int}>
+     */
+    private function loadWebhookSupportStats(array $orgIds): array
+    {
+        if (count($orgIds) === 0) {
+            return [];
+        }
+
+        $recentFailedCutoff = now()->subDays(7);
+
+        $lastPerOrg = StripeWebhookEvent::query()
+            ->whereIn('organization_id', $orgIds)
+            ->whereNotNull('organization_id')
+            ->orderByDesc('processed_at')
+            ->orderByDesc('created_at')
+            ->get(['organization_id', 'type', 'status', 'processed_at'])
+            ->groupBy('organization_id')
+            ->map(fn ($events) => $events->first())
+            ->all();
+
+        $failedCounts = StripeWebhookEvent::query()
+            ->whereIn('organization_id', $orgIds)
+            ->whereNotNull('organization_id')
+            ->where('status', 'failed')
+            ->where('created_at', '>=', $recentFailedCutoff)
+            ->groupBy('organization_id')
+            ->selectRaw('organization_id, count(*) as cnt')
+            ->pluck('cnt', 'organization_id')
+            ->all();
+
+        $result = [];
+        foreach ($orgIds as $orgId) {
+            $last = $lastPerOrg[$orgId] ?? null;
+            $result[$orgId] = [
+                'last_type' => $last?->type,
+                'last_processed_at' => $last?->processed_at?->toIso8601String(),
+                'last_status' => $last?->status,
+                'recent_failed_count' => (int) ($failedCounts[$orgId] ?? 0),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array{last_type?: string|null, last_processed_at?: string|null, last_status?: string|null, recent_failed_count?: int}  $webhookStats
      * @return array<string, mixed>
      */
-    private function mapOrgToBillingOverview(Organization $org): array
+    private function mapOrgToBillingOverview(Organization $org, array $webhookStats = []): array
     {
         $sub = $org->billingSubscription;
         $planKey = $sub?->plan_key ?? null;
@@ -149,6 +204,13 @@ final class SubscriptionsController extends Controller
             'entitlements' => $keyEntitlements,
             'trial_ends_at' => $sub?->trial_ends_at?->toIso8601String(),
             'current_period_ends_at' => $sub?->current_period_ends_at?->toIso8601String(),
+            'webhook' => [
+                'last_type' => $webhookStats['last_type'] ?? null,
+                'last_processed_at' => $webhookStats['last_processed_at'] ?? null,
+                'last_status' => $webhookStats['last_status'] ?? null,
+                'recent_failed_count' => $webhookStats['recent_failed_count'] ?? 0,
+            ],
+            'tenant_billing_url' => url("/org/{$org->slug}/billing"),
         ];
     }
 

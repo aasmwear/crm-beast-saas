@@ -39,6 +39,7 @@
 - [ ] **Uptime monitoring** — No external uptime monitor configured. `/_readiness` endpoint ready for integration.
 - [ ] **Queue worker monitoring** — No worker health/heartbeat check. Queue driver is `database`; workers must be managed externally (Supervisor/systemd).
 - [x] **Platform org billing overview** — Read-only `/admin/organizations/subscriptions` for Super Admin / platform staff. Shows plan, status, Stripe linkage, seats, add-ons, entitlements. Search and filter by status/plan.
+- [x] **Platform webhook support indicators** — Org Subscriptions page shows per-org webhook status (OK/Failed), last processed timestamp, recent failed count (7d). `stripe_webhook_events.organization_id` stores org when resolvable. Support links: platform org detail, tenant billing (new tab).
 - [x] **Platform-admin manual billing overrides** — Super Admin/Support can override plan_key, seat_limit, and add-ons from Org Subscriptions page. Internal operator controls; do **not** mutate Stripe. All actions audited. Changes reflected immediately in entitlements and tenant billing read model.
 
 ---

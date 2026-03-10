@@ -91,3 +91,14 @@
 3. **Billing initiation failure:** Attempt checkout with missing Stripe config.
    - Check log for `stripe.subscription.initiation_failed` with org context fields.
 4. **Verification:** Run `./vendor/bin/sail artisan test tests/Feature/Observability/`.
+
+---
+
+## Platform Webhook Support Tooling QA
+
+1. **Platform admin access:** Log in as platform admin → Org Subscriptions (`/admin/organizations/subscriptions`).
+2. **Webhook column:** Table shows Webhook column with per-org indicators: status badge (OK/Failed/Received/—), last processed relative time, recent failed count when > 0.
+3. **Org with processed webhooks:** Create org with `stripe_id`, trigger webhook, then reload page → "OK" badge and relative timestamp (e.g. "5m ago").
+4. **Org with no webhook events:** Org never received webhooks → "—" in Webhook column.
+5. **Support links:** "View" → platform org detail; "Billing →" (Stripe-linked orgs only) opens `/org/{slug}/billing` in new tab. Customer must log in to see tenant billing.
+6. **Verification:** Run `./vendor/bin/sail artisan test tests/Feature/Platform/OrgSubscriptionsOverviewTest.php`.

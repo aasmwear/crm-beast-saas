@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\OrganizationAddon;
 use App\Models\OrganizationSubscription;
 use App\Models\Platform\PlatformAdmin;
+use App\Models\StripeWebhookEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -219,4 +220,98 @@ class OrgSubscriptionsOverviewTest extends TestCase
         $entitlements = $response->viewData('page')['props']['organizations']['data'][0]['entitlements'] ?? [];
         $this->assertGreaterThanOrEqual(10, $entitlements['storage_gb'] ?? 0);
     }
+
+    public function test_platform_admin_sees_webhook_support_indicators(): void
+    {
+        $org = Organization::factory()->create([
+            'name' => 'Webhook Org',
+            'slug' => 'webhook-org',
+            'stripe_id' => 'cus_webhook',
+        ]);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'pro',
+            'status' => 'active',
+            'seats_included' => 10,
+        ]);
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_platform_1',
+            'type' => 'customer.subscription.updated',
+            'status' => 'processed',
+            'processed_at' => now()->subMinutes(5),
+            'organization_id' => $org->id,
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.subscriptions'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Platform/Organizations/SubscriptionsIndex')
+            ->has('organizations.data.0.webhook')
+            ->where('organizations.data.0.webhook.last_type', 'customer.subscription.updated')
+            ->where('organizations.data.0.webhook.last_status', 'processed')
+            ->where('organizations.data.0.webhook.recent_failed_count', 0)
+            ->has('organizations.data.0.webhook.last_processed_at')
+            ->has('organizations.data.0.tenant_billing_url')
+        );
+    }
+
+    public function test_recent_failed_webhook_count_renders_correctly(): void
+    {
+        $org = Organization::factory()->create([
+            'name' => 'Failed Org',
+            'slug' => 'failed-org',
+            'stripe_id' => 'cus_failed',
+        ]);
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_fail_1',
+            'type' => 'invoice.payment_failed',
+            'status' => 'failed',
+            'notes' => 'Test failure',
+            'organization_id' => $org->id,
+            'created_at' => now()->subDays(2),
+        ]);
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_fail_2',
+            'type' => 'customer.subscription.updated',
+            'status' => 'failed',
+            'notes' => 'Another failure',
+            'organization_id' => $org->id,
+            'created_at' => now()->subDays(1),
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.subscriptions'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Platform/Organizations/SubscriptionsIndex')
+            ->where('organizations.data.0.webhook.recent_failed_count', 2)
+            ->where('organizations.data.0.webhook.last_status', 'failed')
+        );
+    }
+
+    public function test_fallback_when_org_has_no_webhook_events(): void
+    {
+        $org = Organization::factory()->create([
+            'name' => 'No Webhook Org',
+            'slug' => 'no-webhook',
+            'stripe_id' => null,
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.subscriptions'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Platform/Organizations/SubscriptionsIndex')
+            ->where('organizations.data.0.name', 'No Webhook Org')
+            ->where('organizations.data.0.webhook.last_type', null)
+            ->where('organizations.data.0.webhook.last_processed_at', null)
+            ->where('organizations.data.0.webhook.last_status', null)
+            ->where('organizations.data.0.webhook.recent_failed_count', 0)
+        );
+    }
+
 }

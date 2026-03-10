@@ -11,6 +11,8 @@ Super Admins and Support staff can view a **read-only org subscriptions overview
 - See canonical plan_key, status, Stripe linkage, seats, add-ons, and key entitlements (api_rpm, storage_gb, exports_per_day) for all tenants in one place.
 - Filter by search (name/slug), status, or plan.
 - Link to the platform org detail page (`/admin/organizations/{slug}`) for further inspection.
+- See **webhook support indicators** per org: last webhook status (OK/Failed/Received), last processed timestamp, recent failed count (last 7 days). Use these for quick operational health.
+- **Support links:** "View" → platform org detail; "Billing →" → tenant billing page (`/org/{slug}/billing`). The Billing link opens in a new tab; the customer must log in to view their billing. No impersonation — support-only reference.
 
 ### Platform-admin manual billing overrides
 
@@ -86,9 +88,10 @@ location = /_readiness {
    ```bash
    sail artisan tinker --execute="
      \App\Models\StripeWebhookEvent::where('status','failed')
-       ->latest()->take(10)->get(['id','stripe_event_id','type','status','notes','created_at']);
+       ->latest()->take(10)->get(['id','stripe_event_id','type','status','notes','organization_id','created_at']);
    "
    ```
+   Each event stores `organization_id` when the customer can be resolved from the payload (platform Org Subscriptions page shows webhook indicators per org).
 
 2. **Identify the failing event type** — common problem types:
    - `customer.subscription.updated` — price-to-plan mapping missing in `config/billing.php` `stripe_prices`
@@ -238,7 +241,7 @@ This job runs inside a DB transaction. If it fails:
 | Source | Location | Contents |
 |---|---|---|
 | Application log | `storage/logs/laravel.log` | All `Log::*` calls (webhook failures, billing errors, queue failures) |
-| `stripe_webhook_events` table | Database | Every received Stripe event: ID, type, status, notes, payload |
+| `stripe_webhook_events` table | Database | Every received Stripe event: ID, type, status, notes, payload, organization_id (when resolvable from customer) |
 | `audit_logs` table | Database | Org-scoped business events (subscription changes, payment results, settings, CRUD) |
 | `failed_jobs` table | Database | Jobs that exhausted retries |
 

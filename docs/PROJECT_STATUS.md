@@ -39,6 +39,20 @@
 
 ## Last PR Notes
 
+- **Platform-admin webhook/billing support tooling (rescue-mission):**
+  - **Goal:** READ-ONLY operational billing/webhook support tools for platform admins. No webhook replay, no Stripe mutations, no tenant-side UI changes.
+  - **Schema:** Added `organization_id` (nullable) to `stripe_webhook_events`; `WebhookController` stores org when resolvable from payload.
+  - **Platform Org Subscriptions:** New Webhook column shows: status badge (OK/Failed/Received), last processed timestamp (relative), recent failed count (7 days). Support links: View → platform org detail; Billing → tenant billing page (opens new tab; customer must log in).
+  - **Tests:** `OrgSubscriptionsOverviewTest` — platform admin sees webhook indicators, recent failed count, fallback when no webhook events, tenant/guest blocked.
+  - **Docs:** OBSERVABILITY_AND_RUNBOOK.md, PROJECT_STATUS.md, PRODUCTION_READINESS_CHECKLIST.md updated.
+  - **QA checklist:**
+    1. Platform admin → Org Subscriptions → table shows Webhook column with status, timestamp, failed count.
+    2. Org with processed webhooks → "OK" badge, relative time.
+    3. Org with failed webhooks in last 7 days → "Failed" or "N failed" badge.
+    4. Org with no webhook events → "—" for webhook column.
+    5. Billing link (Stripe-linked orgs only) opens `/org/{slug}/billing` in new tab.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Platform-admin manual billing overrides (rescue-mission):**
   - **Goal:** Internal operator control-plane for Super Admin/Support to override billing state without mutating Stripe.
   - **Routes:** PATCH `/admin/organizations/{organization}/subscription`, POST/PATCH/DELETE `/admin/organizations/{organization}/addons[/{addon}]` — platform-only (`auth:platform`), scopeBindings.

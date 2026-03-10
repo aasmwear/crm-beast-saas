@@ -20,6 +20,13 @@ const props = defineProps<{
       entitlements: { api_rpm: number | null; storage_gb: number | null; exports_per_day: number | null };
       trial_ends_at: string | null;
       current_period_ends_at: string | null;
+      webhook: {
+        last_type: string | null;
+        last_processed_at: string | null;
+        last_status: string | null;
+        recent_failed_count: number;
+      };
+      tenant_billing_url: string;
     }>;
     current_page: number;
     last_page: number;
@@ -138,6 +145,25 @@ const statusBadgeClass = (status: string) => {
   return map[status] ?? 'bg-white/10 text-white/60 border-white/20';
 };
 
+const webhookStatusBadge = (webhook: { last_status: string | null; recent_failed_count: number }) => {
+  if (webhook.last_status === 'failed') return { label: 'Failed', cls: 'bg-red-600/20 text-red-400 border-red-500/30' };
+  if (webhook.recent_failed_count > 0) return { label: `${webhook.recent_failed_count} failed`, cls: 'bg-amber-600/20 text-amber-400 border-amber-500/30' };
+  if (webhook.last_status === 'processed') return { label: 'OK', cls: 'bg-green-600/20 text-green-400 border-green-500/30' };
+  if (webhook.last_status === 'received') return { label: 'Received', cls: 'bg-slate-600/20 text-slate-400 border-slate-500/30' };
+  return { label: '—', cls: 'bg-white/10 text-white/40 border-white/20' };
+};
+
+const formatRelativeTime = (iso: string | null) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const now = new Date();
+  const sec = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
+};
+
 </script>
 
 <template>
@@ -212,6 +238,7 @@ const statusBadgeClass = (status: string) => {
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Plan</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Status</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Stripe</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Webhook</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Seats</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Add-ons</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Entitlements</th>
@@ -244,6 +271,22 @@ const statusBadgeClass = (status: string) => {
               <td class="px-4 py-3">
                 <span v-if="org.has_stripe_id" class="text-xs text-green-400">Linked</span>
                 <span v-else class="text-xs text-white/40">—</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-col gap-0.5">
+                  <span
+                    v-if="org.webhook.last_status || org.webhook.recent_failed_count > 0"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border w-fit"
+                    :class="webhookStatusBadge(org.webhook).cls"
+                  >
+                    {{ webhookStatusBadge(org.webhook).label }}
+                  </span>
+                  <span v-else class="text-xs text-white/40">—</span>
+                  <span class="text-xs text-white/50">{{ formatRelativeTime(org.webhook.last_processed_at) }}</span>
+                  <span v-if="org.webhook.recent_failed_count > 0" class="text-xs text-amber-400">
+                    {{ org.webhook.recent_failed_count }} failed (7d)
+                  </span>
+                </div>
               </td>
               <td class="px-4 py-3">
                 <span class="text-sm text-white/80">{{ org.active_seats }} / {{ org.seats_included }}</span>
@@ -282,12 +325,22 @@ const statusBadgeClass = (status: string) => {
                   :href="route('platform.organizations.show', { organization: org.slug })"
                   class="text-sm text-purple-400 hover:text-purple-300 transition"
                 >
-                  View →
+                  View
                 </Link>
+                <a
+                  v-if="org.has_stripe_id"
+                  :href="org.tenant_billing_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-sm text-blue-400 hover:text-blue-300 transition"
+                  title="Tenant billing (support link — customer must log in)"
+                >
+                  Billing →
+                </a>
               </td>
             </tr>
             <tr v-if="!organizations.data.length">
-              <td colspan="8" class="px-4 py-12 text-center text-white/40">
+              <td colspan="9" class="px-4 py-12 text-center text-white/40">
                 No organizations match the current filters.
               </td>
             </tr>
