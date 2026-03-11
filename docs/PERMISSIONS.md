@@ -23,6 +23,7 @@
 | departments | ✓    | ✓      | ✓      | ✓      | —     | —                                  |
 | announcements | ✓  | ✓      | ✓      | ✓      | —     | pin                                |
 | attendance  | ✓    | ✓      | ✓      | ✓      | ✓     | view-own, clock-in, clock-out, approve |
+| hrm         | ✓    | ✓      | ✓      | ✓      | ✓     | —                                     |
 | reports     | ✓    | —      | —      | —      | —     | export                             |
 | activity    | ✓    | —      | —      | —      | —     | —                                  |
 | roles       | ✓    | —      | —      | —      | ✓     | assign                             |
@@ -115,10 +116,10 @@ php artisan permissions:reconcile --assign --dry-run
 | SubscriptionController::checkout | `billing.manage` | Checkout / plan changes |
 | SubscriptionController::updatePlan, storeAddon, updateAddon, destroyAddon | `billing.update` | Internal control-plane: change plan_key, create/update/deactivate add-ons |
 | **HRM** | | |
-| HRMController::index | UserPolicy::viewAny | `users.view` or `users.manage` |
-| HRMController::store | UserPolicy::create | `users.create` |
-| HRMController::update | UserPolicy::update | `users.update` or `users.manage` |
-| HRMController::destroy | UserPolicy::delete | `users.delete` |
+| HRMController::index | UserPolicy::viewAny | `hrm.view`, `hrm.manage`, `users.view`, `users.manage` |
+| HRMController::store | UserPolicy::create | `hrm.create`, `hrm.manage`, `users.create`, `users.manage` |
+| HRMController::update | UserPolicy::update | `hrm.edit`, `hrm.manage`, `users.update`, `users.manage` |
+| HRMController::destroy | UserPolicy::delete | `hrm.delete`, `hrm.manage`, `users.delete` |
 | **Clients Import** | | |
 | ClientsInertiaController::import | `clients.import` | View import form |
 | ClientsImportController::import | `clients.import` | POST import CSV |
@@ -145,6 +146,20 @@ php artisan permissions:reconcile --assign --dry-run
 
 - **Employee:** view-own, create (or clock-in/clock-out); can clock in/out; cannot edit others or delete.
 - **Manager/HR:** view, edit, manage (or approve); can view all, edit status/notes, approve, delete.
+
+## HRM Permissions
+
+| Permission   | Enforced in                    | Description                              |
+|--------------|--------------------------------|------------------------------------------|
+| `hrm.view`   | HRMController::index           | View HRM / Employees page                 |
+| `hrm.create` | HRMController::store           | Create new employees                      |
+| `hrm.edit`   | HRMController::update           | Edit employee details, department, role  |
+| `hrm.delete` | HRMController::destroy          | Remove employee from organization         |
+| `hrm.manage` | All HRM actions                | Full HRM access (admin)                   |
+
+- **Backward compat:** UserPolicy accepts both `hrm.*` and `users.*`; HRM works with either.
+- **Manager role:** Gets hrm.view, hrm.create, hrm.edit, hrm.manage by default.
+- **Employee:** Has users.view (can view HRM page) but no create/edit/delete; Add/Edit/Delete hidden.
 
 ---
 

@@ -83,6 +83,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'api_keys.view',
             'api_keys.create',
             'api_keys.delete',
+            'hrm.view',
+            'hrm.create',
+            'hrm.edit',
+            'hrm.delete',
+            'hrm.manage',
         ];
 
         foreach ($permissions as $permission) {
@@ -100,7 +105,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $manager = Role::firstOrCreate(['name' => 'Manager', 'guard_name' => 'web']);
         $manager->syncPermissions([
             'projects.view', 'projects.create', 'projects.edit', 'projects.update', 'financials.view',
-            'users.view', 'clients.manage', 'clients.view', 'clients.create', 'clients.edit', 'clients.update', 'clients.import',
+            'users.view', 'users.create', 'users.update', 'users.delete', 'hrm.view', 'hrm.create', 'hrm.edit', 'hrm.manage',
+            'clients.manage', 'clients.view', 'clients.create', 'clients.edit', 'clients.update', 'clients.import',
             'contacts.manage', 'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.update',
             'departments.view', 'attendance.view', 'attendance.edit', 'attendance.manage', 'attendance.approve',
             'announcements.view', 'announcements.create', 'announcements.update',

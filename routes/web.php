@@ -334,8 +334,8 @@ Route::prefix('org/{organization:slug}')
         */
         Route::get('/hrm', [HRMController::class, 'index'])->name('hrm.index');
         Route::post('/hrm', [HRMController::class, 'store'])->name('hrm.store');
-        Route::put('/hrm/{user}', [HRMController::class, 'update'])->name('hrm.update');
-        Route::delete('/hrm/{user}', [HRMController::class, 'destroy'])->name('hrm.destroy');
+        Route::put('/hrm/{user}', [HRMController::class, 'update'])->name('hrm.update')->scopeBindings();
+        Route::delete('/hrm/{user}', [HRMController::class, 'destroy'])->name('hrm.destroy')->scopeBindings();
 
         /*
         |------------------------------

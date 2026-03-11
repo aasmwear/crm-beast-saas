@@ -66,11 +66,19 @@ final class HRMController extends Controller
             ->orderBy('name')
             ->pluck('name');
 
+        $user = $request->user();
+        $canCreate = $user && ($user->can('hrm.create') || $user->can('hrm.manage') || $user->can('users.create') || $user->can('users.manage'));
+        $canEdit = $user && ($user->can('hrm.edit') || $user->can('hrm.manage') || $user->can('users.update') || $user->can('users.manage'));
+        $canDelete = $user && ($user->can('hrm.delete') || $user->can('hrm.manage') || $user->can('users.delete'));
+
         return Inertia::render('HRM/Index', [
             'employees' => $employees,
             'departments' => $departments,
             'roles' => $roles,
             'organization' => $organization->only(['id', 'name', 'slug']),
+            'canCreate' => $canCreate,
+            'canEdit' => $canEdit,
+            'canDelete' => $canDelete,
         ]);
     }
 
@@ -92,7 +100,7 @@ final class HRMController extends Controller
             'role' => ['required', 'string'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string'],
-            'department_id' => ['nullable', 'integer'],
+            'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where('organization_id', $organization->id)],
         ]);
 
         app(SeatCounter::class)->assertCanAddSeat($organization);
@@ -133,17 +141,13 @@ final class HRMController extends Controller
     /**
      * Update an employee's profile and role in the current organization.
      */
-    public function update(Request $request, $organization, $user_id): RedirectResponse
+    public function update(Request $request, Organization $organization, User $user): RedirectResponse
     {
-        /** @var Organization $organization */
-        $organization = $request->route('organization');
-
-        $user = User::findOrFail($user_id);
-        $this->authorize('update', $user);
-
         if (! $organization->users()->where('user_id', $user->id)->exists()) {
-            return redirect()->back()->with('error', 'User is not in this organization.');
+            abort(404, 'User is not in this organization.');
         }
+
+        $this->authorize('update', $user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -172,18 +176,13 @@ final class HRMController extends Controller
     /**
      * Remove the user from the current organization.
      */
-    public function destroy(Request $request, $organization, $user_id): RedirectResponse
+    public function destroy(Request $request, Organization $organization, User $user): RedirectResponse
     {
-        /** @var Organization $organization */
-        $organization = $request->route('organization');
-        
-        // Find the user manually since we passed an ID, not a model binding
-        $user = User::findOrFail($user_id);
-        $this->authorize('delete', $user);
-
-        if (!$organization->users()->where('user_id', $user->id)->exists()) {
-            return redirect()->back()->with('error', 'User is not in this organization.');
+        if (! $organization->users()->where('user_id', $user->id)->exists()) {
+            abort(404, 'User is not in this organization.');
         }
+
+        $this->authorize('delete', $user);
 
         $organization->users()->detach($user->id);
 

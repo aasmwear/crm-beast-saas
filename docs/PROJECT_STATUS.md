@@ -23,7 +23,7 @@
 | Notifications | 🟡 | Works; no RBAC |
 | Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations, Modules, API Keys |
 | Billing | 🟡 | Stripe/Cashier self-serve in place (checkout, webhook sync, portal access, invoice history UX); keep iterating on operational hardening |
-| HRM | 🟡 | Auth commented out |
+| HRM | ✅ | RBAC enforced: hrm.view/create/edit/delete/manage; UserPolicy + hrm.*; scopeBindings; UI hiding |
 
 ---
 
@@ -31,13 +31,27 @@
 
 1. **Permission canonicalization** — Pending: align `clients.update` ↔ `clients.edit`, `tasks.update` ↔ `tasks.edit`, etc. (see PERMISSIONS.md).
 2. ~~**Reports page missing**~~ — Fixed: Reports/Index.vue created, RBAC (reports.view, reports.export), export uses primary_contact_*.
-3. **Unprotected controllers** — No authorize(): NotificationCenterController, SettingsController, SubscriptionController (billing), ClientsImportController. HRMController has auth commented out.
+3. **Unprotected controllers** — No authorize(): NotificationCenterController, SettingsController, SubscriptionController (billing), ClientsImportController. ~~HRMController~~ — fixed: RBAC enforced.
 4. **DB risks** — activities table has no organization_id; comments has no org_id; attendance.organization_id nullable. ~~ReportController export~~ — fixed: now uses primary_contact_email, primary_contact_phone. See docs/DB_SCHEMA.md.
 5. ~~**Public API auth**~~ — Fixed: Bearer token auth via AuthenticateOrganizationApiKey middleware; GET /api/ping protected.
 
 ---
 
 ## Last PR Notes
+
+- **HRM module RBAC enforcement (rescue-mission):**
+  - **Goal:** Harden HRM with clear RBAC enforcement and workflow safety, aligned with Granular Role Maker.
+  - **Permissions:** hrm.view (index), hrm.create (store), hrm.edit (update), hrm.delete (destroy), hrm.manage (all). UserPolicy also accepts users.* as fallback.
+  - **UserPolicy:** viewAny, view, create, update, delete, assignRoles — now accept both hrm.* and users.*.
+  - **Controller:** Pass canCreate, canEdit, canDelete; scopeBindings on update/destroy; department_id validated against org.
+  - **UI:** Add Employee hidden when !canCreate; Edit/Delete hidden when lacking permission; Nav/Command Palette gated by canViewHrm.
+  - **Tests:** HRMPermissionTest — view with hrm/view with users, no view 403, create can create, no create 403, no edit 403, edit can update, no delete 403, delete can remove, self-remove 403, cross-tenant 404.
+  - **QA checklist:**
+    1. User with only hrm.view → list OK; Add/Edit/Delete hidden; direct POST store → 403.
+    2. User with hrm.create → Add Employee visible, can create.
+    3. User without hrm.edit → Edit hidden; PUT update → 403.
+    4. User without hrm.delete → Delete hidden; DELETE → 403.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
 
 - **Attendance module RBAC enforcement (rescue-mission):**
   - **Goal:** Harden Attendance module with clear RBAC enforcement and workflow safety.

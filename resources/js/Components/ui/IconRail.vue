@@ -38,13 +38,14 @@
             <Link :href="r('announcements.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('announcements.index') }" @click="emit('close')">Announcements</Link>
             <div v-if="isAdmin" class="border-t border-[#0d0f14]/10 my-2 pt-2">
               <Link v-if="canViewActivity" :href="r('activity.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('activity.index') }" @click="emit('close')">Activity</Link>
-              <Link :href="r('hrm.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('hrm.index') }" @click="emit('close')">Employees</Link>
+              <Link v-if="canViewHrm" :href="r('hrm.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('hrm.index') }" @click="emit('close')">Employees</Link>
               <Link v-if="canViewAttendance" :href="r('attendance.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('attendance.index') }" @click="emit('close')">Attendance</Link>
               <Link :href="r('settings.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('settings.index') }" @click="emit('close')">Settings</Link>
               <Link :href="r('billing.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('billing.index', 'billing.portal', 'billing.checkout') }" @click="emit('close')">Billing</Link>
             </div>
             <div v-else class="border-t border-[#0d0f14]/10 my-2 pt-2">
               <Link v-if="canViewActivity" :href="r('activity.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('activity.index') }" @click="emit('close')">Activity</Link>
+              <Link v-if="canViewHrm" :href="r('hrm.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('hrm.index') }" @click="emit('close')">Employees</Link>
               <Link v-if="canViewAttendance" :href="r('attendance.index', { organization: org })" class="mobile-nav-link" :class="{ 'mobile-nav-link-active': isActive('attendance.index') }" @click="emit('close')">Attendance</Link>
             </div>
             <div class="mt-auto border-t border-[#0d0f14]/10 pt-2">
@@ -216,9 +217,9 @@
         <!-- Section divider: General → Admin/Shared -->
         <div class="rail-section-sep" aria-hidden="true"></div>
 
-        <!-- HRM / Employees (Admins only) -->
+        <!-- HRM / Employees (permission-gated) -->
         <Link
-          v-if="isAdmin"
+          v-if="canViewHrm"
           class="rail-btn"
           :class="{ current: isActive('hrm.index') }"
           :href="r('hrm.index', { organization: org })"
@@ -342,7 +343,7 @@ const mobileOpen = computed(() => props.mobileOpen ?? false)
 const page = usePage<{
   auth?: {
     is_admin?: boolean
-    can?: { activity?: boolean; reports?: boolean; attendance?: boolean }
+    can?: { activity?: boolean; reports?: boolean; attendance?: boolean; hrm?: boolean }
     user?: { name?: string; email?: string }
   }
   organization?: { name?: string; logo_path?: string | null }
@@ -351,6 +352,7 @@ const page = usePage<{
 const isAdmin = computed(() => !!page.props.auth?.is_admin)
 const canViewActivity = computed(() => !!page.props.auth?.can?.activity)
 const canViewAttendance = computed(() => !!page.props.auth?.can?.attendance)
+const canViewHrm = computed(() => !!page.props.auth?.can?.hrm)
 const organization = computed(() => page.props.organization ?? null)
 const logoUrl = computed(() => {
   const path = organization.value?.logo_path

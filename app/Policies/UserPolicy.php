@@ -45,7 +45,8 @@ final class UserPolicy
             return true;
         }
 
-        return $user->can('users.view') || $user->can('users.manage');
+        return $user->can('users.view') || $user->can('users.manage')
+            || $user->can('hrm.view') || $user->can('hrm.manage');
     }
 
     /**
@@ -64,7 +65,8 @@ final class UserPolicy
             return true;
         }
 
-        return $user->can('users.view') || $user->can('users.manage');
+        return $user->can('users.view') || $user->can('users.manage')
+            || $user->can('hrm.view') || $user->can('hrm.manage');
     }
 
     /**
@@ -78,7 +80,7 @@ final class UserPolicy
             return true;
         }
 
-        return $user->can('users.create');
+        return $user->can('users.create') || $user->can('hrm.create') || $user->can('hrm.manage');
     }
 
     /**
@@ -97,7 +99,8 @@ final class UserPolicy
             return false;
         }
 
-        return $user->can('users.update') || $user->can('users.manage');
+        return $user->can('users.update') || $user->can('users.manage')
+            || $user->can('hrm.edit') || $user->can('hrm.manage');
     }
 
     /**
@@ -121,7 +124,7 @@ final class UserPolicy
             return false;
         }
 
-        return $user->can('users.delete');
+        return $user->can('users.delete') || $user->can('hrm.delete') || $user->can('hrm.manage');
     }
 
     /**
@@ -145,6 +148,7 @@ final class UserPolicy
             return false;
         }
 
-        return $user->can('users.assign-roles') || $user->can('users.manage');
+        return $user->can('users.assign-roles') || $user->can('users.manage')
+            || $user->can('hrm.edit') || $user->can('hrm.manage');
     }
 }

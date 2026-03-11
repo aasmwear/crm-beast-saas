@@ -35,6 +35,9 @@ const props = defineProps<{
   roles: string[]
   organization?: { id: number; name: string; slug: string }
   organizationSlug?: string
+  canCreate?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
 }>()
 
 const page = usePage<PageProps>()
@@ -164,7 +167,7 @@ function removeEmployee(employee: Employee) {
           </p>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div v-if="props.canCreate !== false" class="flex items-center gap-2">
           <button
             type="button"
             @click="openAddModal"
@@ -250,7 +253,7 @@ function removeEmployee(employee: Employee) {
               <th class="px-6 py-4">Department</th>
               <th class="px-6 py-4">Status</th>
               <th class="px-6 py-4">Joined</th>
-              <th class="px-6 py-4 text-right">Actions</th>
+              <th v-if="props.canEdit !== false || props.canDelete !== false" class="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
@@ -308,9 +311,10 @@ function removeEmployee(employee: Employee) {
               <td class="px-6 py-4 text-white/60 text-xs">
                 {{ employee.joined }}
               </td>
-              <td class="px-6 py-4 text-right">
+              <td v-if="props.canEdit !== false || props.canDelete !== false" class="px-6 py-4 text-right">
                 <div class="flex items-center justify-end gap-1">
                   <button
+                    v-if="props.canEdit !== false"
                     type="button"
                     class="rounded p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition"
                     title="Edit"
@@ -326,6 +330,7 @@ function removeEmployee(employee: Employee) {
                     </svg>
                   </button>
                   <button
+                    v-if="props.canDelete !== false"
                     type="button"
                     class="rounded p-1.5 text-white/50 hover:bg-red-500/20 hover:text-red-300 transition"
                     title="Remove from organization"
@@ -345,7 +350,7 @@ function removeEmployee(employee: Employee) {
             </tr>
 
             <tr v-if="!filteredEmployees.length">
-              <td colspan="6" class="px-6 py-12 text-center text-sm text-white/50">
+              <td :colspan="(props.canEdit !== false || props.canDelete !== false) ? 6 : 5" class="px-6 py-12 text-center text-sm text-white/50">
                 <svg
                   class="mx-auto h-12 w-12 text-white/20 mb-3"
                   fill="none"
