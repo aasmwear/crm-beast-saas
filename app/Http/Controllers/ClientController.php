@@ -374,6 +374,58 @@ final class ClientController extends Controller
         });
     }
 
+    /**
+     * Export clients as CSV. Requires clients.export or clients.manage.
+     */
+    public function exportCsv(Request $request, Organization $organization): StreamedResponse
+    {
+        abort_unless(
+            $request->user()?->is_super_admin
+            || $request->user()?->can('clients.export')
+            || $request->user()?->can('clients.manage'),
+            403
+        );
+
+        $includeDeleted = $request->boolean('include_deleted');
+        $query = Client::query()->where('organization_id', (int) $organization->id);
+        if ($includeDeleted) {
+            $query->withTrashed();
+        }
+
+        return response()->stream(function () use ($query): void {
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return;
+            }
+            fputcsv($out, [
+                'id', 'company_name', 'industry', 'niche', 'primary_contact_name',
+                'primary_contact_email', 'primary_contact_phone', 'website', 'address',
+                'tags', 'fronter_id', 'closer_id', 'assigned_account_manager_id',
+                'gbp_status', 'gbp_access', 'client_activation_status',
+                'notes_sales', 'notes_cst', 'notes_tech', 'status',
+                'created_at', 'updated_at', 'deleted_at',
+            ]);
+            foreach ($query->orderBy('id')->cursor() as $client) {
+                fputcsv($out, [
+                    $client->id, $client->company_name, $client->industry, $client->niche,
+                    $client->primary_contact_name, $client->primary_contact_email,
+                    $client->primary_contact_phone, $client->website, $client->address,
+                    json_encode($client->tags), $client->fronter_id, $client->closer_id,
+                    $client->assigned_account_manager_id, $client->gbp_status, $client->gbp_access,
+                    $client->client_activation_status, $client->notes_sales, $client->notes_cst,
+                    $client->notes_tech, $client->status,
+                    optional($client->created_at)?->toDateTimeString(),
+                    optional($client->updated_at)?->toDateTimeString(),
+                    optional($client->deleted_at)?->toDateTimeString(),
+                ]);
+            }
+            fclose($out);
+        }, 200, [
+            'content-type' => 'text/csv; charset=UTF-8',
+            'content-disposition' => 'attachment; filename=clients.csv',
+        ]);
+    }
+
     public function destroy(Request $request, Organization $organization, Client $client): RedirectResponse
     {
         $this->authorize('delete', $client);

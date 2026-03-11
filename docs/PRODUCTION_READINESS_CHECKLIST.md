@@ -17,7 +17,8 @@
 - [ ] **Docs** — ENTITLEMENTS_AND_BILLING.md describes pricing model, resolution order, and webhook plan.
 - [ ] **Billing semantics stability** — Add-on modes (augment vs set), plan key canonical (subscription first, org.plan fallback), set conflict rule (highest wins).
 - [ ] **API runtime limit enforcement** — `ThrottleOrgApi` uses canonical `api_rpm` entitlement per org with safe config fallback.
-- [ ] **Storage quota read model** — `StorageUsageService` reports usage/limit/over-limit from canonical entitlements and known storage sources.
+- [x] **Storage quota read model** — `StorageUsageService` reports usage/limit/over-limit from canonical entitlements and known storage sources.
+- [x] **Storage quota enforcement** — `ProjectFileController::store` blocks uploads when projected usage would exceed `storage_gb` entitlement (422 with "Storage limit reached for your plan.").
 - [ ] **Export quota hook** — `ReportController::exportCsv` enforces `exports_per_day` limit via `DailyExportLimitService`.
 - [ ] **Tests** — ApiRpmEntitlementTest, StorageUsageServiceTest, and ExportLimitEnforcementTest pass.
 

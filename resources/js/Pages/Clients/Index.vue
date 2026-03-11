@@ -25,6 +25,9 @@ const props = defineProps<{
     search: string | null
     q: string | null
   }
+  canCreate?: boolean
+  canImport?: boolean
+  canExport?: boolean
   clients: {
     data: Array<any>
     links: Array<{
@@ -143,18 +146,21 @@ function getStatusClass(statusValue: string | null | undefined) {
           Pipeline
         </Link>
         <Link
+          v-if="canCreate !== false"
           :href="r('clients.create', { organization: org })"
           class="chip"
         >
           New Client
         </Link>
         <Link
+          v-if="canImport !== false"
           :href="r('clients.import', { organization: org })"
           class="btn-capsule text-sm"
         >
           Import CSV
         </Link>
         <Link
+          v-if="canExport !== false"
           :href="
             r('export.csv', {
               organization: org,
@@ -225,7 +231,7 @@ function getStatusClass(statusValue: string | null | undefined) {
           description="Get started by adding your first client to the CRM."
           icon="👤"
         >
-          <template #action>
+          <template v-if="canCreate !== false" #action>
             <Link
               :href="r('clients.create', { organization: org })"
               class="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition"

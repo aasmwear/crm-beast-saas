@@ -9,34 +9,32 @@ final class ProjectPolicy
 {
     public function viewAny(User $user): bool
     {
-        // Owners/Admins/PM/AM can always access Projects.
+        if ($user->is_super_admin ?? false) {
+            return true;
+        }
+
         if ($user->hasAnyRole(['Owner', 'Admin', 'PM', 'AM']) || $user->can('projects.view')) {
             return true;
         }
 
-        // Otherwise allow access only if the user has at least one visible project.
-        // This prevents the Projects module from hard-403 for team members who only
-        // participate via tasks (e.g. Tech) and don't have a privileged role.
-        $orgId = (int) $user->active_organization_id;
-
-        return Project::query()
-            ->where('organization_id', $orgId)
-            ->visibleTo($user)
-            ->exists();
+        return false;
     }
 
     public function view(User $user, Project $project): bool
     {
-        // Cross-org guard
         if ((int) $user->active_organization_id !== (int) $project->organization_id) {
             return false;
+        }
+
+        if ($user->is_super_admin ?? false) {
+            return true;
         }
 
         if ($user->hasAnyRole(['Owner', 'Admin', 'PM', 'AM']) || $user->can('projects.view')) {
             return true;
         }
 
-        // Enforce row-level visibility for direct URL access.
+        // Row-level visibility: task assignees/PMs without projects.view can view projects they belong to.
         return Project::query()
             ->whereKey($project->id)
             ->where('organization_id', (int) $project->organization_id)
@@ -46,6 +44,10 @@ final class ProjectPolicy
 
     public function create(User $user): bool
     {
+        if ($user->is_super_admin ?? false) {
+            return true;
+        }
+
         return $user->hasAnyRole(['Owner', 'Admin', 'PM']) || $user->can('projects.create');
     }
 
@@ -55,7 +57,13 @@ final class ProjectPolicy
             return false;
         }
 
-        return $user->hasAnyRole(['Owner', 'Admin', 'PM']) || $user->can('projects.update');
+        if ($user->is_super_admin ?? false) {
+            return true;
+        }
+
+        return $user->hasAnyRole(['Owner', 'Admin', 'PM'])
+            || $user->can('projects.edit')
+            || $user->can('projects.update');
     }
 
     public function delete(User $user, Project $project): bool
@@ -64,7 +72,30 @@ final class ProjectPolicy
             return false;
         }
 
+        if ($user->is_super_admin ?? false) {
+            return true;
+        }
+
         return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('projects.delete');
+    }
+
+    /**
+     * Whether the user may perform bulk or special management actions (e.g. pipeline bulk update).
+     */
+    public function manage(User $user, Project $project): bool
+    {
+        if ((int) $user->active_organization_id !== (int) $project->organization_id) {
+            return false;
+        }
+
+        if ($user->is_super_admin ?? false) {
+            return true;
+        }
+
+        return $user->hasAnyRole(['Owner', 'Admin', 'PM'])
+            || $user->can('projects.manage')
+            || $user->can('projects.edit')
+            || $user->can('projects.update');
     }
 
     /**

@@ -5,6 +5,7 @@ namespace Tests\Feature\Clients;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -16,18 +17,25 @@ class ListTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolesAndPermissionsSeeder::class);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
     protected function makeTenant(): array
     {
         /** @var Organization $org */
         $org = Organization::factory()->create(['slug' => 'acme', 'settings' => []]);
 
         /** @var User $user */
-        $user = User::factory()->create();
+        $user = User::factory()->create(['active_organization_id' => $org->id]);
         $user->organizations()->attach($org->id);
         if (method_exists($user, 'assignRole')) {
             app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
-            Role::findOrCreate('Owner', config('auth.defaults.guard', 'web'));
-            $user->assignRole('Owner');
+            $ownerRole = Role::where('name', 'Owner')->whereNull('team_id')->first();
+            $user->assignRole($ownerRole);
         }
 
         return [$org, $user];

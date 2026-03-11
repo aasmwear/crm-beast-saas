@@ -89,6 +89,9 @@ class ClientsInertiaController extends Controller
             ->paginate(10)
             ->withQueryString();
 
+        /** @var User $user */
+        $user = $request->user();
+
         return Inertia::render('Clients/Index', [
             'organizationSlug' => $organization->slug,
             'filters' => [
@@ -99,6 +102,9 @@ class ClientsInertiaController extends Controller
                 'q' => is_string($search) ? $search : null,      // alias for tests / old links
             ],
             'clients' => $clients,
+            'canCreate' => $user->can('create', Client::class),
+            'canImport' => $user->can('clients.import'),
+            'canExport' => $user->can('clients.export') || $user->can('clients.manage'),
         ]);
     }
 
@@ -160,6 +166,8 @@ class ClientsInertiaController extends Controller
         $payload = [
             'organizationSlug' => $organization->slug,
             'client' => $clientData,
+            'canEdit' => $user->can('update', $client),
+            'canDelete' => $user->can('delete', $client),
         ];
 
         if ($user->can('financials.view')) {
@@ -204,6 +212,8 @@ class ClientsInertiaController extends Controller
             'organizationSlug' => $organization->slug,
             'client' => $client,
             'users' => $users,
+            'canEdit' => request()->user()?->can('update', $client) ?? false,
+            'canDelete' => request()->user()?->can('delete', $client) ?? false,
         ]);
     }
 

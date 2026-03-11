@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DestroyRoleRequest;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRolePermissionsMatrixRequest;
 use App\Http\Requests\UpdateRolePermissionsRequest;
+use App\Http\Requests\UpdateRoleRequest;
+use App\Models\Organization;
+use App\Models\Role;
 use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 final class RolePermissionController extends Controller
@@ -59,6 +63,62 @@ final class RolePermissionController extends Controller
     }
 
     /**
+     * Update role name for the current tenant.
+     */
+    public function updateRole(UpdateRoleRequest $request, Organization $organization, Role $role): RedirectResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        $org = $organization;
+
+        if ($role->team_id !== null && (int) $role->team_id !== (int) $org->id) {
+            abort(403, 'You cannot modify roles from another organization.');
+        }
+
+        $oldName = $role->name;
+        $role->update(['name' => $request->validated('name')]);
+
+        AuditLogger::log(
+            $org,
+            $user,
+            'update',
+            'role',
+            $role->id,
+            ['name' => ['old' => $oldName, 'new' => $role->name]],
+        );
+
+        return back()->with('success', 'Role name updated.');
+    }
+
+    /**
+     * Delete a role (only if not assigned to any users).
+     */
+    public function destroy(DestroyRoleRequest $request, Organization $organization, Role $role): RedirectResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        $org = $organization;
+
+        $roleName = $role->name;
+        $roleId = $role->id;
+
+        $role->delete();
+
+        AuditLogger::log(
+            $org,
+            $user,
+            'delete',
+            'role',
+            $roleId,
+            ['name' => $roleName],
+        );
+
+        return back()->with('success', "Role \"{$roleName}\" deleted.");
+    }
+
+    /**
      * Build roles + permissions matrix payload. Shared by index() and editor().
      *
      * @param  array<string, mixed>  $extra
@@ -80,13 +140,23 @@ final class RolePermissionController extends Controller
             ->orWhereNull('team_id')
             ->orderBy('name')
             ->get(['id', 'name', 'team_id'])
-            ->map(fn ($role) => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'team_id' => $role->team_id,
-                'is_team_scoped' => $role->team_id !== null,
-                'permission_ids' => $role->permissions()->pluck('permissions.id')->toArray(),
-            ]);
+            ->map(function ($role) use ($org) {
+                $permissionIds = $role->permissions()->pluck('permissions.id')->toArray();
+                $usersCount = (int) DB::table('model_has_roles')
+                    ->where('role_id', $role->id)
+                    ->where('team_id', $org->id)
+                    ->count();
+
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'team_id' => $role->team_id,
+                    'is_team_scoped' => $role->team_id !== null,
+                    'permission_ids' => $permissionIds,
+                    'permission_count' => count($permissionIds),
+                    'users_count' => $usersCount,
+                ];
+            });
 
         $allPermissions = Permission::query()
             ->orderBy('name')
@@ -235,7 +305,7 @@ final class RolePermissionController extends Controller
         // Canonical permission names: *.view, *.create, *.update, *.delete
         $matrixTemplate = [
             'clients' => ['view' => 'clients.view', 'create' => 'clients.create', 'update' => 'clients.update', 'delete' => 'clients.delete', 'manage' => 'clients.manage'],
-            'projects' => ['view' => 'projects.view', 'create' => 'projects.create', 'update' => 'projects.update', 'delete' => 'projects.delete'],
+            'projects' => ['view' => 'projects.view', 'create' => 'projects.create', 'update' => 'projects.update', 'delete' => 'projects.delete', 'manage' => 'projects.manage'],
             'tasks' => ['view' => 'tasks.view', 'create' => 'tasks.create', 'update' => 'tasks.update', 'delete' => 'tasks.delete'],
             'attendance' => ['view' => 'attendance.view', 'manage' => 'attendance.manage'],
             'announcements' => ['view' => 'announcements.view', 'create' => 'announcements.create', 'update' => 'announcements.update', 'delete' => 'announcements.delete'],

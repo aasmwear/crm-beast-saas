@@ -31,6 +31,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'projects.edit',
             'projects.update',
             'projects.delete',
+            'projects.manage',
             'roles.manage',
             'roles.view',
             'roles.assign',

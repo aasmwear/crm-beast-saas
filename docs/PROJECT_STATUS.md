@@ -13,10 +13,10 @@
 |--------|--------|-------|
 | Architecture | ✅ | Sail/Docker, Inertia, Multi-tenant Middleware |
 | User Management | ✅ | Roles, Permissions, Team Scoping |
-| Clients | ✅ | Module complete (500 fixed: Relation type-hint in load closure) |
-| Projects | ✅ | Financials (Budget/Price) added |
+| Clients | ✅ | RBAC enforced: clients.view/create/edit/delete/manage; policy + UI hiding |
+| Projects | ✅ | RBAC enforced: projects.view/create/edit/delete/manage; policy + UI hiding |
 | Tasks | ✅ | Kanban, List, Assignees, drawer (fixed: JSON + status-based errors) |
-| Roles & Permissions UI | ✅ | Matrix layout, Quick Matrix + Advanced modes |
+| Roles & Permissions UI | ✅ | Granular Role Maker: list/create/edit/delete roles, permission matrix, select-all per module |
 | Attendance | 🟡 | Basic flow; upgrade pending (minutes, status) |
 | Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice/Settings/API Keys |
 | Reports | ✅ | Page + RBAC + export (primary_contact_email/phone) |
@@ -38,6 +38,60 @@
 ---
 
 ## Last PR Notes
+
+- **Projects module RBAC enforcement (rescue-mission):**
+  - **Goal:** Enforce permission checks for Projects CRUD using Granular Role Maker permissions.
+  - **Permissions:** projects.view (list/show/board/calendar), projects.create (create/store), projects.edit (edit/update/files/status), projects.delete (destroy), projects.manage (bulk/special).
+  - **ProjectPolicy:** viewAny, view, create, update, delete, manage — permission-based; is_super_admin bypass; projects.edit or projects.update for update.
+  - **UI:** Index passes canCreate; Show passes canEdit, canDelete, canManage; New Project/Edit/Delete/file actions hidden when lacking permission.
+  - **Sub-actions:** Board, Calendar use viewAny; file upload/delete/toggle require update; comments require view; pipeline status update requires update.
+  - **Tests:** ProjectPermissionTest — view can list/open, no view 403, create can create, no edit 403 on update, no delete 403 on destroy, no view 403 on show, no create 403 on store, no edit 403 on pipeline update.
+  - **QA checklist:**
+    1. User with only projects.view → list/board/calendar OK; New Project hidden; direct POST store → 403.
+    2. User with projects.create → New Project visible, can create.
+    3. User without projects.edit → Edit/Delete/file actions hidden on Show; PUT update → 403; pipeline status update → 403.
+    4. User without projects.delete → Delete hidden; DELETE → 403.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Clients module RBAC enforcement (rescue-mission):**
+  - **Goal:** Enforce permission checks for Clients CRUD using Granular Role Maker roles.
+  - **Permissions:** clients.view (list/show), clients.create (create/store), clients.edit (edit/update), clients.delete (destroy), clients.manage/clients.export (bulk export).
+  - **ClientPolicy:** viewAny, view, create, update, delete — permission-based; is_super_admin bypass; clients.edit or clients.update for update.
+  - **UI:** Index passes canCreate, canImport, canExport; Show/Edit pass canEdit, canDelete; buttons hidden when lacking permission.
+  - **Export:** ClientController::exportCsv added (clients.export route); requires clients.export or clients.manage.
+  - **Tests:** ClientPermissionTest — view can list, no permission 403, create can create, no edit 403 on update, no delete 403 on destroy.
+  - **QA checklist:**
+    1. User with only clients.view → list OK, Create/Import/Export hidden; direct POST create → 403.
+    2. User with clients.create → New Client visible, can create.
+    3. User without clients.edit → Edit/Delete hidden on Show; PUT update → 403.
+    4. User without clients.delete → Delete hidden; DELETE → 403.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Granular Role Maker UI (rescue-mission):**
+  - **Goal:** Tenant admins can manage roles and permissions via a full CRUD UI.
+  - **Implementation:** Role list with permission count; create/edit/delete roles; permission matrix with module groups (Clients, Projects, Tasks, Attendance, Announcements, Notifications, Activity, Settings, Billing, etc.); "Select All" per module; validation for unique name, no delete if assigned.
+  - **Backend:** `RolePermissionController` — store, updateRole (PATCH), destroy (DELETE), save (permissions); uses Spatie `syncPermissions()`, `team_id` = `organization_id`; `UpdateRoleRequest`, `DestroyRoleRequest` for validation.
+  - **Frontend:** `Roles.vue` — Edit name modal, Delete confirm modal, permission count in list; `PermissionMatrix.vue` — toggleModuleAll (Select All / Deselect All) per module.
+  - **Tests:** `RoleManagementTest` — tenant admin create/edit permissions/edit name/delete; role cannot be deleted if assigned; permissions scoped to org team; 403 without roles.manage.
+  - **Docs:** PROJECT_STATUS.md, ARCHITECTURE_GUARDRAILS.md updated.
+  - **QA checklist:**
+    1. Log in as Owner → Settings → Roles → see role list with permission counts.
+    2. Create role → name + Save → select permissions in matrix → Save → role reflects changes.
+    3. Edit role name (team-scoped only) → Save → name updates.
+    4. Delete role (not assigned) → confirm → role removed.
+    5. Try delete role assigned to user → blocked with message.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Storage quota enforcement for file uploads (rescue-mission):**
+  - **Goal:** Enforce `storage_gb` entitlement when users upload project files. Uses existing `StorageUsageService`.
+  - **Implementation:** `StorageUsageService::wouldExceedLimit(Organization $org, int $additionalBytes)` added for pre-upload validation. `ProjectFileController::store` checks before accepting upload; if `currentUsageBytes + fileSize` exceeds limit, returns 422 with "Storage limit reached for your plan."
+  - **Tests:** `StorageQuotaEnforcementTest` — upload allowed under quota, upload blocked over quota, org with larger storage_gb can upload when smaller org cannot.
+  - **Docs:** ENTITLEMENTS_AND_BILLING.md, PRODUCTION_READINESS_CHECKLIST.md, PROJECT_STATUS.md updated.
+  - **QA checklist:**
+    1. Org with 5GB limit (starter), no files → upload 1MB → success.
+    2. Org with 1GB limit, 1GB existing files → upload 1 byte → 422 "Storage limit reached for your plan."
+    3. Org with 50GB limit (pro) → upload 5MB → success when smaller org at limit would block.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
 
 - **Platform-admin webhook/billing support tooling (rescue-mission):**
   - **Goal:** READ-ONLY operational billing/webhook support tools for platform admins. No webhook replay, no Stripe mutations, no tenant-side UI changes.

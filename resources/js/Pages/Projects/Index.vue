@@ -38,6 +38,7 @@ const props = defineProps<{
   projects: ProjectCard[]
   clients: Client[]
   users: UserOption[]
+  canCreate?: boolean
 }>()
 
 const orgSlug = computed(() => props.organization?.slug ?? 'acme')
@@ -130,6 +131,7 @@ function projectUrl(project: ProjectCard): string {
           Calendar
         </a>
         <button
+          v-if="canCreate !== false"
           type="button"
           @click="openCreateModal"
           class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold bg-[var(--primary)] text-white hover:opacity-90 transition shadow-lg shadow-[var(--primary)]/20"
@@ -214,6 +216,7 @@ function projectUrl(project: ProjectCard): string {
     >
       <template #action>
         <button
+          v-if="canCreate !== false"
           type="button"
           class="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition"
           @click="openCreateModal"

@@ -292,17 +292,19 @@ This PR introduces the first practical runtime limits hooks tied to canonical en
 - If entitlement lookup fails or is missing, middleware safely falls back to `config('api.rate_limit_per_minute')`.
 - Unauthorized/invalid API key behavior remains unchanged in `AuthenticateOrganizationApiKey` (`401` before throttling).
 
-### 2) Storage quota read model (foundation)
+### 2) Storage quota read model + enforcement (live)
 
-- New canonical helper: `App\Services\Billing\StorageUsageService`.
+- Canonical helper: `App\Services\Billing\StorageUsageService`.
 - Methods:
   - `currentUsageBytes(Organization $org): int`
   - `currentUsageGb(Organization $org): float`
   - `limitGb(Organization $org): int|float`
   - `isOverLimit(Organization $org): bool`
-- Current usage source is intentionally minimal and safe:
-  - sums `project_files.size` joined through `projects.organization_id`.
-- This is the agreed hook for future upload/file enforcement in controllers.
+  - `wouldExceedLimit(Organization $org, int $additionalBytes): bool` — for pre-upload validation
+- Current usage source: sums `project_files.size` joined through `projects.organization_id`.
+- **Enforcement:** `ProjectFileController::store` checks `wouldExceedLimit` before accepting uploads. If `currentUsageBytes + fileSize` would exceed `storage_gb` entitlement, returns 422:
+  - `Storage limit reached for your plan.`
+- Limit of 0 (or missing) means unlimited; `wouldExceedLimit` returns false.
 
 ### 3) Export limit hook (proof pattern)
 

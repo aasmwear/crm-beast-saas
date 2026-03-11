@@ -31,7 +31,7 @@ final class UpdateRolePermissionsRequest extends FormRequest
     {
         return [
             'role_id' => ['required', 'integer', 'exists:roles,id'],
-            'permission_ids' => ['required', 'array'],
+            'permission_ids' => ['required', 'array'], // empty array allowed (e.g. Client role)
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ];
     }

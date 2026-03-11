@@ -16,6 +16,8 @@ interface Role {
   team_id: number | null
   is_team_scoped: boolean
   permission_ids: number[]
+  permission_count: number
+  users_count: number
 }
 
 const props = defineProps<{
@@ -37,7 +39,7 @@ const org = computed(() => {
   return i >= 0 && parts[i + 1] ? parts[i + 1] : 'acme'
 })
 
-const r = (name: string, params: Record<string, string> = {}) =>
+const r = (name: string, params: Record<string, string | number> = {}) =>
   (window as any).route ? (window as any).route(name, { ...params, organization: org.value }) : '#'
 
 // Create Role modal
@@ -46,6 +48,17 @@ const createRoleForm = useForm<{ name: string }>({ name: '' })
 const displayName = ref('')
 const slugOverride = ref('')
 const showSlugOverride = ref(false)
+
+// Edit Role modal (team-scoped only)
+const showEditModal = ref(false)
+const editRoleForm = useForm<{ name: string }>({ name: '' })
+const editDisplayName = ref('')
+const editSlugOverride = ref('')
+const editShowSlugOverride = ref(false)
+
+// Delete Role confirmation
+const showDeleteConfirm = ref(false)
+const deleteForm = useForm({})
 
 const slugFromDisplay = computed(() => toSlug(displayName.value))
 const effectiveSlug = computed(() => {
@@ -91,6 +104,84 @@ function submitCreateRole() {
     },
   })
 }
+
+const editSlugFromDisplay = computed(() => toSlug(editDisplayName.value))
+const effectiveEditSlug = computed(() => {
+  const manual = editSlugOverride.value.trim()
+  if (manual) return sanitizeSlug(manual)
+  return editSlugFromDisplay.value
+})
+
+function openEditModal() {
+  const role = selectedRole.value
+  if (!role?.is_team_scoped) return
+  editDisplayName.value = role.name.replace(/-/g, ' ')
+  editSlugOverride.value = ''
+  editShowSlugOverride.value = false
+  editRoleForm.reset()
+  editRoleForm.clearErrors()
+  showEditModal.value = true
+}
+
+function closeEditModal() {
+  showEditModal.value = false
+  editRoleForm.reset()
+  editDisplayName.value = ''
+  editSlugOverride.value = ''
+  editShowSlugOverride.value = false
+}
+
+function submitEditRole() {
+  const slug = effectiveEditSlug.value
+  if (!slug) {
+    editRoleForm.setError('name', 'Enter a role name.')
+    return
+  }
+  const role = selectedRole.value
+  if (!role) return
+  editRoleForm.name = slug
+  editRoleForm.patch(r('roles.updateRole', { role: role.id }), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeEditModal()
+      role.name = slug
+    },
+  })
+}
+
+function openDeleteConfirm() {
+  showDeleteConfirm.value = true
+}
+
+function closeDeleteConfirm() {
+  showDeleteConfirm.value = false
+}
+
+function submitDeleteRole() {
+  const role = selectedRole.value
+  if (!role || role.users_count > 0) return
+  deleteForm.delete(r('roles.destroy', { role: role.id }), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeDeleteConfirm()
+      const idx = props.roles.findIndex(r => r.id === role.id)
+      if (idx >= 0 && selectedRoleId.value === role.id) {
+        const next = props.roles[idx - 1] ?? props.roles[idx + 1]
+        selectedRoleId.value = next?.id ?? null
+      }
+    },
+  })
+}
+
+const canEditRole = computed(() => {
+  const role = selectedRole.value
+  return role?.is_team_scoped ?? false
+})
+
+const canDeleteRole = computed(() => {
+  const role = selectedRole.value
+  return role?.is_team_scoped && (role?.users_count ?? 0) === 0
+})
 
 // Mode: 'matrix' | 'advanced'
 const editorMode = ref<'matrix' | 'advanced'>('matrix')
@@ -160,6 +251,29 @@ function toggleMatrixModule(moduleKey: string) {
   if (next.has(moduleKey)) next.delete(moduleKey)
   else next.add(moduleKey)
   expandedModules.value = next
+}
+
+function getPermissionIdsForModule(moduleKey: string): number[] {
+  const catalog = props.permissionCatalog
+  if (!catalog) return []
+  const names: string[] = []
+  const matrix = catalog.matrix[moduleKey]
+  if (matrix) {
+    for (const p of Object.values(matrix)) names.push(p)
+  }
+  for (const s of catalog.specials) {
+    if (s.module === moduleKey) names.push(s.permission)
+  }
+  const nameToId: Record<string, number> = {}
+  for (const p of props.permissions) nameToId[p.name] = p.id
+  return names.map(n => nameToId[n]).filter((id): id is number => id != null)
+}
+
+function toggleMatrixModuleAll(moduleKey: string, selectAll: boolean) {
+  const ids = getPermissionIdsForModule(moduleKey)
+  const next = new Set(selectedPermissionIds.value)
+  ids.forEach(id => (selectAll ? next.add(id) : next.delete(id)))
+  selectedPermissionIds.value = next
 }
 
 function expandAllMatrix() {
@@ -425,20 +539,23 @@ const catalogSelectedCount = computed(() => {
               ]"
               @click="selectedRoleId = role.id"
             >
-              <div class="flex items-center justify-between">
-                <span class="font-medium capitalize">{{ role.name.replace(/-/g, ' ') }}</span>
-                <span
-                  v-if="role.is_team_scoped"
-                  class="text-xs px-2 py-0.5 rounded-full bg-white/10"
-                >
-                  Team
-                </span>
-                <span
-                  v-else
-                  class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300"
-                >
-                  Global
-                </span>
+              <div class="flex flex-col gap-0.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium capitalize">{{ role.name.replace(/-/g, ' ') }}</span>
+                  <span
+                    v-if="role.is_team_scoped"
+                    class="text-xs px-2 py-0.5 rounded-full bg-white/10"
+                  >
+                    Team
+                  </span>
+                  <span
+                    v-else
+                    class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300"
+                  >
+                    Global
+                  </span>
+                </div>
+                <span class="text-xs text-white/50">{{ role.permission_count }} permissions</span>
               </div>
             </button>
           </div>
@@ -454,14 +571,37 @@ const catalogSelectedCount = computed(() => {
               <h3 class="text-lg font-semibold text-white">
                 Permissions for: <span class="text-indigo-400 capitalize">{{ selectedRole?.name?.replace(/-/g, ' ') }}</span>
               </h3>
-              <p class="text-sm text-white/60 mt-1">
+              <div class="flex items-center gap-2 mt-1">
+                <p class="text-sm text-white/60">
                 <template v-if="editorMode === 'matrix'">
                   {{ catalogSelectedCount }} / {{ catalogPermissionCount }} catalog permissions
                 </template>
                 <template v-else>
                   {{ selectedRole ? Array.from(selectedPermissionIds).length : 0 }} / {{ permissions.length }} permissions
                 </template>
-              </p>
+                </p>
+                <template v-if="canEditRole">
+                  <button
+                    type="button"
+                    @click="openEditModal"
+                    class="px-2 py-1 text-xs rounded bg-gray-800 text-white/70 hover:text-white transition"
+                  >
+                    Edit name
+                  </button>
+                </template>
+                <template v-if="canDeleteRole">
+                  <button
+                    type="button"
+                    @click="openDeleteConfirm"
+                    class="px-2 py-1 text-xs rounded bg-red-900/50 text-red-300 hover:bg-red-900 transition"
+                  >
+                    Delete role
+                  </button>
+                </template>
+                <span v-else-if="selectedRole?.is_team_scoped && (selectedRole?.users_count ?? 0) > 0" class="text-xs text-amber-400">
+                  (Cannot delete: assigned to {{ selectedRole.users_count }} user(s))
+                </span>
+              </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <template v-if="editorMode === 'matrix'">
@@ -540,6 +680,7 @@ const catalogSelectedCount = computed(() => {
               :expanded-modules="expandedModules"
               @toggle="togglePermission"
               @toggle-module="toggleMatrixModule"
+              @toggle-module-all="toggleMatrixModuleAll"
             />
           </div>
 
@@ -708,6 +849,101 @@ const catalogSelectedCount = computed(() => {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Edit Role Modal -->
+    <Teleport to="body">
+      <div
+        v-show="showEditModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        aria-modal="true"
+        role="dialog"
+        aria-labelledby="edit-role-title"
+      >
+        <div
+          class="fixed inset-0 bg-black/60 backdrop-blur-sm"
+          aria-hidden="true"
+          @click="closeEditModal"
+        />
+        <div
+          class="relative w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 shadow-2xl p-6"
+          @click.stop
+        >
+          <h2 id="edit-role-title" class="text-lg font-semibold text-white mb-4">Edit Role Name</h2>
+          <form @submit.prevent="submitEditRole" class="space-y-4">
+            <div>
+              <label for="edit-role-name" class="block text-sm font-medium text-white/80 mb-1">Role Name</label>
+              <input
+                id="edit-role-name"
+                v-model="editDisplayName"
+                type="text"
+                placeholder="e.g. WordPress Developer"
+                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                :class="{ 'border-red-500': editRoleForm.errors.name }"
+              />
+              <p v-if="editRoleForm.errors.name" class="mt-1 text-sm text-red-400">
+                {{ editRoleForm.errors.name }}
+              </p>
+              <p v-if="effectiveEditSlug" class="mt-1 text-xs text-white/50">
+                Role key: <span class="font-mono text-indigo-300">{{ effectiveEditSlug }}</span>
+              </p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                @click="closeEditModal"
+                class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="editRoleForm.processing || !effectiveEditSlug"
+                class="px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {{ editRoleForm.processing ? 'Saving...' : 'Save' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Role Confirm -->
+    <Teleport to="body">
+      <div
+        v-show="showDeleteConfirm"
+        class="fixed inset-0 z-[55] flex items-center justify-center p-4"
+        aria-modal="true"
+        role="dialog"
+        aria-labelledby="delete-role-title"
+      >
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="closeDeleteConfirm" />
+        <div class="relative w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 p-6">
+          <h2 id="delete-role-title" class="text-lg font-semibold text-white mb-2">Delete Role</h2>
+          <p class="text-sm text-white/70 mb-4">
+            Are you sure you want to delete the role "{{ selectedRole?.name?.replace(/-/g, ' ') }}"?
+            This cannot be undone.
+          </p>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              @click="closeDeleteConfirm"
+              class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-gray-800 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              :disabled="deleteForm.processing"
+              @click="submitDeleteRole"
+              class="px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
+            >
+              {{ deleteForm.processing ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
         </div>
       </div>
     </Teleport>

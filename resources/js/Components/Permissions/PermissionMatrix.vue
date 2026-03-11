@@ -25,6 +25,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   toggle: [permissionId: number]
   toggleModule: [moduleKey: string]
+  toggleModuleAll: [moduleKey: string, selectAll: boolean]
   save: []
   discard: []
 }>()
@@ -87,6 +88,21 @@ function getModuleTotalCount(moduleKey: string): number {
 function isExpanded(moduleKey: string): boolean {
   return props.expandedModules?.has(moduleKey) ?? false
 }
+
+function areAllSelectedInModule(moduleKey: string): boolean {
+  const matrixPerms = getModuleMatrixPerms(moduleKey)
+  const specialPerms = getModuleSpecials(moduleKey)
+  const all = [...matrixPerms.map(p => p.permission), ...specialPerms.map(s => s.permission)]
+  if (all.length === 0) return false
+  return all.every(name => {
+    const id = nameToId.value[name]
+    return id != null && props.selectedPermissionIds.has(id)
+  })
+}
+
+function toggleModuleAll(moduleKey: string) {
+  emit('toggleModuleAll', moduleKey, !areAllSelectedInModule(moduleKey))
+}
 </script>
 
 <template>
@@ -110,7 +126,15 @@ function isExpanded(moduleKey: string): boolean {
             </p>
           </div>
         </div>
-        <svg
+        <div class="flex items-center gap-3" @click.stop>
+          <button
+            type="button"
+            class="px-2 py-1 text-xs rounded bg-gray-800 text-white/70 hover:text-white transition"
+            @click="toggleModuleAll(module.key)"
+          >
+            {{ areAllSelectedInModule(module.key) ? 'Deselect All' : 'Select All' }}
+          </button>
+          <svg
           :class="[
             'w-5 h-5 text-white/60 transition-transform',
             isExpanded(module.key) ? 'rotate-180' : ''
@@ -125,6 +149,7 @@ function isExpanded(moduleKey: string): boolean {
             stroke-linecap="round"
           />
         </svg>
+        </div>
       </div>
 
       <!-- Module body: matrix cells + specials -->

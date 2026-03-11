@@ -40,62 +40,48 @@ final class ClientPolicy
 
     public function viewAny(User $user): bool
     {
-        // Owners/Admins can always access the Clients module.
         $this->scopeTeamId($this->currentTeamId($user));
 
-        if ($user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.view')) {
-            return true;
-        }
-
-        // Otherwise, only allow access if the user has at least one visible client
-        // (prevents 403/blank module for task-only team members).
-        $orgId = $this->currentTeamId($user);
-
-        return Client::query()
-            ->forOrg($orgId)
-            ->visibleTo($user)
-            ->exists();
+        return $user->is_super_admin || $user->can('clients.view');
     }
 
     public function view(User $user, Client $client): bool
     {
-        // Cross-org guard
-        if ((int) $user->active_organization_id !== (int) $client->organization_id) {
+        if ((int) $client->organization_id !== (int) $user->active_organization_id) {
             return false;
         }
 
         $this->scopeTeamId((int) $client->organization_id);
 
-        if ($user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.view')) {
-            return true;
-        }
-
-        // Enforce row-level visibility for direct URL access.
-        return Client::query()
-            ->whereKey($client->id)
-            ->forOrg((int) $client->organization_id)
-            ->visibleTo($user)
-            ->exists();
+        return $user->is_super_admin || $user->can('clients.view');
     }
 
     public function create(User $user): bool
     {
         $this->scopeTeamId($this->currentTeamId($user));
 
-        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.create');
+        return $user->is_super_admin || $user->can('clients.create');
     }
 
     public function update(User $user, Client $client): bool
     {
+        if ((int) $client->organization_id !== (int) $user->active_organization_id) {
+            return false;
+        }
+
         $this->scopeTeamId((int) $client->organization_id);
 
-        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.update');
+        return $user->is_super_admin || $user->can('clients.edit') || $user->can('clients.update');
     }
 
     public function delete(User $user, Client $client): bool
     {
+        if ((int) $client->organization_id !== (int) $user->active_organization_id) {
+            return false;
+        }
+
         $this->scopeTeamId((int) $client->organization_id);
 
-        return $user->hasAnyRole(['Owner', 'Admin']) || $user->can('clients.delete');
+        return $user->is_super_admin || $user->can('clients.delete');
     }
 }

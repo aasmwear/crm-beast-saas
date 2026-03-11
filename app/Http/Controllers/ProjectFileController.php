@@ -6,10 +6,12 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectFile;
 use App\Services\ActivityLogger;
+use App\Services\Billing\StorageUsageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ProjectFileController extends Controller
@@ -31,6 +33,12 @@ final class ProjectFileController extends Controller
 
         /** @var \Illuminate\Http\UploadedFile $uploaded */
         $uploaded = $request->file('file');
+
+        if (app(StorageUsageService::class)->wouldExceedLimit($organization, (int) $uploaded->getSize())) {
+            throw ValidationException::withMessages([
+                'file' => ['Storage limit reached for your plan.'],
+            ]);
+        }
         $filename = $uploaded->getClientOriginalName();
         $path = $uploaded->store(
             "project_files/{$project->id}",

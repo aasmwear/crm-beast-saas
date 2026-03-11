@@ -89,6 +89,9 @@ const props = defineProps<{
   files?: ProjectFileBrief[]
   comments?: CommentBrief[]
   activities?: ActivityBrief[]
+  canEdit?: boolean
+  canDelete?: boolean
+  canManage?: boolean
 }>()
 
 const page = usePage()
@@ -351,6 +354,7 @@ function deleteFile(f: ProjectFileBrief) {
           </Link>
 
           <Link
+            v-if="canEdit !== false"
             :href="
               r('projects.edit', {
                 organization: props.organizationSlug,
@@ -363,6 +367,7 @@ function deleteFile(f: ProjectFileBrief) {
           </Link>
 
           <button
+            v-if="canDelete !== false"
             type="button"
             class="inline-flex items-center rounded-full border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/20"
             @click="destroyProject"
@@ -623,6 +628,7 @@ function deleteFile(f: ProjectFileBrief) {
 
             <!-- Drop zone -->
             <div
+              v-if="canEdit !== false"
               class="rounded-xl border-2 border-dashed transition-colors"
               :class="
                 dropzoneActive
@@ -685,6 +691,7 @@ function deleteFile(f: ProjectFileBrief) {
                     </svg>
                   </button>
                   <button
+                    v-if="canEdit !== false"
                     type="button"
                     :class="[
                       'rounded p-1.5',
@@ -701,6 +708,7 @@ function deleteFile(f: ProjectFileBrief) {
                     </svg>
                   </button>
                   <button
+                    v-if="canEdit !== false"
                     type="button"
                     class="rounded p-1.5 text-white/50 hover:bg-red-500/20 hover:text-red-400"
                     title="Delete"

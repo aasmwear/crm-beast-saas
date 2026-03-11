@@ -123,53 +123,59 @@ __VLS_2.slots.default;
     }, ...__VLS_functionalComponentArgsRest(__VLS_5));
     __VLS_7.slots.default;
     var __VLS_7;
-    const __VLS_8 = {}.Link;
-    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-    // @ts-ignore
-    const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
-        href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-        ...{ class: "chip" },
-    }));
-    const __VLS_10 = __VLS_9({
-        href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-        ...{ class: "chip" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_9));
-    __VLS_11.slots.default;
-    var __VLS_11;
-    const __VLS_12 = {}.Link;
-    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-    // @ts-ignore
-    const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
-        href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
-        ...{ class: "btn-capsule text-sm" },
-    }));
-    const __VLS_14 = __VLS_13({
-        href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
-        ...{ class: "btn-capsule text-sm" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_13));
-    __VLS_15.slots.default;
-    var __VLS_15;
-    const __VLS_16 = {}.Link;
-    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-    // @ts-ignore
-    const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
-        href: (__VLS_ctx.r('export.csv', {
-            organization: __VLS_ctx.org,
-            entity: 'clients',
-            include_deleted: 1,
-        })),
-        ...{ class: "btn-capsule text-sm" },
-    }));
-    const __VLS_18 = __VLS_17({
-        href: (__VLS_ctx.r('export.csv', {
-            organization: __VLS_ctx.org,
-            entity: 'clients',
-            include_deleted: 1,
-        })),
-        ...{ class: "btn-capsule text-sm" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_17));
-    __VLS_19.slots.default;
-    var __VLS_19;
+    if (__VLS_ctx.canCreate !== false) {
+        const __VLS_8 = {}.Link;
+        /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+        // @ts-ignore
+        const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+            href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+            ...{ class: "chip" },
+        }));
+        const __VLS_10 = __VLS_9({
+            href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+            ...{ class: "chip" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+        __VLS_11.slots.default;
+        var __VLS_11;
+    }
+    if (__VLS_ctx.canImport !== false) {
+        const __VLS_12 = {}.Link;
+        /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+        // @ts-ignore
+        const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
+            href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
+            ...{ class: "btn-capsule text-sm" },
+        }));
+        const __VLS_14 = __VLS_13({
+            href: (__VLS_ctx.r('clients.import', { organization: __VLS_ctx.org })),
+            ...{ class: "btn-capsule text-sm" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_13));
+        __VLS_15.slots.default;
+        var __VLS_15;
+    }
+    if (__VLS_ctx.canExport !== false) {
+        const __VLS_16 = {}.Link;
+        /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+        // @ts-ignore
+        const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
+            href: (__VLS_ctx.r('export.csv', {
+                organization: __VLS_ctx.org,
+                entity: 'clients',
+                include_deleted: 1,
+            })),
+            ...{ class: "btn-capsule text-sm" },
+        }));
+        const __VLS_18 = __VLS_17({
+            href: (__VLS_ctx.r('export.csv', {
+                organization: __VLS_ctx.org,
+                entity: 'clients',
+                include_deleted: 1,
+            })),
+            ...{ class: "btn-capsule text-sm" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_17));
+        __VLS_19.slots.default;
+        var __VLS_19;
+    }
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "space-y-4" },
@@ -234,33 +240,35 @@ if (!props.clients.data.length) {
         icon: "👤",
     }, ...__VLS_functionalComponentArgsRest(__VLS_20));
     __VLS_22.slots.default;
-    {
-        const { action: __VLS_thisSlot } = __VLS_22.slots;
-        const __VLS_23 = {}.Link;
-        /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-        // @ts-ignore
-        const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
-            href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-            ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
-        }));
-        const __VLS_25 = __VLS_24({
-            href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
-            ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_24));
-        __VLS_26.slots.default;
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.svg, __VLS_intrinsicElements.svg)({
-            ...{ class: "w-5 h-5" },
-            fill: "none",
-            stroke: "currentColor",
-            viewBox: "0 0 24 24",
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.path)({
-            'stroke-linecap': "round",
-            'stroke-linejoin': "round",
-            'stroke-width': "2",
-            d: "M12 4v16m8-8H4",
-        });
-        var __VLS_26;
+    if (__VLS_ctx.canCreate !== false) {
+        {
+            const { action: __VLS_thisSlot } = __VLS_22.slots;
+            const __VLS_23 = {}.Link;
+            /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+            // @ts-ignore
+            const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
+                href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+                ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
+            }));
+            const __VLS_25 = __VLS_24({
+                href: (__VLS_ctx.r('clients.create', { organization: __VLS_ctx.org })),
+                ...{ class: "inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 hover:opacity-90 transition" },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_24));
+            __VLS_26.slots.default;
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.svg, __VLS_intrinsicElements.svg)({
+                ...{ class: "w-5 h-5" },
+                fill: "none",
+                stroke: "currentColor",
+                viewBox: "0 0 24 24",
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.path)({
+                'stroke-linecap': "round",
+                'stroke-linejoin': "round",
+                'stroke-width': "2",
+                d: "M12 4v16m8-8H4",
+            });
+            var __VLS_26;
+        }
     }
     var __VLS_22;
 }

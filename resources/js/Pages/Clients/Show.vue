@@ -78,6 +78,8 @@ const props = defineProps<{
   client: ClientPayload
   organizationSlug: string
   financial_summary?: FinancialSummary
+  canEdit?: boolean
+  canDelete?: boolean
 }>()
 
 type TabId = 'overview' | 'projects' | 'contacts' | 'notes'
@@ -295,12 +297,14 @@ function formatMoney(cents: number, currency: string) {
           ← Clients
         </Link>
         <Link
+          v-if="canEdit !== false"
           :href="r('clients.edit', { organization: organizationSlug, client: client.id })"
           class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
         >
           Edit
         </Link>
         <button
+          v-if="canDelete !== false"
           type="button"
           class="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/20"
           @click="destroyClient"
@@ -480,21 +484,21 @@ function formatMoney(cents: number, currency: string) {
             <div class="rounded-xl border border-white/10 bg-slate-900/60 p-3">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-[11px] font-semibold uppercase tracking-wide text-white/60">Sales</h3>
-                <button type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_sales')">Edit</button>
+                <button v-if="canEdit !== false" type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_sales')">Edit</button>
               </div>
               <p class="text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]">{{ client.notes_sales || 'No notes yet' }}</p>
             </div>
             <div class="rounded-xl border border-white/10 bg-slate-900/60 p-3">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-[11px] font-semibold uppercase tracking-wide text-white/60">CST</h3>
-                <button type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_cst')">Edit</button>
+                <button v-if="canEdit !== false" type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_cst')">Edit</button>
               </div>
               <p class="text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]">{{ client.notes_cst || 'No notes yet' }}</p>
             </div>
             <div class="rounded-xl border border-white/10 bg-slate-900/60 p-3">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-[11px] font-semibold uppercase tracking-wide text-white/60">Tech</h3>
-                <button type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_tech')">Edit</button>
+                <button v-if="canEdit !== false" type="button" class="text-xs font-medium text-indigo-300 hover:text-indigo-200" @click="openNotesEditor('notes_tech')">Edit</button>
               </div>
               <p class="text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]">{{ client.notes_tech || 'No notes yet' }}</p>
             </div>

@@ -96,6 +96,7 @@ final class ProjectController extends Controller
             'projects' => $projects,
             'clients' => $clients,
             'users' => $users,
+            'canCreate' => $user->can('create', Project::class),
         ]);
     }
 
@@ -182,6 +183,9 @@ final class ProjectController extends Controller
             'files' => $files,
             'comments' => $comments,
             'activities' => $activities,
+            'canEdit' => $user->can('update', $project),
+            'canDelete' => $user->can('delete', $project),
+            'canManage' => $user->can('manage', $project),
         ]);
     }
 

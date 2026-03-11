@@ -406,6 +406,8 @@ Route::prefix('org/{organization:slug}')
         Route::get('/settings/roles', [RolePermissionController::class, 'index'])->name('roles.index');
         Route::post('/settings/roles', [RolePermissionController::class, 'store'])->name('roles.store');
         Route::put('/settings/roles', [RolePermissionController::class, 'update'])->name('roles.update');
+        Route::patch('/settings/roles/{role}', [RolePermissionController::class, 'updateRole'])->name('roles.updateRole');
+        Route::delete('/settings/roles/{role}', [RolePermissionController::class, 'destroy'])->name('roles.destroy');
         Route::post('/roles-permissions/save', [RolePermissionController::class, 'save'])->name('roles.save');
 
         /*

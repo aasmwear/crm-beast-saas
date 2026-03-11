@@ -225,24 +225,28 @@ __VLS_2.slots.default;
     }, ...__VLS_functionalComponentArgsRest(__VLS_5));
     __VLS_7.slots.default;
     var __VLS_7;
-    const __VLS_8 = {}.Link;
-    /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
-    // @ts-ignore
-    const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
-        href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
-        ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
-    }));
-    const __VLS_10 = __VLS_9({
-        href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
-        ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_9));
-    __VLS_11.slots.default;
-    var __VLS_11;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.destroyClient) },
-        type: "button",
-        ...{ class: "rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/20" },
-    });
+    if (__VLS_ctx.canEdit !== false) {
+        const __VLS_8 = {}.Link;
+        /** @type {[typeof __VLS_components.Link, typeof __VLS_components.Link, ]} */ ;
+        // @ts-ignore
+        const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+            href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
+            ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
+        }));
+        const __VLS_10 = __VLS_9({
+            href: (__VLS_ctx.r('clients.edit', { organization: __VLS_ctx.organizationSlug, client: __VLS_ctx.client.id })),
+            ...{ class: "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+        __VLS_11.slots.default;
+        var __VLS_11;
+    }
+    if (__VLS_ctx.canDelete !== false) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.destroyClient) },
+            type: "button",
+            ...{ class: "rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/20" },
+        });
+    }
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8" },
@@ -669,13 +673,17 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({
     ...{ class: "text-[11px] font-semibold uppercase tracking-wide text-white/60" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.openNotesEditor('notes_sales');
-        } },
-    type: "button",
-    ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
-});
+if (__VLS_ctx.canEdit !== false) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.canEdit !== false))
+                    return;
+                __VLS_ctx.openNotesEditor('notes_sales');
+            } },
+        type: "button",
+        ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]" },
 });
@@ -689,13 +697,17 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({
     ...{ class: "text-[11px] font-semibold uppercase tracking-wide text-white/60" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.openNotesEditor('notes_cst');
-        } },
-    type: "button",
-    ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
-});
+if (__VLS_ctx.canEdit !== false) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.canEdit !== false))
+                    return;
+                __VLS_ctx.openNotesEditor('notes_cst');
+            } },
+        type: "button",
+        ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]" },
 });
@@ -709,13 +721,17 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({
     ...{ class: "text-[11px] font-semibold uppercase tracking-wide text-white/60" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.openNotesEditor('notes_tech');
-        } },
-    type: "button",
-    ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
-});
+if (__VLS_ctx.canEdit !== false) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.canEdit !== false))
+                    return;
+                __VLS_ctx.openNotesEditor('notes_tech');
+            } },
+        type: "button",
+        ...{ class: "text-xs font-medium text-indigo-300 hover:text-indigo-200" },
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "text-xs text-white/70 whitespace-pre-wrap min-h-[3rem]" },
 });

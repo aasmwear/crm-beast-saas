@@ -49,4 +49,21 @@ final class StorageUsageService
 
         return $this->currentUsageBytes($org) > (int) round($limitGb * self::BYTES_PER_GB);
     }
+
+    /**
+     * Whether adding the given number of bytes would exceed the org's storage limit.
+     * Used for pre-upload validation; limit of 0 means unlimited (returns false).
+     */
+    public function wouldExceedLimit(Organization $org, int $additionalBytes): bool
+    {
+        $limitGb = (float) $this->limitGb($org);
+        if ($limitGb <= 0) {
+            return false;
+        }
+
+        $limitBytes = (int) round($limitGb * self::BYTES_PER_GB);
+        $projectedUsage = $this->currentUsageBytes($org) + $additionalBytes;
+
+        return $projectedUsage > $limitBytes;
+    }
 }
