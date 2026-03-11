@@ -186,6 +186,7 @@ final class ProjectController extends Controller
             'canEdit' => $user->can('update', $project),
             'canDelete' => $user->can('delete', $project),
             'canManage' => $user->can('manage', $project),
+            'canCreateTask' => $user->can('create', \App\Models\Task::class),
         ]);
     }
 

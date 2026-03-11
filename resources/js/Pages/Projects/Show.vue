@@ -92,6 +92,7 @@ const props = defineProps<{
   canEdit?: boolean
   canDelete?: boolean
   canManage?: boolean
+  canCreateTask?: boolean
 }>()
 
 const page = usePage()
@@ -517,6 +518,7 @@ function deleteFile(f: ProjectFileBrief) {
 
             <!-- Quick add task -->
             <div
+              v-if="canCreateTask !== false"
               class="mt-4 rounded-xl border border-dashed border-white/15 bg-slate-900/60 p-3"
             >
               <h3

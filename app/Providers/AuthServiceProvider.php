@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\Attendance;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Policies\AttendancePolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\ProjectPolicy;
@@ -22,6 +24,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
+        Attendance::class => AttendancePolicy::class,
         Project::class => ProjectPolicy::class,
         Client::class => ClientPolicy::class,
         Invoice::class => InvoicePolicy::class,

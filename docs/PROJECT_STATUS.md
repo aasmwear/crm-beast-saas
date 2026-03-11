@@ -15,9 +15,9 @@
 | User Management | ✅ | Roles, Permissions, Team Scoping |
 | Clients | ✅ | RBAC enforced: clients.view/create/edit/delete/manage; policy + UI hiding |
 | Projects | ✅ | RBAC enforced: projects.view/create/edit/delete/manage; policy + UI hiding |
-| Tasks | ✅ | Kanban, List, Assignees, drawer (fixed: JSON + status-based errors) |
+| Tasks | ✅ | RBAC enforced: tasks.view/create/edit/delete/manage/review; policy + UI hiding |
 | Roles & Permissions UI | ✅ | Granular Role Maker: list/create/edit/delete roles, permission matrix, select-all per module |
-| Attendance | 🟡 | Basic flow; upgrade pending (minutes, status) |
+| Attendance | ✅ | RBAC enforced: attendance.view/create/edit/delete/manage; policy + UI hiding; delete supported |
 | Audit Logs | ✅ | activity.view RBAC; AuditLogger for Clients/Projects/Tasks/Attendance/Announcements/Import/Invoice/Settings/API Keys |
 | Reports | ✅ | Page + RBAC + export (primary_contact_email/phone) |
 | Notifications | 🟡 | Works; no RBAC |
@@ -38,6 +38,36 @@
 ---
 
 ## Last PR Notes
+
+- **Attendance module RBAC enforcement (rescue-mission):**
+  - **Goal:** Harden Attendance module with clear RBAC enforcement and workflow safety.
+  - **Permissions:** attendance.view (index/history), attendance.create (clock in/out), attendance.edit (update status/notes), attendance.delete (destroy), attendance.manage (approve, bulk). Legacy: attendance.view-own, attendance.clock-in, attendance.clock-out, attendance.approve.
+  - **AttendancePolicy:** viewAny, view, clockIn, clockOut, approve, update, delete — permission-based; is_super_admin bypass; attendance.create OR clock-in/clock-out for create path; attendance.edit OR manage for update; attendance.delete OR manage for delete.
+  - **Workflow:** Normal employee can only create/update own via clock in/out; HR/admin with attendance.edit or manage can edit others; users with only view-own cannot filter by other users.
+  - **Controller:** index passes canCreate, canEdit, canDelete, canManage, canViewAll; user filter restricted when !canViewAll; destroy() added with scopeBindings.
+  - **UI:** Clock in/out hidden when !canCreate; Edit/Approve/Delete hidden by permission; user filter hidden when !canViewAll.
+  - **Tests:** AttendancePermissionTest — view can list, view-own can list, no view 403, create can clock in, clock-in/out backward compat, no create 403 on clock in/out, normal user cannot edit others, HR with edit can edit others, no delete 403, HR with manage can delete, cross-tenant 404.
+  - **QA checklist:**
+    1. User with only attendance.view-own → own records only; no user filter; clock in/out if has create/clock-in/clock-out.
+    2. User with attendance.view → user filter visible; can filter by any org user.
+    3. User without attendance.create → clock in/out hidden; POST clockIn/clockOut → 403.
+    4. User without attendance.edit → Edit hidden; PATCH update → 403.
+    5. User with attendance.manage → Approve visible on closed records; Delete visible.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Tasks module RBAC enforcement (rescue-mission):**
+  - **Goal:** Enforce permission checks for Tasks CRUD using Granular Role Maker permissions.
+  - **Permissions:** tasks.view (list/board/show), tasks.create (store), tasks.edit (update/move/submit/review), tasks.delete (destroy), tasks.manage (bulk/special), tasks.review (review submitted tasks).
+  - **TaskPolicy:** viewAny, view, create, update, delete, submit, review, manage — permission-based; is_super_admin bypass; tasks.edit or tasks.update for update/submit; tasks.review for review.
+  - **UI:** Index passes canCreate; Projects/Show passes canCreateTask; TaskDrawer gets can_update/can_submit/can_review/can_delete from API; Board passes can_update per task.
+  - **Sub-actions:** submit and review require tasks.edit/tasks.update or tasks.review; move/status via update.
+  - **Tests:** TaskPermissionTest — view can list/board, no view 403, create can create, no edit 403 on update/submit/review, no delete 403 on destroy, no view 403 on show, no create 403 on store.
+  - **QA checklist:**
+    1. User with only tasks.view → list/board OK; New Task, quick-add hidden; direct POST store → 403.
+    2. User with tasks.create → New Task visible, quick-add on Projects/Show.
+    3. User without tasks.edit → Update/move/submit/review disabled in drawer/board; PUT update, POST submit/review → 403.
+    4. User without tasks.delete → Delete hidden in drawer; DELETE → 403.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
 
 - **Projects module RBAC enforcement (rescue-mission):**
   - **Goal:** Enforce permission checks for Projects CRUD using Granular Role Maker permissions.

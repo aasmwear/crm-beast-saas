@@ -22,7 +22,7 @@
 | users       | ✓    | ✓      | ✓      | ✓      | ✓     | assign-roles                       |
 | departments | ✓    | ✓      | ✓      | ✓      | —     | —                                  |
 | announcements | ✓  | ✓      | ✓      | ✓      | —     | pin                                |
-| attendance  | ✓    | —      | —      | —      | ✓     | view-own, clock-in, clock-out, approve |
+| attendance  | ✓    | ✓      | ✓      | ✓      | ✓     | view-own, clock-in, clock-out, approve |
 | reports     | ✓    | —      | —      | —      | —     | export                             |
 | activity    | ✓    | —      | —      | —      | —     | —                                  |
 | roles       | ✓    | —      | —      | —      | ✓     | assign                             |
@@ -129,6 +129,22 @@ php artisan permissions:reconcile --assign --dry-run
 
 - **Billing:** Owner-only by default (Owner/Super Admin get all permissions). Manager/Employee do not get billing.view, billing.manage, or billing.update.
 - **Settings update:** Manager and Owner get `settings.update`; Employee gets `settings.view` only.
+
+## Attendance Permissions
+
+| Permission       | Enforced in                         | Description                                    |
+|------------------|-------------------------------------|------------------------------------------------|
+| `attendance.view`| AttendanceController::index         | View attendance index and all users' history   |
+| `attendance.view-own` | AttendanceController::index      | View own attendance only (no user filter)     |
+| `attendance.create` | clockIn, clockOut                 | Clock in / clock out (create/update own)       |
+| `attendance.edit` | AttendanceController::update        | Edit status and notes (HR corrections)        |
+| `attendance.delete` | AttendanceController::destroy     | Delete attendance records (soft delete)       |
+| `attendance.manage` | update, approve, destroy           | Admin/HR: edit, approve, delete any record     |
+| `attendance.clock-in`, `attendance.clock-out` | Legacy, backward compat | Alternative to attendance.create         |
+| `attendance.approve` | AttendanceController::approve     | Approve attendance (legacy)                   |
+
+- **Employee:** view-own, create (or clock-in/clock-out); can clock in/out; cannot edit others or delete.
+- **Manager/HR:** view, edit, manage (or approve); can view all, edit status/notes, approve, delete.
 
 ---
 

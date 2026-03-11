@@ -306,8 +306,8 @@ final class RolePermissionController extends Controller
         $matrixTemplate = [
             'clients' => ['view' => 'clients.view', 'create' => 'clients.create', 'update' => 'clients.update', 'delete' => 'clients.delete', 'manage' => 'clients.manage'],
             'projects' => ['view' => 'projects.view', 'create' => 'projects.create', 'update' => 'projects.update', 'delete' => 'projects.delete', 'manage' => 'projects.manage'],
-            'tasks' => ['view' => 'tasks.view', 'create' => 'tasks.create', 'update' => 'tasks.update', 'delete' => 'tasks.delete'],
-            'attendance' => ['view' => 'attendance.view', 'manage' => 'attendance.manage'],
+            'tasks' => ['view' => 'tasks.view', 'create' => 'tasks.create', 'update' => 'tasks.update', 'delete' => 'tasks.delete', 'manage' => 'tasks.manage'],
+            'attendance' => ['view' => 'attendance.view', 'create' => 'attendance.create', 'update' => 'attendance.edit', 'delete' => 'attendance.delete', 'manage' => 'attendance.manage'],
             'announcements' => ['view' => 'announcements.view', 'create' => 'announcements.create', 'update' => 'announcements.update', 'delete' => 'announcements.delete'],
             'notifications' => ['view' => 'notifications.view', 'update' => 'notifications.update'],
             'activity' => ['view' => 'activity.view'],

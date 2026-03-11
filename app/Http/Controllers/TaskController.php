@@ -105,6 +105,7 @@ final class TaskController extends Controller
             'tasks' => $tasks,
             'filters' => $filters,
             'projects' => $projects,
+            'canCreate' => $user->can('create', Task::class),
         ]);
     }
 
@@ -226,6 +227,7 @@ final class TaskController extends Controller
             'can_update' => $user->can('update', $task),
             'can_submit' => $user->can('submit', $task),
             'can_review' => $user->can('review', $task),
+            'can_delete' => $user->can('delete', $task),
         ]);
     }
 
@@ -420,25 +422,22 @@ final class TaskController extends Controller
     /**
      * Soft-delete a task.
      */
-    public function destroy(Request $request, Task $task): RedirectResponse
+    public function destroy(Request $request, Organization $organization, Task $task): RedirectResponse
     {
         $this->authorize('delete', $task);
 
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
-
-        if ((int) $task->organization_id !== (int) $org->id) {
+        if ((int) $task->organization_id !== (int) $organization->id) {
             abort(404);
         }
 
-        return DB::transaction(function () use ($task, $org, $request): RedirectResponse {
+        return DB::transaction(function () use ($task, $organization, $request): RedirectResponse {
             $before = $task->getAttributes();
             $taskId = (int) $task->id;
 
             $task->delete();
 
             AuditLogger::log(
-                $org,
+                $organization,
                 $request->user(),
                 'deleted',
                 'task',
@@ -453,14 +452,11 @@ final class TaskController extends Controller
     /**
      * Submit a task for review.
      */
-    public function submit(Request $request, Task $task): RedirectResponse
+    public function submit(Request $request, Organization $organization, Task $task): RedirectResponse
     {
         $this->authorize('submit', $task);
 
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
-
-        if ((int) $task->organization_id !== (int) $org->id) {
+        if ((int) $task->organization_id !== (int) $organization->id) {
             abort(404);
         }
 
@@ -470,7 +466,7 @@ final class TaskController extends Controller
             'submission_files' => 'nullable|array',
         ]);
 
-        return DB::transaction(function () use ($task, $data, $org, $request): RedirectResponse {
+        return DB::transaction(function () use ($task, $data, $organization, $request): RedirectResponse {
             $before = $task->getAttributes();
 
             $update = [
@@ -491,7 +487,7 @@ final class TaskController extends Controller
             $after = $task->getAttributes();
 
             AuditLogger::log(
-                $org,
+                $organization,
                 $request->user(),
                 'submitted',
                 'task',
@@ -509,14 +505,11 @@ final class TaskController extends Controller
     /**
      * Review a submitted task (approve, request changes, reject).
      */
-    public function review(Request $request, Task $task): RedirectResponse
+    public function review(Request $request, Organization $organization, Task $task): RedirectResponse
     {
         $this->authorize('review', $task);
 
-        /** @var \App\Models\Organization $org */
-        $org = $request->route('organization');
-
-        if ((int) $task->organization_id !== (int) $org->id) {
+        if ((int) $task->organization_id !== (int) $organization->id) {
             abort(404);
         }
 
@@ -528,7 +521,7 @@ final class TaskController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return DB::transaction(function () use ($task, $data, $org, $user): RedirectResponse {
+        return DB::transaction(function () use ($task, $data, $organization, $user): RedirectResponse {
             $before = $task->getAttributes();
 
             $update = [
@@ -560,7 +553,7 @@ final class TaskController extends Controller
             }
 
             AuditLogger::log(
-                $org,
+                $organization,
                 $user,
                 'reviewed',
                 'task',

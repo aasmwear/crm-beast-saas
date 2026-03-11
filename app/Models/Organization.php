@@ -118,6 +118,14 @@ class Organization extends Model
     }
 
     /**
+     * @return HasMany<\App\Models\Attendance, \App\Models\Organization>
+     */
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    /**
      * @return BelongsToMany<\App\Models\User, \App\Models\Organization, \Illuminate\Database\Eloquent\Relations\Pivot, 'pivot'>
      */
     public function users(): BelongsToMany

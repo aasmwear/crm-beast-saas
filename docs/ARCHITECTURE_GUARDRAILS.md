@@ -21,6 +21,8 @@
 - **Permission checks:** Use `$user->can('permission.name')` or policy `$this->authorize()` with tenant context set
 - **Clients module:** clients.view (list/show), clients.create, clients.edit (edit/update), clients.delete, clients.manage/clients.export (bulk)
 - **Projects module:** projects.view (list/show/board/calendar), projects.create, projects.edit (edit/update/status/files), projects.delete, projects.manage (bulk/special)
+- **Tasks module:** tasks.view (list/board/show), tasks.create, tasks.edit (edit/update/move/submit/review), tasks.delete, tasks.manage (bulk/special), tasks.review (review submitted tasks)
+- **Attendance module:** attendance.view (index/history), attendance.create (clock in/out), attendance.edit (update status/notes), attendance.delete (destroy), attendance.manage (approve, bulk); legacy: view-own, clock-in, clock-out, approve
 - **Granular Role Maker:** Tenant admins with `roles.manage` can:
   - View, create, edit, delete (team-scoped) roles
   - Assign permissions via permission matrix UI

@@ -346,8 +346,9 @@ Route::prefix('org/{organization:slug}')
             Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
             Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clockIn');
             Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clockOut');
-            Route::post('/attendance/{attendance}/approve', [AttendanceController::class, 'approve'])->name('attendance.approve');
-            Route::patch('/attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update');
+            Route::post('/attendance/{attendance}/approve', [AttendanceController::class, 'approve'])->name('attendance.approve')->scopeBindings();
+            Route::patch('/attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update')->scopeBindings();
+            Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy'])->name('attendance.destroy')->scopeBindings();
         });
 
         /*

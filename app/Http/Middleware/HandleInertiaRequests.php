@@ -125,7 +125,7 @@ class HandleInertiaRequests extends Middleware
     private function resolveCan(Request $request, $user): array
     {
         if (! $user || ! method_exists($user, 'can')) {
-            return ['activity' => false, 'reports' => false];
+            return ['activity' => false, 'reports' => false, 'attendance' => false];
         }
 
         $org = $request->route('organization');
@@ -145,6 +145,7 @@ class HandleInertiaRequests extends Middleware
         return [
             'activity' => (bool) $user->can('activity.view'),
             'reports' => (bool) $user->can('reports.view'),
+            'attendance' => (bool) ($user->can('attendance.view') || $user->can('attendance.view-own')),
         ];
     }
 }

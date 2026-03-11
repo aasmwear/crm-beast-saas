@@ -24,12 +24,23 @@ final class AttendanceController extends Controller
         $organization = $request->route('organization');
         $user = $request->user();
 
+        $canViewAll = $user !== null && $user->can('attendance.view');
+        $canCreate = $user !== null && ($user->can('attendance.create') || $user->can('attendance.clock-in') || $user->can('attendance.clock-out'));
+        $canEdit = $user !== null && ($user->can('attendance.edit') || $user->can('attendance.manage'));
+        $canDelete = $user !== null && ($user->can('attendance.delete') || $user->can('attendance.manage'));
+        $canManage = $user !== null && ($user->can('attendance.manage') || $user->can('attendance.approve'));
+
         $filters = [
             'user_id' => $request->query('user_id'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
             'status' => $request->query('status'),
         ];
+
+        // Users with only view-own cannot filter by another user; enforce self.
+        if (! $canViewAll && $user !== null && ! empty($filters['user_id']) && (int) $filters['user_id'] !== (int) $user->id) {
+            $filters['user_id'] = (string) $user->id;
+        }
 
         $query = Attendance::query()
             ->select([
@@ -97,11 +108,19 @@ final class AttendanceController extends Controller
             ->orderBy('users.name')
             ->get();
 
+        // Only expose user filter when user can view all attendance.
+        $users = $canViewAll ? $users : collect();
+
         return Inertia::render('Attendance/Index', [
             'attendance' => $attendance,
             'current' => $current,
             'filters' => $filters,
             'users' => $users,
+            'canCreate' => $canCreate,
+            'canEdit' => $canEdit,
+            'canDelete' => $canDelete,
+            'canManage' => $canManage,
+            'canViewAll' => $canViewAll,
         ]);
     }
 
@@ -306,5 +325,31 @@ final class AttendanceController extends Controller
         );
 
         return back()->with('success', 'Attendance updated.');
+    }
+
+    /**
+     * Delete an attendance record (soft delete).
+     */
+    public function destroy(Request $request, Organization $organization, Attendance $attendance): RedirectResponse
+    {
+        if ((int) $attendance->organization_id !== (int) $organization->id) {
+            abort(404);
+        }
+
+        $this->authorize('delete', $attendance);
+
+        $before = $attendance->getAttributes();
+        $attendance->delete();
+
+        AuditLogger::log(
+            $organization,
+            $request->user(),
+            'deleted',
+            'attendance',
+            (int) $attendance->id,
+            ['before' => $before],
+        );
+
+        return back()->with('success', 'Attendance record deleted.');
     }
 }

@@ -43,6 +43,11 @@ const props = defineProps<{
   current: AttendanceRecord | null
   filters?: AttendanceFilters
   users?: SimpleUser[]
+  canCreate?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
+  canManage?: boolean
+  canViewAll?: boolean
 }>()
 
 // Ziggy wrapper
@@ -204,6 +209,22 @@ function saveEdit() {
     },
   )
 }
+
+function approveRecord(record: AttendanceRecord) {
+  router.post(
+    r('attendance.approve', { organization: org.value, attendance: record.id }),
+    {},
+    { preserveScroll: true },
+  )
+}
+
+function deleteRecord(record: AttendanceRecord) {
+  if (!confirm('Delete this attendance record? This cannot be undone.')) return
+  router.delete(
+    r('attendance.destroy', { organization: org.value, attendance: record.id }),
+    { preserveScroll: true },
+  )
+}
 </script>
 
 <template>
@@ -215,7 +236,7 @@ function saveEdit() {
     }"
   >
     <template #header-actions>
-      <div class="flex items-center gap-3">
+      <div v-if="props.canCreate !== false" class="flex items-center gap-3">
         <button
           v-if="!props.current"
           type="button"
@@ -301,8 +322,8 @@ function saveEdit() {
         </div>
 
         <div class="flex flex-wrap items-center gap-2 text-xs text-white/60">
-          <!-- User filter -->
-          <div class="flex items-center gap-2">
+          <!-- User filter (HR/Admin only) -->
+          <div v-if="props.canViewAll" class="flex items-center gap-2">
             <span class="hidden sm:inline">User</span>
             <select
               v-model="selectedUserId"
@@ -398,7 +419,7 @@ function saveEdit() {
               <th class="px-4 py-3">
                 Notes
               </th>
-              <th class="px-4 py-3 text-right">
+              <th v-if="props.canEdit || props.canManage || props.canDelete" class="px-4 py-3 text-right">
                 Actions
               </th>
             </tr>
@@ -439,19 +460,38 @@ function saveEdit() {
                   —
                 </span>
               </td>
-              <td class="px-4 py-3 align-top text-right">
-                <button
-                  type="button"
-                  class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-3 py-1 text-[11px] font-medium text-white hover:bg-white/10"
-                  @click="openEdit(row)"
-                >
-                  Edit
-                </button>
+              <td v-if="props.canEdit || props.canManage || props.canDelete" class="px-4 py-3 align-top text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button
+                    v-if="props.canManage && row.status === 'closed'"
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20"
+                    @click="approveRecord(row)"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    v-if="props.canEdit"
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-3 py-1 text-[11px] font-medium text-white hover:bg-white/10"
+                    @click="openEdit(row)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    v-if="props.canDelete"
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1 text-[11px] font-medium text-rose-200 hover:bg-rose-500/20"
+                    @click="deleteRecord(row)"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
 
             <tr v-if="!props.attendance.data.length">
-              <td colspan="7" class="px-4 py-10 text-center text-sm text-white/50">
+              <td :colspan="(props.canEdit || props.canManage || props.canDelete) ? 7 : 6" class="px-4 py-10 text-center text-sm text-white/50">
                 No attendance records yet. As you check in and out, your history will appear here.
               </td>
             </tr>

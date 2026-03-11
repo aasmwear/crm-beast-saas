@@ -40,6 +40,7 @@ type TaskPayload = {
   can_update?: boolean
   can_submit?: boolean
   can_review?: boolean
+  can_delete?: boolean
 }
 
 const props = withDefaults(
@@ -100,6 +101,7 @@ const priorityOptions = ['', 'Low', 'Medium', 'High', 'Urgent']
 const canUpdate = computed(() => !!task.value?.can_update)
 const canSubmit = computed(() => !!task.value?.can_submit)
 const canReview = computed(() => !!task.value?.can_review)
+const canDelete = computed(() => !!task.value?.can_delete)
 
 const normalizedComments = computed<TaskComment[]>(() => {
   const raw = task.value?.comments
@@ -298,6 +300,25 @@ function submitForReview() {
   )
 }
 
+function deleteTask() {
+  if (!task.value) return
+  if (!canDelete.value) return
+  if (!confirm('Are you sure you want to delete this task? This cannot be undone.')) return
+
+  router.delete(
+    r('tasks.destroy', {
+      organization: props.organizationSlug,
+      task: task.value.id,
+    }),
+    {
+      preserveScroll: true,
+      onSuccess: () => {
+        close()
+      },
+    },
+  )
+}
+
 function reviewTask() {
   if (!task.value) return
   if (!canReview.value) return
@@ -388,13 +409,23 @@ watch(
             </div>
           </div>
 
-          <button
-            type="button"
-            class="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
-            @click="close"
-          >
-            Close
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="canDelete"
+              type="button"
+              class="inline-flex items-center rounded-full border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-500/20"
+              @click="deleteTask"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
+              @click="close"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <!-- Content -->

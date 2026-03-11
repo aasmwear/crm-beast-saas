@@ -35,6 +35,9 @@ final class AttendancePolicy
         return (int) $user->active_organization_id;
     }
 
+    /**
+     * Can view attendance index/history.
+     */
     public function viewAny(User $user): bool
     {
         $this->scopeTeamId($this->currentTeamId($user));
@@ -43,13 +46,14 @@ final class AttendancePolicy
             return true;
         }
 
-        // Users can view their own attendance or those with permission can view all
         return $user->can('attendance.view') || $user->can('attendance.view-own');
     }
 
+    /**
+     * Can view a specific attendance record.
+     */
     public function view(User $user, Attendance $attendance): bool
     {
-        // Cross-org guard
         if ((int) $user->active_organization_id !== (int) $attendance->organization_id) {
             return false;
         }
@@ -60,7 +64,6 @@ final class AttendancePolicy
             return true;
         }
 
-        // Can view if they have the general permission or if it's their own
         if ($user->can('attendance.view')) {
             return true;
         }
@@ -68,6 +71,9 @@ final class AttendancePolicy
         return $user->can('attendance.view-own') && (int) $attendance->user_id === (int) $user->id;
     }
 
+    /**
+     * Can clock in (create own attendance record).
+     */
     public function clockIn(User $user): bool
     {
         $this->scopeTeamId($this->currentTeamId($user));
@@ -76,9 +82,12 @@ final class AttendancePolicy
             return true;
         }
 
-        return $user->can('attendance.clock-in');
+        return $user->can('attendance.create') || $user->can('attendance.clock-in');
     }
 
+    /**
+     * Can clock out (update own open attendance record).
+     */
     public function clockOut(User $user): bool
     {
         $this->scopeTeamId($this->currentTeamId($user));
@@ -87,9 +96,12 @@ final class AttendancePolicy
             return true;
         }
 
-        return $user->can('attendance.clock-out');
+        return $user->can('attendance.create') || $user->can('attendance.clock-out');
     }
 
+    /**
+     * Can approve attendance (HR/Admin).
+     */
     public function approve(User $user, Attendance $attendance): bool
     {
         $this->scopeTeamId((int) $attendance->organization_id);
@@ -98,17 +110,42 @@ final class AttendancePolicy
             return true;
         }
 
-        return $user->can('attendance.approve');
+        return $user->can('attendance.manage') || $user->can('attendance.approve');
     }
 
+    /**
+     * Can edit/update attendance records (status, notes). HR/Admin can edit others.
+     */
     public function update(User $user, Attendance $attendance): bool
     {
+        if ((int) $attendance->organization_id !== (int) $user->active_organization_id) {
+            return false;
+        }
+
         $this->scopeTeamId((int) $attendance->organization_id);
 
         if ($user->is_super_admin) {
             return true;
         }
 
-        return $user->can('attendance.manage');
+        return $user->can('attendance.edit') || $user->can('attendance.manage');
+    }
+
+    /**
+     * Can delete attendance records.
+     */
+    public function delete(User $user, Attendance $attendance): bool
+    {
+        if ((int) $attendance->organization_id !== (int) $user->active_organization_id) {
+            return false;
+        }
+
+        $this->scopeTeamId((int) $attendance->organization_id);
+
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        return $user->can('attendance.delete') || $user->can('attendance.manage');
     }
 }
