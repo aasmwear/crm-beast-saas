@@ -23,6 +23,8 @@ const csrf =
 
 const name = ref('')
 const niche = ref('')
+const primaryContactName = ref('')
+const primaryContactEmail = ref('')
 const status = ref('active')
 
 // UI Helpers (Matching Dark Dashboard Theme)
@@ -46,6 +48,29 @@ const labelClass = 'block text-sm text-white/60'
           :class="inputClass"
           name="company_name"
           placeholder="Acme LLC"
+          required
+        />
+      </label>
+
+      <label class="block">
+        <span :class="labelClass">Primary contact name *</span>
+        <input
+          v-model="primaryContactName"
+          :class="inputClass"
+          name="primary_contact_name"
+          placeholder="Jane Doe"
+          required
+        />
+      </label>
+
+      <label class="block">
+        <span :class="labelClass">Primary contact email *</span>
+        <input
+          v-model="primaryContactEmail"
+          :class="inputClass"
+          type="email"
+          name="primary_contact_email"
+          placeholder="jane@acme.com"
           required
         />
       </label>

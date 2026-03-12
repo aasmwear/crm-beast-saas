@@ -39,6 +39,68 @@
 
 ## Last PR Notes
 
+- **HRM security & onboarding reliability (rescue-mission):**
+  - **Goal:** Remove weak default password behavior and eliminate silent role-assignment failures in employee onboarding flows.
+  - **Password security:** `HRMController::store()` no longer uses `Hash::make('password')`. It now sets a strong random password server-side and triggers password reset link delivery for safe first-time credential setup.
+  - **No password leakage:** Success messaging no longer exposes raw credentials.
+  - **Reliability:** `store()` and `update()` now run profile changes + role assignment in a transaction, so role sync failures roll back the operation.
+  - **Failure visibility:** Role-assignment failures are logged with support context (`organization_id`, `user_id`, attempted role, exception class/message) and return safe user-facing errors.
+  - **Tests:** Added `HRMSecurityReliabilityTest` covering no literal default password, no password leak in flash, role assignment failure rollback on create, and rollback on update.
+  - **QA checklist:**
+    1. Create employee via HRM → success message contains no raw password.
+    2. Trigger role assignment failure (e.g., temporary permission-layer fault) → operation fails with safe error and no half-created/half-updated user.
+    3. Create employee and verify first-time credential setup relies on password reset link flow.
+
+- **Form alignment: Clients & Projects (rescue-mission):**
+  - **Goal:** Fix broken forms and align validation across Clients and Projects.
+  - **A) CSV Import:** Vue `Import.vue` now uses `file` (not `csv`) to match controller; `ClientsImportController` validates `file` (required, csv/txt, max 10MB); controller accepts `Organization` from route model binding.
+  - **B) QuickCreate:** Added `primary_contact_name` and `primary_contact_email` (required by ClientController::store); form submits successfully.
+  - **C) Projects Create:** Create.vue sends `status`, `description`, `due_date`, `user_ids`; removed `project_manager_id` (controller maps `user_ids[0]` to project_manager_id).
+  - **D) Project status enum:** `PROJECT_STATUS_VALUES` constant in ProjectController; store(), update(), updateStatus() all use `Rule::in()`; Create.vue and Edit.vue use same options (Planned, Active, In Progress, Blocked, Completed, On Hold, Cancelled).
+  - **E) Client pipeline:** `ClientsPipelineController::update` now uses `Rule::in(['lead','active','inactive','paused','churned'])` instead of `string|max:50`.
+  - **Tests:** `FormAlignmentTest` — CSV import, QuickCreate, project create, invalid project status rejected, invalid client pipeline status rejected.
+  - **QA checklist:**
+    1. Clients → Import → upload CSV with `file` field → success.
+    2. QuickCreate modal → fill company, primary contact name, primary contact email → Create Client succeeds.
+    3. Projects → Create → enter title, status, description, due date, team members → Create project succeeds.
+    4. Project create with invalid status (e.g. "Invalid") → validation error.
+    5. Client Pipeline drag-and-drop with invalid status → validation error.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Attendance data integrity (rescue-mission):**
+  - **Goal:** Fix race condition double clock-in, timezone mismatch for "today", and approval of open records.
+  - **Double clock-in:** Migration adds partial unique index on `(organization_id, user_id) WHERE clock_out_at IS NULL` (PostgreSQL). `clockIn()` wrapped in transaction; catches unique constraint violation and returns user-friendly error.
+  - **Timezone:** "Today" and per-day record checks now use `Carbon::now($organization->timezone)`. `hasTodayRecord` uses timezone-aware date comparison.
+  - **Approve validation:** `approve()` requires `clock_out_at IS NOT NULL` and `status === 'closed'`; otherwise throws `ValidationException` with clear message.
+  - **Defense-in-depth:** `AttendancePolicy::approve()` now checks `attendance.organization_id === user.active_organization_id`.
+  - **UX:** Clock in/out buttons use `isClocking` flag; disabled during request to prevent double-submit.
+  - **Tests:** `AttendanceIntegrityTest` — double clock-in prevented (app + DB when pgsql), timezone for today check, open cannot be approved, closed can be approved.
+  - **QA checklist:**
+    1. Clock in → immediately click again → button disabled, no duplicate record.
+    2. Org with timezone `America/New_York` → "today" and per-day logic use NY date.
+    3. Open record (no clock-out) → Approve button hidden in UI; direct POST approve → validation error.
+    4. Closed record → Approve succeeds.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Global role protection (rescue-mission):**
+  - **Goal:** Prevent tenants from modifying permissions on global roles (Owner, Manager, Employee, Client, Super Admin). These roles have `team_id = null` and are system-managed.
+  - **Backend:** `UpdateRolePermissionsRequest` and `UpdateRolePermissionsMatrixRequest` now reject any role with `team_id === null` with 403 "Global roles cannot be modified." Super Admin protection fixed to match seeded role name `'Super Admin'`.
+  - **Controller:** Roles payload includes `is_editable: role.team_id !== null` for frontend use.
+  - **Frontend:** When a global role is selected, permission matrix is disabled (read-only), Save button hidden, and banner shows "Global roles are system-managed and cannot be modified." Edit/Delete remain hidden for global roles.
+  - **Tests:** `GlobalRoleProtectionTest` — tenant cannot modify global role via save or matrix update (403); tenant can modify tenant-scoped roles; roles index includes is_editable flag.
+  - **QA checklist:**
+    1. Log in as Owner → Settings → Roles → select Owner/Manager/Employee/Client/Super Admin → see banner, matrix disabled, no Save bar.
+    2. Select a team-scoped role → matrix editable, Save/Discard appear when changes made.
+    3. Attempt POST roles.save with global role_id (e.g. via DevTools) → 403.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Cross-tenant validation hardening (rescue-mission):**
+  - **Goal:** Close remaining org-scoping validation gaps in Clients, Projects, and HRM.
+  - **Implemented:** `ClientController` now validates `fronter_id` / `closer_id` / `assigned_account_manager_id` against `organization_user` membership for the current org. `ProjectController::update` now validates `client_id` with org-scoped `Rule::exists`. `HRMController::update` now validates `department_id` with org-scoped `Rule::exists`.
+  - **Role assignment safety:** HRM role resolution is now scoped to current team roles plus explicitly allowed global roles (`Owner`, `Manager`, `Employee`, `Client`) to prevent accidental cross-tenant role lookup.
+  - **Supportability:** `ClientsInertiaController` assignment dropdown now resolves users from `organization_user` membership instead of `active_organization_id`, so valid multi-org members are included.
+  - **Tests:** `TenantIsolationHardeningTest` extended for cross-tenant assignment rejection (client user, project client, HRM department) and dropdown membership coverage.
+
 - **HRM module RBAC enforcement (rescue-mission):**
   - **Goal:** Harden HRM with clear RBAC enforcement and workflow safety, aligned with Granular Role Maker.
   - **Permissions:** hrm.view (index), hrm.create (store), hrm.edit (update), hrm.delete (destroy), hrm.manage (all). UserPolicy also accepts users.* as fallback.

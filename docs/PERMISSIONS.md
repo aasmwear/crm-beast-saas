@@ -92,8 +92,20 @@ php artisan permissions:reconcile --assign --dry-run
 ## Team Scoping
 
 - `team_id` = `organization_id` for tenant roles
-- `team_id` = `null` for global roles (Super Admin, etc.)
+- `team_id` = `null` for global roles (Super Admin, Owner, Manager, Employee, Client)
 - Uniqueness: role name + guard + team_id
+
+### Global Role Immutability
+
+Global roles (`team_id = null`) are system-managed and **cannot have their permissions modified by tenants**. The Role Maker UI shows them as read-only; `roles.save` and `roles.update` (matrix) return 403 when a global role is targeted. Tenant-scoped roles (`team_id` = org id) remain fully editable by tenant admins with `roles.manage`.
+
+---
+
+## HRM Onboarding Safety
+
+- `hrm.create` / `users.create` employee onboarding must never expose or depend on a hardcoded default password.
+- Credential setup is handled through password-reset link flow; raw passwords must not be returned in flash/session/UI.
+- Role assignment failures in HRM create/update flows must return safe errors and must not be silently ignored.
 
 ---
 

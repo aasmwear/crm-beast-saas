@@ -41,8 +41,8 @@ const orgSlug = computed(() => {
   return page.props.organization?.slug ?? 'acme'
 })
 
-const form = useForm<{ csv: File | null }>({
-  csv: null,
+const form = useForm<{ file: File | null }>({
+  file: null,
 })
 
 function submit() {
@@ -74,18 +74,18 @@ const inputClass =
           accept=".csv,text/csv"
           :class="inputClass"
           @change="
-            (e: any) => (form.csv = e.target.files?.[0] ?? null)
+            (e: any) => (form.file = e.target.files?.[0] ?? null)
           "
         />
 
-        <div v-if="form.errors.csv" class="text-red-400 text-sm">
-          {{ form.errors.csv }}
+        <div v-if="form.errors.file" class="text-red-400 text-sm">
+          {{ form.errors.file }}
         </div>
 
         <div class="pt-2">
           <button
             class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90"
-            :disabled="form.processing || !form.csv"
+            :disabled="form.processing || !form.file"
           >
             {{ form.processing ? 'Uploading...' : 'Upload CSV' }}
           </button>

@@ -61,12 +61,18 @@ final class UpdateRolePermissionsMatrixRequest extends FormRequest
                     continue;
                 }
 
-                if ($role->team_id !== null && (int) $role->team_id !== (int) $org->id) {
+                // Global roles (team_id = null) cannot be modified by any tenant
+                if ($role->team_id === null) {
+                    abort(403, 'Global roles cannot be modified.');
+                }
+
+                if ((int) $role->team_id !== (int) $org->id) {
                     $validator->errors()->add('matrix', "You cannot modify role id {$roleId} (another organization).");
                 }
 
-                if (in_array($role->name, ['super-admin', 'Super Admin'], true) && ! $user->is_super_admin) {
-                    $validator->errors()->add('matrix', 'You cannot modify the super-admin role.');
+                // Super Admin protection (defense in depth; already covered by team_id null check)
+                if ($role->name === 'Super Admin' && ! $user->is_super_admin) {
+                    abort(403, 'Global roles cannot be modified.');
                 }
             }
         });

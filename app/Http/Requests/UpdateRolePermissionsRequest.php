@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 final class UpdateRolePermissionsRequest extends FormRequest
 {
@@ -66,16 +66,23 @@ final class UpdateRolePermissionsRequest extends FormRequest
             $roleId = $this->input('role_id');
             $role = Role::find($roleId);
 
-            if ($role) {
-                // Ensure the role is team-scoped to this organization or is global
-                if ($role->team_id !== null && (int) $role->team_id !== (int) $org->id) {
-                    $validator->errors()->add('role_id', 'You cannot modify roles from another organization.');
-                }
+            if (! $role) {
+                return;
+            }
 
-                // Prevent non-super-admins from editing the super-admin role
-                if ($role->name === 'super-admin' && ! $user->is_super_admin) {
-                    $validator->errors()->add('role_id', 'You cannot modify the super-admin role.');
-                }
+            // Global roles (team_id = null) cannot be modified by any tenant
+            if ($role->team_id === null) {
+                abort(403, 'Global roles cannot be modified.');
+            }
+
+            // Ensure the role is team-scoped to this organization
+            if ((int) $role->team_id !== (int) $org->id) {
+                $validator->errors()->add('role_id', 'You cannot modify roles from another organization.');
+            }
+
+            // Prevent non-super-admins from editing the Super Admin role (defense in depth)
+            if ($role->name === 'Super Admin' && ! $user->is_super_admin) {
+                abort(403, 'Global roles cannot be modified.');
             }
         });
     }

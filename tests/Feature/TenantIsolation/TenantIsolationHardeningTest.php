@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -157,5 +158,101 @@ final class TenantIsolationHardeningTest extends TestCase
             ->get("/org/{$this->orgA->slug}/projects/{$projectB->id}");
 
         $response->assertStatus(404);
+    }
+
+    public function test_client_store_rejects_assignment_user_from_another_organization(): void
+    {
+        $foreignUser = User::factory()->create(['active_organization_id' => $this->orgB->id]);
+        $this->orgB->users()->attach($foreignUser->id);
+
+        $response = $this->actingAs($this->userA)
+            ->postJson(route('clients.store', ['organization' => $this->orgA->slug]), [
+                'company_name' => 'Isolation Co',
+                'primary_contact_name' => 'A Contact',
+                'primary_contact_email' => 'contact@isolation.test',
+                'fronter_id' => $foreignUser->id,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['fronter_id']);
+        $this->assertDatabaseMissing('clients', [
+            'organization_id' => $this->orgA->id,
+            'company_name' => 'Isolation Co',
+        ]);
+    }
+
+    public function test_project_update_rejects_client_id_from_another_organization(): void
+    {
+        $clientA = Client::factory()->create(['organization_id' => $this->orgA->id]);
+        $clientB = Client::factory()->create(['organization_id' => $this->orgB->id]);
+
+        $project = Project::factory()->create([
+            'organization_id' => $this->orgA->id,
+            'client_id' => $clientA->id,
+            'title' => 'Org A Project',
+            'status' => 'Not Started',
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->putJson(route('projects.update', [
+                'organization' => $this->orgA->slug,
+                'project' => $project->id,
+            ]), [
+                'client_id' => $clientB->id,
+                'title' => 'Org A Project',
+                'status' => 'In Progress',
+                'billable' => false,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['client_id']);
+    }
+
+    public function test_hrm_update_rejects_department_id_from_another_organization(): void
+    {
+        $departmentA = Department::factory()->create(['organization_id' => $this->orgA->id]);
+        $departmentB = Department::factory()->create(['organization_id' => $this->orgB->id]);
+
+        $employee = User::factory()->create([
+            'active_organization_id' => $this->orgA->id,
+            'department_id' => $departmentA->id,
+        ]);
+        $this->orgA->users()->attach($employee->id);
+
+        $response = $this->actingAs($this->userA)
+            ->putJson(route('hrm.update', [
+                'organization' => $this->orgA->slug,
+                'user' => $employee->id,
+            ]), [
+                'name' => $employee->name,
+                'email' => $employee->email,
+                'designation' => 'Engineer',
+                'department_id' => $departmentB->id,
+                'role' => 'Employee',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['department_id']);
+    }
+
+    public function test_clients_assignment_dropdown_includes_org_members_even_if_active_org_differs(): void
+    {
+        $multiOrgMember = User::factory()->create([
+            'name' => 'Zulu Member',
+            'active_organization_id' => $this->orgB->id,
+        ]);
+        $this->orgA->users()->attach($multiOrgMember->id);
+
+        $response = $this->actingAs($this->userA)
+            ->get(route('clients.create', ['organization' => $this->orgA->slug]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('Clients/Create')
+                ->where('users', static function ($users) use ($multiOrgMember): bool {
+                    return collect($users)->pluck('id')->contains($multiOrgMember->id);
+                })
+        );
     }
 }

@@ -112,12 +112,7 @@ class ClientsInertiaController extends Controller
     {
         $this->authorize('create', Client::class);
 
-        // Get all users in this organization for assignment dropdowns
-        $users = DB::table('users')
-            ->where('active_organization_id', $organization->id)
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
+        $users = $this->assignmentUsersForOrganization((int) $organization->id);
 
         return Inertia::render('Clients/Create', [
             'organizationSlug' => $organization->slug,
@@ -201,12 +196,7 @@ class ClientsInertiaController extends Controller
     {
         $this->authorize('update', $client);
 
-        // Get all users in this organization for assignment dropdowns
-        $users = DB::table('users')
-            ->where('active_organization_id', $organization->id)
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
+        $users = $this->assignmentUsersForOrganization((int) $organization->id);
 
         return Inertia::render('Clients/Edit', [
             'organizationSlug' => $organization->slug,
@@ -259,5 +249,16 @@ class ClientsInertiaController extends Controller
                 ->route('clients.index', ['organization' => $organization->slug])
                 ->with('success', 'Client deleted.');
         });
+    }
+
+    private function assignmentUsersForOrganization(int $organizationId)
+    {
+        return DB::table('users')
+            ->join('organization_user', 'users.id', '=', 'organization_user.user_id')
+            ->where('organization_user.organization_id', $organizationId)
+            ->select('users.id', 'users.name')
+            ->distinct()
+            ->orderBy('users.name')
+            ->get();
     }
 }

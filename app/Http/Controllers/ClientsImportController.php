@@ -10,15 +10,17 @@ use Illuminate\Http\Request;
 
 final class ClientsImportController extends Controller
 {
-    public function import(Request $request, string $organization): RedirectResponse
+    public function import(Request $request, Organization $organization): RedirectResponse
     {
         abort_unless($request->user()?->can('clients.import'), 403);
 
-        $org = Organization::query()->where('slug', $organization)->firstOrFail();
+        $org = $organization;
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+        ]);
+
         $file = $request->file('file');
-        if (! $file) {
-            return back()->with('error', 'No file');
-        }
         $fh = fopen($file->getRealPath(), 'r');
         $header = fgetcsv($fh);
         $count = 0;

@@ -152,6 +152,7 @@ final class RolePermissionController extends Controller
                     'name' => $role->name,
                     'team_id' => $role->team_id,
                     'is_team_scoped' => $role->team_id !== null,
+                    'is_editable' => $role->team_id !== null,
                     'permission_ids' => $permissionIds,
                     'permission_count' => count($permissionIds),
                     'users_count' => $usersCount,

@@ -17,6 +17,11 @@ use Inertia\Response;
 
 final class ProjectController extends Controller
 {
+    /** @var list<string> Canonical project status values (shared with store/update/pipeline). */
+    private const PROJECT_STATUS_VALUES = [
+        'Planned', 'Active', 'In Progress', 'Blocked', 'Completed', 'On Hold', 'Cancelled',
+    ];
+
     /**
      * Display a listing of the resource (Grid view).
      *
@@ -232,7 +237,7 @@ final class ProjectController extends Controller
                 'integer',
                 Rule::exists('clients', 'id')->where('organization_id', $organization->id),
             ],
-            'status' => ['required', 'string', Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed'])],
+            'status' => ['required', 'string', Rule::in(self::PROJECT_STATUS_VALUES)],
             'due_date' => ['nullable', 'date'],
             'user_ids' => ['array'],
             'user_ids.*' => [
@@ -301,7 +306,11 @@ final class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $data = $request->validate([
-            'client_id' => ['nullable', 'exists:clients,id'],
+            'client_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('clients', 'id')->where('organization_id', (int) $organization->id),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'project_code' => ['nullable', 'string', 'max:50'],
             'project_manager_id' => [
@@ -311,7 +320,7 @@ final class ProjectController extends Controller
                     $query->where('active_organization_id', $organization->id);
                 }),
             ],
-            'status' => ['required', 'string', 'max:50'],
+            'status' => ['required', 'string', Rule::in(self::PROJECT_STATUS_VALUES)],
             'budget' => ['nullable', 'numeric'],
             'price' => ['nullable', 'numeric'],
             'currency' => ['nullable', 'string', 'max:3'],
@@ -377,7 +386,7 @@ final class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $data = $request->validate([
-            'status' => ['required', 'string', 'max:50'],
+            'status' => ['required', 'string', Rule::in(self::PROJECT_STATUS_VALUES)],
         ]);
 
         $before = $project->getAttributes();

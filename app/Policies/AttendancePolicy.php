@@ -104,6 +104,10 @@ final class AttendancePolicy
      */
     public function approve(User $user, Attendance $attendance): bool
     {
+        if ((int) $attendance->organization_id !== (int) $user->active_organization_id) {
+            return false;
+        }
+
         $this->scopeTeamId((int) $attendance->organization_id);
 
         if ($user->is_super_admin) {

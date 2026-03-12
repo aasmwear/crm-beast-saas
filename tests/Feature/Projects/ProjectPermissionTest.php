@@ -132,7 +132,7 @@ class ProjectPermissionTest extends TestCase
         $response = $this->actingAs($user)
             ->post(route('projects.store', ['organization' => $org->slug]), [
                 'title' => 'New Project',
-                'status' => 'Not Started',
+                'status' => 'Planned',
                 'client_id' => $client->id,
                 'user_ids' => [],
             ]);

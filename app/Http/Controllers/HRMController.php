@@ -6,10 +6,16 @@ use App\Models\Department;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Billing\SeatCounter;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -17,6 +23,18 @@ use Spatie\Permission\PermissionRegistrar;
 
 final class HRMController extends Controller
 {
+    /**
+     * Global roles that are intentionally assignable from tenant HRM flows.
+     *
+     * @var array<int, string>
+     */
+    private const ASSIGNABLE_GLOBAL_ROLE_NAMES = [
+        'Owner',
+        'Manager',
+        'Employee',
+        'Client',
+    ];
+
     /**
      * Display the employee management page.
      * List all users belonging to the current organization (via BelongsToMany).
@@ -61,8 +79,13 @@ final class HRMController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
-        $roles = Role::where('team_id', $organization->id)
-            ->orWhereNull('team_id')
+        $roles = Role::where(function ($query) use ($organization): void {
+            $query->where('team_id', $organization->id)
+                ->orWhere(function ($globalScope): void {
+                    $globalScope->whereNull('team_id')
+                        ->whereIn('name', self::ASSIGNABLE_GLOBAL_ROLE_NAMES);
+                });
+        })
             ->orderBy('name')
             ->pluck('name');
 
@@ -97,45 +120,78 @@ final class HRMController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'joining_date' => ['nullable', 'date'],
-            'role' => ['required', 'string'],
+            'role' => ['required', 'string', $this->assignableRoleRule((int) $organization->id)],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string'],
+            'roles.*' => ['string', $this->assignableRoleRule((int) $organization->id)],
             'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where('organization_id', $organization->id)],
         ]);
 
         app(SeatCounter::class)->assertCanAddSeat($organization);
 
-        $user = new User;
-        $user->name = $validated['name'];
-        $user->email = $validated['email'];
-        $user->password = Hash::make('password');
-        $user->department_id = $validated['department_id'] ?? null;
-        $user->active_organization_id = $organization->id;
-        $user->designation = $validated['job_title'] ?? null;
-        $user->joining_date = $validated['joining_date'] ?? null;
-        $user->save();
-
-        $organization->users()->syncWithoutDetaching([$user->id]);
-
         $rolesToAssign = ! empty($validated['roles']) ? $validated['roles'] : [$validated['role']];
         $rolesToAssign = array_unique(array_filter($rolesToAssign));
+        $createdUserId = null;
 
         try {
-            app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
-            $validRoles = Role::whereIn('name', $rolesToAssign)->where('guard_name', 'web')->pluck('name')->toArray();
-            if (! empty($validRoles)) {
-                $user->syncRoles($validRoles);
-            } else {
-                $fallback = Role::where('name', $validated['role'])->where('guard_name', 'web')->first();
-                if ($fallback) {
-                    $user->assignRole($fallback);
+            /** @var User $user */
+            $user = DB::transaction(function () use ($validated, $organization, $rolesToAssign): User {
+                $user = new User;
+                $user->name = $validated['name'];
+                $user->email = $validated['email'];
+                // Never use a predictable default password.
+                $user->password = Hash::make(Str::password(32));
+                $user->department_id = $validated['department_id'] ?? null;
+                $user->active_organization_id = $organization->id;
+                $user->designation = $validated['job_title'] ?? null;
+                $user->joining_date = $validated['joining_date'] ?? null;
+                $user->save();
+
+                $organization->users()->syncWithoutDetaching([$user->id]);
+
+                app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
+                $validRoles = $this->resolveAssignableRoleNames((int) $organization->id, $rolesToAssign);
+                if ($validRoles === []) {
+                    throw ValidationException::withMessages([
+                        'role' => ['No assignable role was resolved for this employee.'],
+                    ]);
                 }
+                $user->syncRoles($validRoles);
+
+                return $user;
+            });
+
+            $createdUserId = (int) $user->id;
+        } catch (\Throwable $e) {
+            Log::error('HRM employee creation failed during role assignment', [
+                'organization_id' => (int) $organization->id,
+                'user_id' => $createdUserId,
+                'attempted_role' => implode(',', $rolesToAssign),
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            if ($e instanceof ValidationException) {
+                throw $e;
             }
-        } catch (\Exception $e) {
-            // Ignore permission errors
+
+            return redirect()->back()
+                ->withErrors(['hrm' => 'Employee could not be created. Please try again.'])
+                ->withInput();
         }
 
-        return redirect()->back()->with('success', 'Employee created. Default password is "password".');
+        try {
+            Password::sendResetLink(['email' => $user->email]);
+        } catch (\Throwable $e) {
+            Log::warning('HRM employee created but password setup link could not be sent', [
+                'organization_id' => (int) $organization->id,
+                'user_id' => (int) $user->id,
+                'attempted_role' => implode(',', $rolesToAssign),
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Employee created. Password setup email has been queued.');
     }
 
     /**
@@ -153,21 +209,43 @@ final class HRMController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'designation' => ['nullable', 'string', 'max:255'],
-            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'role' => ['required', 'string'],
+            'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where('organization_id', (int) $organization->id)],
+            'role' => ['required', 'string', $this->assignableRoleRule((int) $organization->id)],
         ]);
 
-        $user->name = $validated['name'];
-        $user->email = $validated['email'];
-        $user->designation = $validated['designation'] ?? null;
-        $user->department_id = $validated['department_id'] ?? null;
-        $user->save();
-
         try {
-            app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
-            $user->syncRoles([$validated['role']]);
-        } catch (\Exception $e) {
-            // Ignore if role not found or permission errors
+            DB::transaction(function () use ($user, $validated, $organization): void {
+                $user->name = $validated['name'];
+                $user->email = $validated['email'];
+                $user->designation = $validated['designation'] ?? null;
+                $user->department_id = $validated['department_id'] ?? null;
+                $user->save();
+
+                app(PermissionRegistrar::class)->setPermissionsTeamId($organization->id);
+                $roleNames = $this->resolveAssignableRoleNames((int) $organization->id, [(string) $validated['role']]);
+                if ($roleNames === []) {
+                    throw ValidationException::withMessages([
+                        'role' => ['The selected role is not assignable in this organization.'],
+                    ]);
+                }
+                $user->syncRoles($roleNames);
+            });
+        } catch (\Throwable $e) {
+            Log::error('HRM employee update failed during role assignment', [
+                'organization_id' => (int) $organization->id,
+                'user_id' => (int) $user->id,
+                'attempted_role' => (string) $validated['role'],
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
+
+            return redirect()->back()
+                ->withErrors(['hrm' => 'Employee could not be updated. Please try again.'])
+                ->withInput();
         }
 
         return redirect()->back()->with('success', 'Employee updated.');
@@ -187,5 +265,43 @@ final class HRMController extends Controller
         $organization->users()->detach($user->id);
 
         return redirect()->back()->with('success', 'Employee removed.');
+    }
+
+    private function assignableRoleRule(int $organizationId): Exists
+    {
+        return Rule::exists('roles', 'name')->where(function ($query) use ($organizationId): void {
+            $query->where('guard_name', 'web')
+                ->where(function ($roleScope) use ($organizationId): void {
+                    $roleScope->where('team_id', $organizationId)
+                        ->orWhere(function ($globalScope): void {
+                            $globalScope->whereNull('team_id')
+                                ->whereIn('name', self::ASSIGNABLE_GLOBAL_ROLE_NAMES);
+                        });
+                });
+        });
+    }
+
+    /**
+     * @param  array<int, string>  $roleNames
+     * @return array<int, string>
+     */
+    private function resolveAssignableRoleNames(int $organizationId, array $roleNames): array
+    {
+        if ($roleNames === []) {
+            return [];
+        }
+
+        return Role::query()
+            ->whereIn('name', $roleNames)
+            ->where('guard_name', 'web')
+            ->where(function ($query) use ($organizationId): void {
+                $query->where('team_id', $organizationId)
+                    ->orWhere(function ($globalScope): void {
+                        $globalScope->whereNull('team_id')
+                            ->whereIn('name', self::ASSIGNABLE_GLOBAL_ROLE_NAMES);
+                    });
+            })
+            ->pluck('name')
+            ->toArray();
     }
 }

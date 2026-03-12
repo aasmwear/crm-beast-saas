@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Contracts\Database\Query\Builder as BaseBuilder;
+use Illuminate\Validation\Rule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ final class ClientsPipelineController extends Controller
         $this->authorize('update', $client);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'max:50'],
+            'status' => ['required', 'string', Rule::in(['lead', 'active', 'inactive', 'paused', 'churned'])],
         ]);
 
         $client->update([

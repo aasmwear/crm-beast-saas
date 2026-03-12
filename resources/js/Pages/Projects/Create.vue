@@ -21,7 +21,10 @@ type ProjectForm = {
   client_id: number | null
   title: string
   project_code: string | null
-  project_manager_id: number | null
+  description: string | null
+  status: string
+  due_date: string | null
+  user_ids: number[]
   budget: string | null
   price: string | null
   billable: boolean
@@ -54,11 +57,24 @@ const form = useForm<ProjectForm>({
   client_id: null,
   title: '',
   project_code: null,
-  project_manager_id: null,
+  description: null,
+  status: 'Planned',
+  due_date: null,
+  user_ids: [],
   budget: null,
   price: null,
   billable: false,
 })
+
+const statusOptions = [
+  { value: 'Planned', label: 'Planned' },
+  { value: 'Active', label: 'Active' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Blocked', label: 'Blocked' },
+  { value: 'Completed', label: 'Completed' },
+  { value: 'On Hold', label: 'On Hold' },
+  { value: 'Cancelled', label: 'Cancelled' },
+]
 
 const submit = () => {
   form.post(r('projects.store', { organization: org.value }))
@@ -151,12 +167,66 @@ const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
           </div>
 
           <div>
-            <label :class="labelClass">Project Manager</label>
+            <label :class="labelClass">Status *</label>
             <select
-              v-model="form.project_manager_id"
+              v-model="form.status"
               :class="inputClass"
+              required
             >
-              <option :value="null">— Select project manager —</option>
+              <option
+                v-for="opt in statusOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+            <div
+              v-if="form.errors.status"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.status }}
+            </div>
+          </div>
+
+          <div>
+            <label :class="labelClass">Due date</label>
+            <input
+              v-model="form.due_date"
+              :class="inputClass"
+              type="date"
+            />
+            <div
+              v-if="form.errors.due_date"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.due_date }}
+            </div>
+          </div>
+
+          <div class="md:col-span-2">
+            <label :class="labelClass">Description</label>
+            <textarea
+              v-model="form.description"
+              :class="inputClass"
+              rows="3"
+              placeholder="Project description..."
+            />
+            <div
+              v-if="form.errors.description"
+              class="mt-1 text-sm text-red-400"
+            >
+              {{ form.errors.description }}
+            </div>
+          </div>
+
+          <div class="md:col-span-2">
+            <label :class="labelClass">Team members</label>
+            <select
+              v-model="form.user_ids"
+              :class="inputClass"
+              multiple
+            >
               <option
                 v-for="user in props.cstManagers"
                 :key="user.id"
@@ -165,11 +235,12 @@ const labelClass = 'block text-xs font-medium text-white/60 tracking-wide mb-1'
                 {{ user.name }}
               </option>
             </select>
+            <p class="mt-1 text-xs text-white/50">Hold Ctrl/Cmd to select multiple</p>
             <div
-              v-if="form.errors.project_manager_id"
+              v-if="form.errors.user_ids"
               class="mt-1 text-sm text-red-400"
             >
-              {{ form.errors.project_manager_id }}
+              {{ form.errors.user_ids }}
             </div>
           </div>
         </div>

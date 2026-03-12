@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Organization;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -135,60 +138,71 @@ final class AttendanceController extends Controller
         $organization = $request->route('organization');
         $user = $request->user();
 
-        // Do not allow multiple open sessions.
-        $alreadyClockedIn = Attendance::query()
-            ->where('organization_id', (int) $organization->id)
-            ->where('user_id', (int) $user->id)
-            ->whereNull('clock_out_at')
-            ->exists();
+        $timezone = $organization->timezone ?? 'UTC';
 
-        if ($alreadyClockedIn) {
-            return back()->with('error', 'You are already clocked in.');
+        try {
+            return DB::transaction(function () use ($request, $organization, $user, $timezone): RedirectResponse {
+                // Do not allow multiple open sessions.
+                $alreadyClockedIn = Attendance::query()
+                    ->where('organization_id', (int) $organization->id)
+                    ->where('user_id', (int) $user->id)
+                    ->whereNull('clock_out_at')
+                    ->exists();
+
+                if ($alreadyClockedIn) {
+                    return back()->with('error', 'You are already clocked in.');
+                }
+
+                // Enforce at most one record per user per day (org timezone).
+                $today = Carbon::now($timezone)->toDateString();
+
+                $hasTodayRecord = Attendance::query()
+                    ->where('organization_id', (int) $organization->id)
+                    ->where('user_id', (int) $user->id)
+                    ->whereRaw('(clock_in_at AT TIME ZONE ?)::date = ?::date', [$timezone, $today])
+                    ->exists();
+
+                if ($hasTodayRecord) {
+                    return back()->with('error', 'You already have an attendance record for today.');
+                }
+
+                // Extract geolocation if provided
+                $lat = $request->input('lat');
+                $lng = $request->input('lng');
+
+                $attendance = new Attendance;
+                $attendance->setAttribute('organization_id', (int) $organization->id);
+                $attendance->setAttribute('user_id', (int) $user->id);
+                $attendance->setAttribute('clock_in_at', Carbon::now($timezone));
+                $attendance->setAttribute('clock_in_ip', $request->ip());
+                $attendance->setAttribute('status', 'open');
+
+                // Store geolocation if available
+                if ($lat !== null && $lng !== null) {
+                    $attendance->setAttribute('clock_in_lat', (float) $lat);
+                    $attendance->setAttribute('clock_in_lng', (float) $lng);
+                    $attendance->setAttribute('clock_in_geo', json_encode(['lat' => $lat, 'lng' => $lng]));
+                }
+
+                $attendance->save();
+
+                AuditLogger::log(
+                    $organization,
+                    $user,
+                    'clocked_in',
+                    'attendance',
+                    (int) $attendance->id,
+                    ['clock_in_at' => $attendance->clock_in_at?->toIso8601String()],
+                );
+
+                return back()->with('success', 'Clocked in');
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23505' || str_contains((string) $e->getMessage(), 'duplicate key') || str_contains((string) $e->getMessage(), 'attendance_one_open_session')) {
+                return back()->with('error', 'You are already clocked in.');
+            }
+            throw $e;
         }
-
-        // Enforce at most one record per user per day.
-        $today = now()->toDateString();
-
-        $hasTodayRecord = Attendance::query()
-            ->where('organization_id', (int) $organization->id)
-            ->where('user_id', (int) $user->id)
-            ->whereDate('clock_in_at', $today)
-            ->exists();
-
-        if ($hasTodayRecord) {
-            return back()->with('error', 'You already have an attendance record for today.');
-        }
-
-        // Extract geolocation if provided
-        $lat = $request->input('lat');
-        $lng = $request->input('lng');
-
-        $attendance = new Attendance;
-        $attendance->setAttribute('organization_id', (int) $organization->id);
-        $attendance->setAttribute('user_id', (int) $user->id);
-        $attendance->setAttribute('clock_in_at', now());
-        $attendance->setAttribute('clock_in_ip', $request->ip());
-        $attendance->setAttribute('status', 'open');
-
-        // Store geolocation if available
-        if ($lat !== null && $lng !== null) {
-            $attendance->setAttribute('clock_in_lat', (float) $lat);
-            $attendance->setAttribute('clock_in_lng', (float) $lng);
-            $attendance->setAttribute('clock_in_geo', json_encode(['lat' => $lat, 'lng' => $lng]));
-        }
-
-        $attendance->save();
-
-        AuditLogger::log(
-            $organization,
-            $user,
-            'clocked_in',
-            'attendance',
-            (int) $attendance->id,
-            ['clock_in_at' => $attendance->clock_in_at?->toIso8601String()],
-        );
-
-        return back()->with('success', 'Clocked in');
     }
 
     /**
@@ -258,16 +272,19 @@ final class AttendanceController extends Controller
     /**
      * Approve an attendance record (HR / Manager).
      */
-    public function approve(Request $request, Attendance $attendance): RedirectResponse
+    public function approve(Request $request, Organization $organization, Attendance $attendance): RedirectResponse
     {
-        /** @var Organization $organization */
-        $organization = $request->route('organization');
-
         if ((int) $attendance->organization_id !== (int) $organization->id) {
             abort(404);
         }
 
         $this->authorize('approve', $attendance);
+
+        if ($attendance->clock_out_at === null || strtolower((string) ($attendance->status ?? '')) !== 'closed') {
+            throw ValidationException::withMessages([
+                'attendance' => ['Only closed attendance records (with clock-out time) can be approved.'],
+            ]);
+        }
 
         $before = $attendance->getAttributes();
 

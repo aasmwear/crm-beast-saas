@@ -15,6 +15,7 @@ interface Role {
   name: string
   team_id: number | null
   is_team_scoped: boolean
+  is_editable?: boolean
   permission_ids: number[]
   permission_count: number
   users_count: number
@@ -178,6 +179,11 @@ const canEditRole = computed(() => {
   return role?.is_team_scoped ?? false
 })
 
+const canEditPermissions = computed(() => {
+  const role = selectedRole.value
+  return (role?.is_editable ?? role?.is_team_scoped ?? false)
+})
+
 const canDeleteRole = computed(() => {
   const role = selectedRole.value
   return role?.is_team_scoped && (role?.users_count ?? 0) === 0
@@ -199,6 +205,7 @@ const selectedPermissionIds = ref<Set<number>>(new Set())
 const baselinePermissionIds = ref<Set<number>>(new Set())
 
 const hasUnsavedChanges = computed(() => {
+  if (!canEditPermissions.value) return false
   if (selectedPermissionIds.value.size !== baselinePermissionIds.value.size) return true
   for (const id of selectedPermissionIds.value) {
     if (!baselinePermissionIds.value.has(id)) return true
@@ -400,6 +407,8 @@ const saveForm = useForm({
 
 function savePermissions() {
   if (!selectedRoleId.value) return
+  const role = props.roles.find(r => r.id === selectedRoleId.value)
+  if (role && !(role.is_editable ?? role.is_team_scoped)) return
   saveForm.role_id = selectedRoleId.value
   saveForm.permission_ids = Array.from(selectedPermissionIds.value)
   saveForm.post(r('roles.save'), {
@@ -424,6 +433,7 @@ const allowNextLeave = ref(false)
 const removeBeforeListener = router.on('before', (event: { detail: { visit: { url: { href?: string } | string; method?: string } }; preventDefault: () => void }) => {
   if (allowNextLeave.value) return
   if (!hasUnsavedChanges.value) return
+  if (!selectedRole.value?.is_editable) return
   // Do NOT block form submissions (Save, Create Role) — only block actual navigation (GET)
   const method = (event.detail.visit?.method ?? 'get').toLowerCase()
   if (method !== 'get') return
@@ -450,7 +460,7 @@ function cancelLeave() {
 }
 
 function handleBeforeUnload(e: BeforeUnloadEvent) {
-  if (hasUnsavedChanges.value) e.preventDefault()
+  if (hasUnsavedChanges.value && (selectedRole.value?.is_editable ?? selectedRole.value?.is_team_scoped)) e.preventDefault()
 }
 
 window.addEventListener('beforeunload', handleBeforeUnload)
@@ -751,9 +761,9 @@ const catalogSelectedCount = computed(() => {
       </div>
     </div>
 
-    <!-- Sticky bottom bar: Unsaved changes -->
+    <!-- Sticky bottom bar: Unsaved changes (only for editable roles) -->
     <div
-      v-if="hasUnsavedChanges"
+      v-if="hasUnsavedChanges && selectedRole?.is_editable"
       class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 rounded-xl border border-amber-500/50 bg-amber-900/30 px-6 py-4 shadow-lg"
     >
       <span class="text-amber-200 font-medium">Unsaved changes</span>

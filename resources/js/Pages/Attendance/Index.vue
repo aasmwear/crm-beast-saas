@@ -153,19 +153,32 @@ function statusClass(status?: string | null): string {
   return 'bg-white/5 text-white/70 border border-white/15'
 }
 
+// Clock in/out loading state to prevent double-submit
+const isClocking = ref(false)
+
 function clockIn() {
+  if (isClocking.value) return
+  isClocking.value = true
   router.post(
     r('attendance.clockIn', { organization: org.value }),
     {},
-    { preserveScroll: true },
+    {
+      preserveScroll: true,
+      onFinish: () => { isClocking.value = false },
+    },
   )
 }
 
 function clockOut() {
+  if (isClocking.value) return
+  isClocking.value = true
   router.post(
     r('attendance.clockOut', { organization: org.value }),
     {},
-    { preserveScroll: true },
+    {
+      preserveScroll: true,
+      onFinish: () => { isClocking.value = false },
+    },
   )
 }
 
@@ -240,18 +253,20 @@ function deleteRecord(record: AttendanceRecord) {
         <button
           v-if="!props.current"
           type="button"
-          class="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25"
+          :disabled="isClocking"
+          class="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-60"
           @click="clockIn"
         >
-          ⏱ Clock in
+          {{ isClocking ? '…' : '⏱ Clock in' }}
         </button>
         <button
           v-else
           type="button"
-          class="rounded-full border border-rose-400/40 bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/25"
+          :disabled="isClocking"
+          class="rounded-full border border-rose-400/40 bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60"
           @click="clockOut"
         >
-          ⏹ Clock out
+          {{ isClocking ? '…' : '⏹ Clock out' }}
         </button>
       </div>
     </template>

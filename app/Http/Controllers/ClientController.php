@@ -157,9 +157,21 @@ final class ClientController extends Controller
 
             'tags' => ['nullable', 'array'],
 
-            'fronter_id' => ['nullable', 'integer', 'exists:users,id'],
-            'closer_id' => ['nullable', 'integer', 'exists:users,id'],
-            'assigned_account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'fronter_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $org->id),
+            ],
+            'closer_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $org->id),
+            ],
+            'assigned_account_manager_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $org->id),
+            ],
 
             'gbp_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
             'gbp_access' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
@@ -284,9 +296,21 @@ final class ClientController extends Controller
             'currency' => ['nullable', 'string', 'size:3'],
 
             'tags' => ['nullable', 'array'],
-            'fronter_id' => ['nullable', 'integer', 'exists:users,id'],
-            'closer_id' => ['nullable', 'integer', 'exists:users,id'],
-            'assigned_account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'fronter_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $organization->id),
+            ],
+            'closer_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $organization->id),
+            ],
+            'assigned_account_manager_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $organization->id),
+            ],
 
             'gbp_status' => ['nullable', 'string', Rule::in(self::GBP_STATUS_VALUES)],
             'gbp_access' => ['nullable', 'string', Rule::in(self::GBP_ACCESS_VALUES)],
