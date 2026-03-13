@@ -61,6 +61,9 @@ const editShowSlugOverride = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteForm = useForm({})
 
+// Clone role (team-scoped only; direct POST, no modal)
+const cloneForm = useForm({})
+
 const slugFromDisplay = computed(() => toSlug(displayName.value))
 const effectiveSlug = computed(() => {
   const manual = slugOverride.value.trim()
@@ -156,6 +159,17 @@ function openDeleteConfirm() {
 
 function closeDeleteConfirm() {
   showDeleteConfirm.value = false
+}
+
+function submitCloneRole() {
+  const role = selectedRole.value
+  if (!role?.is_team_scoped) return
+  cloneForm.post(r('roles.clone', { role: role.id }), {
+    preserveScroll: true,
+    onSuccess: () => {
+      // created_role_id in flash will trigger watcher to select new role
+    },
+  })
 }
 
 function submitDeleteRole() {
@@ -597,6 +611,14 @@ const catalogSelectedCount = computed(() => {
                     class="px-2 py-1 text-xs rounded bg-gray-800 text-white/70 hover:text-white transition"
                   >
                     Edit name
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="cloneForm.processing"
+                    @click="submitCloneRole"
+                    class="px-2 py-1 text-xs rounded bg-gray-800 text-white/70 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {{ cloneForm.processing ? 'Cloning...' : 'Clone role' }}
                   </button>
                 </template>
                 <template v-if="canDeleteRole">

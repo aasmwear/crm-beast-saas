@@ -97,7 +97,11 @@ php artisan permissions:reconcile --assign --dry-run
 
 ### Global Role Immutability
 
-Global roles (`team_id = null`) are system-managed and **cannot have their permissions modified by tenants**. The Role Maker UI shows them as read-only; `roles.save` and `roles.update` (matrix) return 403 when a global role is targeted. Tenant-scoped roles (`team_id` = org id) remain fully editable by tenant admins with `roles.manage`.
+Global roles (`team_id = null`) are system-managed and **cannot have their permissions modified by tenants**. The Role Maker UI shows them as read-only; `roles.save` and `roles.update` (matrix) return 403 when a global role is targeted. Tenant-scoped roles (`team_id` = org id) remain fully editable by tenant admins with `roles.manage`. Global roles **cannot be cloned**; only team-scoped roles support the clone action.
+
+### Role Cloning
+
+Tenant admins with `roles.manage` can clone team-scoped roles via "Clone role" in the Role Maker UI or `POST /org/{org}/settings/roles/{role}/clone`. The new role gets name `{original}-copy` (or `-copy-2`, `-copy-3` if the name already exists) and inherits all permissions from the source. Audit logs the `cloned` action with source and new role ids/names.
 
 ---
 

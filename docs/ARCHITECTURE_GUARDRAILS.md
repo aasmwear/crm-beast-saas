@@ -32,9 +32,10 @@
 - **HRM onboarding security:** Never assign predictable default passwords. New employees must get a cryptographically random password server-side and use password reset link flow for first credential setup. Raw passwords must never be flashed, logged, or rendered.
 - **HRM reliability:** Employee create/update and role assignment must be atomic (single transaction). Do not silently swallow role sync failures; log context (`organization_id`, `user_id`, attempted role, exception class/message) and return a safe actionable error.
 - **Granular Role Maker:** Tenant admins with `roles.manage` can:
-  - View, create, edit, delete (team-scoped) roles
+  - View, create, edit, delete, clone (team-scoped) roles
   - Assign permissions via permission matrix UI
   - Cannot delete roles assigned to users
+  - **Role cloning:** Team-scoped roles only; creates copy with `-copy` suffix (or `-copy-2`, etc. if exists); copies all permissions. Global roles cannot be cloned.
   - **Global roles are immutable:** Roles with `team_id = null` (Owner, Manager, Employee, Client, Super Admin) cannot have their permissions modified by tenants. API returns 403. UI disables matrix and Save for these roles.
 - **Authorization:** Policies/Gates for server-side enforcement; UI hiding is not security
 
@@ -47,6 +48,7 @@
 - **Permission matrix:** Grouped by module (Clients, Projects, Tasks, Attendance, etc.); "Select All" per module
 - **Validation:** Role name unique per organization; cannot delete if assigned
 - **Backend:** Uses Spatie `syncPermissions()`; `team_id` = `organization_id` for new roles
+- **Clone:** `POST roles.clone` creates a team-scoped copy with `-copy` suffix; same permissions; global roles cannot be cloned
 
 ---
 

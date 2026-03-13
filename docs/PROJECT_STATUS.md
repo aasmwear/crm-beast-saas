@@ -39,6 +39,16 @@
 
 ## Last PR Notes
 
+- **Role cloning in tenant Role Maker (rescue-mission):**
+  - **Backend:** `POST /org/{organization}/settings/roles/{role}/clone` — clones team-scoped roles only. Creates new role with name `{original}-copy` (or `-copy-2`, `-copy-3` if exists). Copies all permissions from source. Global roles cannot be cloned; cross-tenant clone blocked. Audit: `cloned` action with source/new role ids and names.
+  - **Frontend:** "Clone role" button for editable team-scoped roles in Roles.vue; after clone, new role is auto-selected (uses `created_role_id` flash). Success feedback via flash message.
+  - **Tests:** RoleCloneTest — tenant admin can clone, cloned role gets same permissions, unique name with suffix when copy exists, cannot clone global role, cross-tenant blocked, user without roles.manage gets 403.
+  - **QA checklist:**
+    1. Settings → Roles → select team-scoped role → click "Clone role" → new role appears with "-copy" suffix, same permissions, auto-selected.
+    2. Clone same role again → second clone named "-copy-2".
+    3. Select global role (Owner, Manager, etc.) → "Clone role" button not shown.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Scale pass three: dropdown bounds, eager load limits, N+1 fix, consolidated revenue query, storage cache (rescue-mission):**
   - **Dropdown/filter bounds:** Replaced unbounded `->get()` with `->limit(200)->get()` for clients, users, projects dropdowns in ProjectController (index/create/edit/show), TaskController (index projects), InvoiceController (create clients/projects), AttendanceController (user filter), ActivityController (user filter), ClientsInertiaController (assignment users).
   - **Project show eager load limits:** Tasks, files, comments, activities now use `->limit(200)` / `->limit(100)` in ProjectController::show to bound memory on heavy projects.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CloneRoleRequest;
 use App\Http\Requests\DestroyRoleRequest;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRolePermissionsMatrixRequest;
@@ -116,6 +117,63 @@ final class RolePermissionController extends Controller
         );
 
         return back()->with('success', "Role \"{$roleName}\" deleted.");
+    }
+
+    /**
+     * Clone a team-scoped role (creates a new role with same permissions).
+     */
+    public function clone(CloneRoleRequest $request, Organization $organization, Role $role): RedirectResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        $org = $organization;
+
+        $sourceName = $role->name;
+        $baseName = $sourceName . '-copy';
+        $candidate = $baseName;
+        $suffix = 2;
+
+        while (Role::query()
+            ->where('guard_name', 'web')
+            ->where('team_id', $org->id)
+            ->where('name', $candidate)
+            ->exists()) {
+            $candidate = $baseName . '-' . $suffix;
+            $suffix++;
+        }
+
+        $newRole = Role::create([
+            'name' => $candidate,
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+
+        $permissionIds = $role->permissions()->pluck('permissions.id')->toArray();
+        if ($permissionIds !== []) {
+            $permissions = Permission::query()->whereIn('id', $permissionIds)->get();
+            $newRole->syncPermissions($permissions);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        Cache::forget('spatie.permission.cache');
+
+        AuditLogger::log(
+            $org,
+            $user,
+            'cloned',
+            'role',
+            $newRole->id,
+            [
+                'source_role_id' => $role->id,
+                'source_role_name' => $sourceName,
+                'new_role_name' => $candidate,
+            ],
+        );
+
+        return back()
+            ->with('success', "Role cloned as \"{$candidate}\". You can edit the name and permissions.")
+            ->with('created_role_id', $newRole->id);
     }
 
     /**
