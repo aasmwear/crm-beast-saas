@@ -19,11 +19,17 @@ interface EventGroup {
   sortKey: number
   items: CalendarEvent[]
 }
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedEvents = {
+  data: CalendarEvent[]
+  links: PaginationLink[]
+  total?: number
+}
 
 const props = defineProps<{
   organization: { id: number; name: string; slug: string }
   filters: { from: string | null; to: string | null }
-  events: CalendarEvent[]
+  events: PaginatedEvents
 }>()
 
 const page = usePage()
@@ -72,7 +78,7 @@ function formatDateLabel(dateStr: string | null | undefined): string {
 const groupedEvents = computed<EventGroup[]>(() => {
   const map = new Map<string, EventGroup>()
 
-  props.events.forEach((e) => {
+  ;(props.events.data ?? []).forEach((e) => {
     const baseDateStr = e.start_date ?? e.end_date
     let label: string
     let sortKey: number
@@ -100,7 +106,7 @@ const groupedEvents = computed<EventGroup[]>(() => {
   return Array.from(map.values()).sort((a, b) => a.sortKey - b.sortKey)
 })
 
-const totalEvents = computed(() => props.events.length)
+const totalEvents = computed(() => props.events.total ?? (props.events.data?.length ?? 0))
 </script>
 
 <template>
@@ -270,6 +276,28 @@ const totalEvents = computed(() => props.events.length)
           </div>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="props.events.links && props.events.links.length > 1"
+      class="border-t border-white/10 pt-4"
+    >
+      <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+        <Link
+          v-for="link in props.events.links"
+          :key="link.label + (link.url || '')"
+          :href="link.url || '#'"
+          class="rounded-full px-3 py-1"
+          :class="[
+            link.active
+              ? 'bg-white/20 text-white'
+              : link.url
+                ? 'text-white/70 hover:bg-white/10'
+                : 'text-white/30 cursor-default',
+          ]"
+          v-html="link.label"
+        />
+      </nav>
     </div>
   </div>
 </template>

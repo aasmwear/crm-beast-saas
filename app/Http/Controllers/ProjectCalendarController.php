@@ -23,8 +23,13 @@ final class ProjectCalendarController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $fromInput = $request->query('from');
-        $toInput = $request->query('to');
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $fromInput = $validated['from'] ?? null;
+        $toInput = $validated['to'] ?? null;
 
         $from = $fromInput ? Carbon::parse($fromInput)->startOfDay() : null;
         $to = $toInput ? Carbon::parse($toInput)->endOfDay() : null;
@@ -63,21 +68,21 @@ final class ProjectCalendarController extends Controller
             });
         }
 
-        $projects = $query
+        $events = $query
             ->orderBy('start_date')
             ->orderBy('end_date')
-            ->get();
-
-        $events = $projects->map(static function (Project $project): array {
-            return [
-                'id' => $project->id,
-                'title' => $project->title,
-                'status' => $project->status,
-                'start_date' => optional($project->start_date)->toDateString(),
-                'end_date' => optional($project->end_date)->toDateString(),
-                'project_manager_name' => optional($project->manager)->name,
-            ];
-        })->values();
+            ->paginate(25)
+            ->withQueryString()
+            ->through(static function (Project $project): array {
+                return [
+                    'id' => $project->id,
+                    'title' => $project->title,
+                    'status' => $project->status,
+                    'start_date' => optional($project->start_date)->toDateString(),
+                    'end_date' => optional($project->end_date)->toDateString(),
+                    'project_manager_name' => optional($project->manager)->name,
+                ];
+            });
 
         return Inertia::render('Projects/Calendar', [
             'organization' => $organization->only(['id', 'name', 'slug']),

@@ -33,7 +33,7 @@ function normalizeStatus(status) {
     return 'planned';
 }
 function projectsInColumn(key) {
-    return props.projects.filter((p) => normalizeStatus(p.status) === key);
+    return (props.projects.data ?? []).filter((p) => normalizeStatus(p.status) === key);
 }
 const isUpdating = ref(null);
 function updateStatus(project, columnKey) {
@@ -193,6 +193,44 @@ for (const [column] of __VLS_getVForSourceType((__VLS_ctx.columns))) {
         });
     }
 }
+if (props.projects.links && props.projects.links.length > 1) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "border-t border-white/10 pt-4" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
+        ...{ class: "flex flex-wrap items-center justify-end gap-1 text-xs" },
+    });
+    for (const [link] of __VLS_getVForSourceType((props.projects.links))) {
+        const __VLS_8 = {}.Link;
+        /** @type {[typeof __VLS_components.Link, ]} */ ;
+        // @ts-ignore
+        const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+            key: (link.label + (link.url || '')),
+            href: (link.url || '#'),
+            ...{ class: "rounded-full px-3 py-1" },
+            ...{ class: ([
+                    link.active
+                        ? 'bg-white/20 text-white'
+                        : link.url
+                            ? 'text-white/70 hover:bg-white/10'
+                            : 'text-white/30 cursor-default',
+                ]) },
+        }));
+        const __VLS_10 = __VLS_9({
+            key: (link.label + (link.url || '')),
+            href: (link.url || '#'),
+            ...{ class: "rounded-full px-3 py-1" },
+            ...{ class: ([
+                    link.active
+                        ? 'bg-white/20 text-white'
+                        : link.url
+                            ? 'text-white/70 hover:bg-white/10'
+                            : 'text-white/30 cursor-default',
+                ]) },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+        __VLS_asFunctionalDirective(__VLS_directives.vHtml)(null, { ...__VLS_directiveBindingRestFields, value: (link.label) }, null, null);
+    }
+}
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
 /** @type {__VLS_StyleScopedClasses['mb-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-2xl']} */ ;
@@ -342,6 +380,18 @@ for (const [column] of __VLS_getVForSourceType((__VLS_ctx.columns))) {
 /** @type {__VLS_StyleScopedClasses['text-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-white/40']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-t']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
+/** @type {__VLS_StyleScopedClasses['pt-4']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['justify-end']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-1']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {

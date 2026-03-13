@@ -12,10 +12,15 @@ interface BoardProject {
   project_manager_id: number | null
   project_manager_name?: string | null
 }
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedProjects = {
+  data: BoardProject[]
+  links: PaginationLink[]
+}
 
 const props = defineProps<{
   organization: { id: number; name: string; slug: string }
-  projects: BoardProject[]
+  projects: PaginatedProjects
 }>()
 
 const page = usePage()
@@ -49,7 +54,7 @@ function normalizeStatus(status: string | null | undefined): ColumnKey {
 }
 
 function projectsInColumn(key: ColumnKey): BoardProject[] {
-  return props.projects.filter((p) => normalizeStatus(p.status) === key)
+  return (props.projects.data ?? []).filter((p) => normalizeStatus(p.status) === key)
 }
 
 const isUpdating = ref<number | null>(null)
@@ -194,6 +199,28 @@ function onColumnChange(project: BoardProject, event: Event) {
           </div>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="props.projects.links && props.projects.links.length > 1"
+      class="border-t border-white/10 pt-4"
+    >
+      <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+        <Link
+          v-for="link in props.projects.links"
+          :key="link.label + (link.url || '')"
+          :href="link.url || '#'"
+          class="rounded-full px-3 py-1"
+          :class="[
+            link.active
+              ? 'bg-white/20 text-white'
+              : link.url
+                ? 'text-white/70 hover:bg-white/10'
+                : 'text-white/30 cursor-default',
+          ]"
+          v-html="link.label"
+        />
+      </nav>
     </div>
   </div>
 </template>

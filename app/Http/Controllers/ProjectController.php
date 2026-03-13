@@ -46,44 +46,45 @@ final class ProjectController extends Controller
             ->visibleTo($user)
             ->latest();
 
-        $projectsCollection = $projectsQuery->get();
+        $projects = $projectsQuery
+            ->paginate(25)
+            ->withQueryString()
+            ->through(function (Project $project): array {
+                $tasks = $project->tasks;
+                $total = $tasks->count();
+                $completed = $tasks->filter(static function ($t): bool {
+                    $s = strtolower(trim((string) ($t->status ?? '')));
 
-        $projects = $projectsCollection->map(function (Project $project): array {
-            $tasks = $project->tasks;
-            $total = $tasks->count();
-            $completed = $tasks->filter(static function ($t): bool {
-                $s = strtolower(trim((string) ($t->status ?? '')));
+                    return in_array($s, ['done', 'completed', 'closed', 'finished'], true);
+                })->count();
+                $progress = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
 
-                return in_array($s, ['done', 'completed', 'closed', 'finished'], true);
-            })->count();
-            $progress = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
+                $teamUsers = $project->users->isNotEmpty()
+                    ? $project->users
+                    : ($project->manager ? collect([$project->manager]) : collect());
+                $teamMembers = $teamUsers->take(3)->map(static function ($u): array {
+                    return [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                    ];
+                })->values()->all();
+                $teamExtra = max(0, $teamUsers->count() - 3);
 
-            $teamUsers = $project->users->isNotEmpty()
-                ? $project->users
-                : ($project->manager ? collect([$project->manager]) : collect());
-            $teamMembers = $teamUsers->take(3)->map(static function ($u): array {
                 return [
-                    'id' => $u->id,
-                    'name' => $u->name,
+                    'id' => $project->id,
+                    'title' => $project->title,
+                    'description' => $project->description,
+                    'status' => $project->status,
+                    'client_name' => $project->client?->company_name ?? null,
+                    'progress' => $progress,
+                    'due_date' => $project->end_date?->format('Y-m-d'),
+                    'due_date_formatted' => $project->end_date?->format('M j, Y'),
+                    'team' => [
+                        'avatars' => $teamMembers,
+                        'extra' => $teamExtra,
+                    ],
                 ];
-            })->values()->all();
-            $teamExtra = max(0, $teamUsers->count() - 3);
-
-            return [
-                'id' => $project->id,
-                'title' => $project->title,
-                'description' => $project->description,
-                'status' => $project->status,
-                'client_name' => $project->client?->company_name ?? null,
-                'progress' => $progress,
-                'due_date' => $project->end_date?->format('Y-m-d'),
-                'due_date_formatted' => $project->end_date?->format('M j, Y'),
-                'team' => [
-                    'avatars' => $teamMembers,
-                    'extra' => $teamExtra,
-                ],
-            ];
-        })->values()->all();
+            });
 
         $clients = DB::table('clients')
             ->where('organization_id', $organization->id)

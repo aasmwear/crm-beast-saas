@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { router, useForm, usePage } from '@inertiajs/vue3'
+import { Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
@@ -28,9 +28,16 @@ type PageProps = {
   organization?: { slug: string }
   flash?: { success?: string; error?: string }
 }
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedEmployees = {
+  data: Employee[]
+  links: PaginationLink[]
+  total: number
+}
 
 const props = defineProps<{
-  employees: Employee[]
+  employees: PaginatedEmployees
+  filters?: { q?: string | null }
   departments: Department[]
   roles: string[]
   organization?: { id: number; name: string; slug: string }
@@ -50,18 +57,25 @@ const org = computed(() => {
   return props.organization?.slug ?? props.organizationSlug ?? page.props.tenant?.slug ?? page.props.organization?.slug ?? 'acme'
 })
 
-const searchQuery = ref('')
-const filteredEmployees = computed(() => {
-  if (!searchQuery.value) return props.employees
-  const query = searchQuery.value.toLowerCase()
-  return props.employees.filter(
-    (emp) =>
-      emp.name.toLowerCase().includes(query) ||
-      emp.email.toLowerCase().includes(query) ||
-      emp.role.toLowerCase().includes(query) ||
-      (emp.department_name && emp.department_name.toLowerCase().includes(query))
+const searchQuery = ref(props.filters?.q ?? '')
+const employeeRows = computed(() => props.employees?.data ?? [])
+
+function applySearch() {
+  router.get(
+    r('hrm.index', { organization: org.value }),
+    { q: searchQuery.value || undefined },
+    {
+      preserveScroll: true,
+      preserveState: true,
+      replace: true,
+    }
   )
-})
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  applySearch()
+}
 
 function statusClass(status: string): string {
   if (status === 'Active') {
@@ -211,7 +225,7 @@ function removeEmployee(employee: Employee) {
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-center gap-4">
           <div class="text-sm text-white/60">
-            <span class="text-2xl font-bold text-white">{{ employees.length }}</span>
+            <span class="text-2xl font-bold text-white">{{ props.employees.total }}</span>
             <span class="ml-2">Total Members</span>
           </div>
         </div>
@@ -236,8 +250,23 @@ function removeEmployee(employee: Employee) {
               type="text"
               placeholder="Search employees..."
               class="w-full md:w-64 rounded-xl border border-white/10 bg-white/5 pl-10 pr-4 py-2 text-sm text-white/90 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition"
+              @keyup.enter="applySearch"
             />
           </div>
+          <button
+            type="button"
+            class="btn-capsule bg-white/10 text-white/80 hover:bg-white/15"
+            @click="applySearch"
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            class="btn-capsule text-white/60 hover:text-white"
+            @click="clearSearch"
+          >
+            Clear
+          </button>
         </div>
       </div>
     </div>
@@ -258,7 +287,7 @@ function removeEmployee(employee: Employee) {
           </thead>
           <tbody class="divide-y divide-white/5">
             <tr
-              v-for="employee in filteredEmployees"
+              v-for="employee in employeeRows"
               :key="employee.id"
               class="hover:bg-white/[0.02] transition"
             >
@@ -349,7 +378,7 @@ function removeEmployee(employee: Employee) {
               </td>
             </tr>
 
-            <tr v-if="!filteredEmployees.length">
+            <tr v-if="!employeeRows.length">
               <td :colspan="(props.canEdit !== false || props.canDelete !== false) ? 6 : 5" class="px-6 py-12 text-center text-sm text-white/50">
                 <svg
                   class="mx-auto h-12 w-12 text-white/20 mb-3"
@@ -369,6 +398,33 @@ function removeEmployee(employee: Employee) {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div
+        v-if="props.employees.links && props.employees.links.length > 1"
+        class="border-t border-white/10 bg-black/20 px-4 py-3"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="text-xs text-white/50">
+            {{ props.employees.total }} total members
+          </div>
+          <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+            <Link
+              v-for="link in props.employees.links"
+              :key="link.label + (link.url || '')"
+              :href="link.url || '#'"
+              class="rounded-full px-3 py-1"
+              :class="[
+                link.active
+                  ? 'bg-white/20 text-white'
+                  : link.url
+                    ? 'text-white/70 hover:bg-white/10'
+                    : 'text-white/30 cursor-default',
+              ]"
+              v-html="link.label"
+            />
+          </nav>
+        </div>
       </div>
     </div>
 

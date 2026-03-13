@@ -26,11 +26,9 @@ final class ProjectBoardController extends Controller
             ->where('organization_id', $organization->id)
             ->visibleTo($user)
             ->orderByDesc('created_at')
-            ->get();
-
-        return Inertia::render('Projects/Board', [
-            'organization' => $organization->only(['id', 'name', 'slug']),
-            'projects' => $projects->map(static function (Project $project): array {
+            ->paginate(25)
+            ->withQueryString()
+            ->through(static function (Project $project): array {
                 return [
                     'id' => $project->id,
                     'title' => $project->title,
@@ -38,7 +36,11 @@ final class ProjectBoardController extends Controller
                     'project_manager_id' => $project->project_manager_id,
                     'project_manager_name' => optional($project->manager)->name,
                 ];
-            })->values(),
+            });
+
+        return Inertia::render('Projects/Board', [
+            'organization' => $organization->only(['id', 'name', 'slug']),
+            'projects' => $projects,
         ]);
     }
 }

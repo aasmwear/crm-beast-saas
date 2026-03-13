@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { Link, useForm } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import PageShell from '@/Components/ui/PageShell.vue'
 import Card from '@/Components/ui/Card.vue'
@@ -28,6 +28,11 @@ type ProjectCard = {
 
 type Client = { id: number; company_name: string }
 type UserOption = { id: number; name: string }
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedProjects = {
+  data: ProjectCard[]
+  links: PaginationLink[]
+}
 
 const routeGlobal = (window as any).route
 const r = (name: string, params: Record<string, unknown> = {}) =>
@@ -35,13 +40,14 @@ const r = (name: string, params: Record<string, unknown> = {}) =>
 
 const props = defineProps<{
   organization: { id: number; name: string; slug: string }
-  projects: ProjectCard[]
+  projects: PaginatedProjects
   clients: Client[]
   users: UserOption[]
   canCreate?: boolean
 }>()
 
 const orgSlug = computed(() => props.organization?.slug ?? 'acme')
+const projects = computed(() => props.projects?.data ?? [])
 
 const showingCreateModal = ref(false)
 
@@ -228,6 +234,28 @@ function projectUrl(project: ProjectCard): string {
         </button>
       </template>
     </EmptyState>
+
+    <div
+      v-if="props.projects.links && props.projects.links.length > 1"
+      class="border-t border-white/10 pt-4"
+    >
+      <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+        <Link
+          v-for="link in props.projects.links"
+          :key="link.label + (link.url || '')"
+          :href="link.url || '#'"
+          class="rounded-full px-3 py-1"
+          :class="[
+            link.active
+              ? 'bg-white/20 text-white'
+              : link.url
+                ? 'text-white/70 hover:bg-white/10'
+                : 'text-white/30 cursor-default',
+          ]"
+          v-html="link.label"
+        />
+      </nav>
+    </div>
 
     <Modal :show="showingCreateModal" max-width="lg" @close="closeCreateModal">
       <div class="p-6 text-left text-white">

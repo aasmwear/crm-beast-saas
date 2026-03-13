@@ -51,13 +51,30 @@ final class HRMController extends Controller
              abort(404, 'Organization not found');
         }
 
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+        ]);
+        $search = trim((string) ($validated['q'] ?? ''));
+
         $users = $organization->users()
             ->with(['department', 'roles'])
             ->select('users.id', 'users.name', 'users.email', 'users.designation', 'users.created_at', 'users.joining_date', 'users.active_organization_id', 'users.department_id')
             ->orderBy('users.name')
-            ->get();
+            ->when($search !== '', static function ($query) use ($search): void {
+                $query->where(static function ($where) use ($search): void {
+                    $where
+                        ->where('users.name', 'like', "%{$search}%")
+                        ->orWhere('users.email', 'like', "%{$search}%")
+                        ->orWhere('users.designation', 'like', "%{$search}%")
+                        ->orWhereHas('department', static function ($departmentQuery) use ($search): void {
+                            $departmentQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->paginate(25)
+            ->withQueryString();
 
-        $employees = $users->map(function ($user) use ($organization) {
+        $employees = $users->through(function (User $user) use ($organization): array {
             $roleLabel = $user->roles->pluck('name')->join(', ') ?: 'Employee';
 
             return [
@@ -68,7 +85,7 @@ final class HRMController extends Controller
                 'role' => $roleLabel,
                 'department_id' => $user->department_id,
                 'department_name' => $user->department->name ?? '-',
-                'status' => ($user->active_organization_id == $organization->id) ? 'Active' : 'Inactive',
+                'status' => ((int) $user->active_organization_id === (int) $organization->id) ? 'Active' : 'Inactive',
                 'joined' => ($user->joining_date ?? $user->created_at)?->format('M d, Y') ?? 'N/A',
                 'avatar_path' => $user->avatar_path,
             ];
@@ -96,6 +113,9 @@ final class HRMController extends Controller
 
         return Inertia::render('HRM/Index', [
             'employees' => $employees,
+            'filters' => [
+                'q' => $search,
+            ],
             'departments' => $departments,
             'roles' => $roles,
             'organization' => $organization->only(['id', 'name', 'slug']),

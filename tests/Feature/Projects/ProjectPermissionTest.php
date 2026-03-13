@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -85,6 +86,122 @@ class ProjectPermissionTest extends TestCase
             ]));
 
         $response->assertOk();
+    }
+
+    public function test_projects_index_is_paginated_with_25_per_page(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $role = Role::create([
+            'name' => 'project-viewer-paginated-list',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('projects.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        Project::factory()->count(30)->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.index', ['organization' => $org->slug]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Projects/Index')
+                ->where('projects.total', 30)
+                ->has('projects.data', 25)
+                ->has('projects.links')
+            );
+    }
+
+    public function test_projects_board_is_paginated_with_25_per_page(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $role = Role::create([
+            'name' => 'project-viewer-paginated-board',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('projects.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        Project::factory()->count(31)->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.board', ['organization' => $org->slug]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Projects/Board')
+                ->where('projects.total', 31)
+                ->has('projects.data', 25)
+                ->has('projects.links')
+            );
+    }
+
+    public function test_projects_calendar_is_paginated_and_preserves_date_filters(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $role = Role::create([
+            'name' => 'project-viewer-paginated-calendar',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('projects.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        Project::factory()->count(30)->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+            'start_date' => '2026-01-10',
+            'end_date' => '2026-01-20',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.calendar', [
+                'organization' => $org->slug,
+                'from' => '2026-01-01',
+                'to' => '2026-01-31',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Projects/Calendar')
+                ->where('filters.from', '2026-01-01')
+                ->where('filters.to', '2026-01-31')
+                ->where('events.total', 30)
+                ->has('events.data', 25)
+                ->where('events.next_page_url', fn (?string $url) => is_string($url)
+                    && str_contains($url, 'from=2026-01-01')
+                    && str_contains($url, 'to=2026-01-31'))
+                ->has('events.links')
+            );
     }
 
     public function test_user_without_projects_view_gets_403_on_list(): void

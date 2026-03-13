@@ -9,6 +9,7 @@ use App\Support\PlanCatalog;
 use App\Models\OrganizationSubscription;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -75,6 +76,41 @@ class HRMPermissionTest extends TestCase
             ->get(route('hrm.index', ['organization' => $org->slug]));
 
         $response->assertOk();
+    }
+
+    public function test_hrm_index_is_paginated_and_preserves_search_filter(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = $this->createUserWithRole($org, 'hrm-viewer-paginated', ['hrm.view']);
+
+        User::factory()->count(30)->create([
+            'name' => 'Needle Person',
+            'active_organization_id' => $org->id,
+        ])->each(function (User $member) use ($org): void {
+            $org->users()->attach($member->id);
+        });
+
+        User::factory()->count(4)->create([
+            'name' => 'Other Person',
+            'active_organization_id' => $org->id,
+        ])->each(function (User $member) use ($org): void {
+            $org->users()->attach($member->id);
+        });
+
+        $this->actingAs($user)
+            ->get(route('hrm.index', [
+                'organization' => $org->slug,
+                'q' => 'Needle',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('HRM/Index')
+                ->where('filters.q', 'Needle')
+                ->where('employees.total', 30)
+                ->has('employees.data', 25)
+                ->where('employees.next_page_url', fn (?string $url) => is_string($url) && str_contains($url, 'q=Needle'))
+                ->has('employees.links')
+            );
     }
 
     public function test_user_without_hrm_or_users_view_gets_403(): void
