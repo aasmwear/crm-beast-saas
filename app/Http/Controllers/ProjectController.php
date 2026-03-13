@@ -134,7 +134,10 @@ final class ProjectController extends Controller
                     ->visibleTo($user)
                     ->orderByDesc('id');
             },
-            'files' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
+            'files' => static fn ($q) => $q
+                ->where('organization_id', $organization->id)
+                ->with('user:id,name')
+                ->orderByDesc('created_at'),
             'comments' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
             'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
         ]);

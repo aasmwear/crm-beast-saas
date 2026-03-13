@@ -39,11 +39,12 @@ final class TaskBoardController extends Controller
             END")
             ->orderBy('due_date')
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
 
         return Inertia::render('Tasks/Board', [
             'organization' => $organization->only(['id', 'name', 'slug']),
-            'tasks' => $tasks->map(function (Task $task) use ($user): array {
+            'tasks' => $tasks->through(function (Task $task) use ($user): array {
                 return [
                     'id' => $task->id,
                     'title' => $task->title,
@@ -56,7 +57,7 @@ final class TaskBoardController extends Controller
                     ],
                     'can_update' => $user->can('update', $task),
                 ];
-            })->values(),
+            }),
         ]);
     }
 }

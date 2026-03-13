@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 final class ProjectFileController extends Controller
 {
@@ -50,6 +50,7 @@ final class ProjectFileController extends Controller
         }
 
         $projectFile = ProjectFile::create([
+            'organization_id' => $organization->id,
             'project_id' => $project->id,
             'user_id' => $request->user()->id,
             'filename' => $filename,
@@ -80,9 +81,7 @@ final class ProjectFileController extends Controller
             abort(404);
         }
 
-        if ((int) $projectFile->project_id !== (int) $project->id) {
-            abort(404);
-        }
+        $projectFile = $this->resolveScopedProjectFile($organization, $project, $projectFile);
 
         Storage::disk('public')->delete($projectFile->path);
         $projectFile->delete();
@@ -101,9 +100,7 @@ final class ProjectFileController extends Controller
             abort(404);
         }
 
-        if ((int) $projectFile->project_id !== (int) $project->id) {
-            abort(404);
-        }
+        $projectFile = $this->resolveScopedProjectFile($organization, $project, $projectFile);
 
         $projectFile->update([
             'is_visible_to_client' => ! $projectFile->is_visible_to_client,
@@ -115,7 +112,7 @@ final class ProjectFileController extends Controller
     /**
      * Force download of a file.
      */
-    public function download(Request $request, Organization $organization, Project $project, ProjectFile $projectFile): StreamedResponse|Response
+    public function download(Request $request, Organization $organization, Project $project, ProjectFile $projectFile): BinaryFileResponse|Response
     {
         $this->authorize('view', $project);
 
@@ -123,9 +120,7 @@ final class ProjectFileController extends Controller
             abort(404);
         }
 
-        if ((int) $projectFile->project_id !== (int) $project->id) {
-            abort(404);
-        }
+        $projectFile = $this->resolveScopedProjectFile($organization, $project, $projectFile);
 
         $fullPath = Storage::disk('public')->path($projectFile->path);
 
@@ -140,5 +135,14 @@ final class ProjectFileController extends Controller
                 'Content-Type' => $projectFile->mime_type ?? 'application/octet-stream',
             ],
         );
+    }
+
+    private function resolveScopedProjectFile(Organization $organization, Project $project, ProjectFile $projectFile): ProjectFile
+    {
+        return ProjectFile::query()
+            ->whereKey($projectFile->id)
+            ->where('organization_id', $organization->id)
+            ->where('project_id', $project->id)
+            ->firstOrFail();
     }
 }

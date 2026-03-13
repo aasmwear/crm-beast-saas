@@ -9,6 +9,7 @@
 - **Route pattern:** All tenant routes must be under `/org/{organization:slug}/...`
 - **Tenant resolution:** `ResolveTenant` middleware resolves org from route and sets Spatie team context
 - **No cross-tenant leakage:** Every org-scoped query MUST filter by `organization_id` or equivalent
+- **Tenant-owned attachments:** `project_files` MUST always carry `organization_id`; read/write paths must scope by `organization_id` plus parent id (`project_id`) for defense-in-depth
 - **Validation hardening:** Foreign-key inputs (e.g. `client_id`, `department_id`, assignee user IDs) MUST use org-scoped validation rules (`Rule::exists(...)->where('organization_id', $org->id)` or organization membership pivot checks)
 - **Team ID = Organization ID:** Spatie permission/role scoping uses `team_id` = `organization_id`
 
@@ -23,6 +24,8 @@
 - **Clients module:** clients.view (list/show), clients.create, clients.edit (edit/update), clients.delete, clients.manage/clients.export (bulk)
 - **Projects module:** projects.view (list/show/board/calendar), projects.create, projects.edit (edit/update/status/files), projects.delete, projects.manage (bulk/special)
 - **Tasks module:** tasks.view (list/board/show), tasks.create, tasks.edit (edit/update/move/submit/review), tasks.delete, tasks.manage (bulk/special), tasks.review (review submitted tasks)
+- **Task visibility/indexing:** `tasks.assignees` is JSONB and visibility checks use `whereJsonContains`; PostgreSQL deployments MUST keep a GIN index on `tasks.assignees` (`jsonb_path_ops`) to avoid full scans at tenant scale.
+- **Task board safety:** Board endpoints must be paginated (current baseline: `paginate(50)->withQueryString()`), never unbounded `->get()`.
 - **Attendance module:** attendance.view (index/history), attendance.create (clock in/out), attendance.edit (update status/notes), attendance.delete (destroy), attendance.manage (approve, bulk); legacy: view-own, clock-in, clock-out, approve
 - **Attendance data integrity:** "Today" and one-record-per-day checks use `organization.timezone` (not app default). Partial unique index on `(organization_id, user_id) WHERE clock_out_at IS NULL` prevents double clock-in race. Approve requires `clock_out_at IS NOT NULL` and `status === 'closed'`.
 - **HRM module:** hrm.view (index), hrm.create (store), hrm.edit (update), hrm.delete (destroy), hrm.manage (all); UserPolicy accepts hrm.* or users.*

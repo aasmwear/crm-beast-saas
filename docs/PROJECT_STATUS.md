@@ -39,6 +39,31 @@
 
 ## Last PR Notes
 
+- **Task board scale hardening + assignee index (rescue-mission):**
+  - **Goal:** Apply highest-priority scale fixes from audit for task visibility and task board loading.
+  - **Indexes:** Added PostgreSQL GIN index `tasks_assignees_gin_idx` on `tasks.assignees` (`jsonb_path_ops`) to accelerate `whereJsonContains('assignees', ...)` visibility checks; added composite index `tasks_organization_id_status_idx` on `(organization_id, status)` for tenant/status board access patterns.
+  - **Task board pagination:** `TaskBoardController::index` now uses `paginate(50)->withQueryString()` (previously unbounded `->get()`), preserving existing tenant scope, `visibleTo`, eager loads, and ordering.
+  - **Frontend:** `Tasks/Board.vue` now reads paginated props (`tasks.data`, `tasks.links`) and renders pagination links using existing app pagination style.
+  - **Tests:** `TaskPermissionTest` extended to verify board pagination count (`50` per page), total (`tasks.total`), visibility enforcement remains intact, and query strings are preserved in pagination links.
+  - **QA checklist:**
+    1. Open `/org/{org}/tasks/board` with >50 visible tasks; confirm only 50 render per page.
+    2. Navigate board pagination links; confirm links keep existing query string parameters.
+    3. Verify non-admin user only sees tasks permitted by `visibleTo` rules.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
+- **Project files tenant isolation hardening (rescue-mission):**
+  - **Goal:** Make `project_files` tenant-safe at schema level and enforce direct org scoping on file paths.
+  - **Schema:** Added migration to introduce `project_files.organization_id`, backfill from `projects.organization_id`, enforce NOT NULL, index `organization_id`, and add FK to `organizations`.
+  - **Write path:** `ProjectFileController::store` now writes `organization_id` from resolved tenant route context.
+  - **Read/mutate paths:** `ProjectFileController` now resolves files by `id + organization_id + project_id`; portal file list/download also enforce direct `organization_id` matching.
+  - **Billing usage read-model:** `StorageUsageService` now scopes storage sums directly by `project_files.organization_id` (no project join required).
+  - **Tests:** Added `ProjectFileTenantIsolationTest` (org_id set on create, cross-tenant mismatched file blocked, same-tenant download/toggle/delete still work); updated storage quota/usage tests to include `organization_id` in direct `project_files` inserts.
+  - **QA checklist:**
+    1. Upload file to `/org/{org}/projects/{project}` and verify `project_files.organization_id` equals org id.
+    2. Attempt file download with mismatched `organization_id` row -> request returns 404.
+    3. Same-tenant file download/toggle/delete continues working.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **HRM security & onboarding reliability (rescue-mission):**
   - **Goal:** Remove weak default password behavior and eliminate silent role-assignment failures in employee onboarding flows.
   - **Password security:** `HRMController::store()` no longer uses `Hash::make('password')`. It now sets a strong random password server-side and triggers password reset link delivery for safe first-time credential setup.

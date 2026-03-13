@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 final class ProjectController extends Controller
 {
@@ -29,7 +29,10 @@ final class ProjectController extends Controller
 
         $project->load([
             'tasks' => fn ($q) => $q->select(['id', 'project_id', 'title', 'status', 'due_date'])->orderBy('id'),
-            'files' => fn ($q) => $q->where('is_visible_to_client', true)->orderByDesc('created_at'),
+            'files' => fn ($q) => $q
+                ->where('organization_id', $project->organization_id)
+                ->where('is_visible_to_client', true)
+                ->orderByDesc('created_at'),
         ]);
 
         $projectData = $project->only(['id', 'title', 'status', 'description', 'start_date', 'end_date']);
@@ -50,7 +53,7 @@ final class ProjectController extends Controller
     /**
      * Download a project file (client-visible only).
      */
-    public function downloadFile(Request $request, Project $project, ProjectFile $projectFile): StreamedResponse
+    public function downloadFile(Request $request, Project $project, ProjectFile $projectFile): BinaryFileResponse
     {
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -59,9 +62,12 @@ final class ProjectController extends Controller
             abort(404);
         }
 
-        if ((int) $projectFile->project_id !== (int) $project->id || ! $projectFile->is_visible_to_client) {
-            abort(404);
-        }
+        $projectFile = ProjectFile::query()
+            ->whereKey($projectFile->id)
+            ->where('organization_id', $project->organization_id)
+            ->where('project_id', $project->id)
+            ->where('is_visible_to_client', true)
+            ->firstOrFail();
 
         $fullPath = Storage::disk('public')->path($projectFile->path);
 

@@ -28,7 +28,7 @@
 |-------|-------------|-----------------|---------|
 | projects | id, organization_id, client_id, title, project_manager_id | FK, cascade | (org_id, client_id), (org_id, project_code) unique |
 | project_messages | id, organization_id, project_id, author_id | FK, cascade | (org_id, project_id) |
-| project_files | id, project_id, user_id | via project | — |
+| project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id |
 | project_user | id, project_id, user_id | via project | — |
 | comments | id, organization_id, user_id, morphs(commentable) | FK, cascade | (org_id, created_at) |
 
@@ -36,7 +36,7 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| tasks | id, organization_id, project_id, assignees (json) | FK, cascade | (org_id, project_id) |
+| tasks | id, organization_id, project_id, assignees (jsonb) | FK, cascade | (org_id, project_id), (org_id, status), GIN(assignees jsonb_path_ops) |
 
 ### Attendance
 
@@ -110,17 +110,17 @@
 
 4. ~~**notifications table**~~ — **FIXED:** `organization_id` column added, backfilled from JSON. Index (org_id, read_at, created_at). Query uses column with JSON fallback.
 
-5. **project_files has no organization_id** — Scoped via project_id only. OK if project is always org-scoped; add index on project_id if missing.
+5. ~~**project_files has no organization_id**~~ — **FIXED:** `organization_id` added, backfilled from projects, indexed, FK-enforced. File queries should scope by `(organization_id, project_id)`.
 
-6. **ReportController export** — Uses `client->getAttribute('email')` and `client->getAttribute('phone')` but Client has `primary_contact_email`, `primary_contact_phone`. Export columns likely empty.
+6. ~~**Task assignee visibility scans are unindexed**~~ — **FIXED:** GIN index added on `tasks.assignees` for `whereJsonContains('assignees', ...)` visibility queries.
 
-7. **client_contacts** — No organization_id; scoped via client. OK if client is always org-scoped.
+7. ~~**Task board can load all tasks without pagination**~~ — **FIXED:** task board now paginates at 50 rows per page with query-string-preserving links.
 
-8. **invoice_items** — No organization_id; scoped via invoice. OK.
+8. **client_contacts** — No organization_id; scoped via client. OK if client is always org-scoped.
 
-9. **Naming mismatch: notifications_center vs notifications** — Migration history shows rename from custom `notifications` to `notification_events`; Laravel `notifications` is separate. Ensure no orphan `notifications_center` table.
+9. **invoice_items** — No organization_id; scoped via invoice. OK.
 
-10. **Spatie team_id** — Roles can have team_id = null (global) or org id. Ensure all tenant role checks use team_id.
+10. **Naming mismatch: notifications_center vs notifications** — Migration history shows rename from custom `notifications` to `notification_events`; Laravel `notifications` is separate. Ensure no orphan `notifications_center` table.
 
 ---
 # Note: Orphans default to first org only if subject/commentable missing.

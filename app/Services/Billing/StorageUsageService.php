@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * Canonical storage usage read model for runtime billing enforcement hooks.
  *
  * Current implementation uses project file attachments (`project_files.size`)
- * scoped via `projects.organization_id`. This is intentionally incremental and
+ * scoped directly via `project_files.organization_id`. This is intentionally incremental and
  * can be extended later when additional storage-backed modules are introduced.
  */
 final class StorageUsageService
@@ -21,8 +21,7 @@ final class StorageUsageService
     public function currentUsageBytes(Organization $org): int
     {
         $bytes = DB::table('project_files')
-            ->join('projects', 'projects.id', '=', 'project_files.project_id')
-            ->where('projects.organization_id', (int) $org->id)
+            ->where('project_files.organization_id', (int) $org->id)
             ->sum('project_files.size');
 
         return (int) $bytes;

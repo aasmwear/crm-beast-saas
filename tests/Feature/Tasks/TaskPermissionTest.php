@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -358,5 +359,149 @@ class TaskPermissionTest extends TestCase
             'organization_id' => $org->id,
             'title' => 'New Task',
         ]);
+    }
+
+    public function test_task_board_is_paginated_with_50_per_page_and_total_count(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $role = Role::create([
+            'name' => 'task-board-paginated-viewer',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('tasks.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+        ]);
+
+        Task::factory()->count(55)->create([
+            'organization_id' => $org->id,
+            'project_id' => $project->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.board', ['organization' => $org->slug]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('tasks.total', 55)
+                ->has('tasks.data', 50)
+                ->has('tasks.links')
+            );
+    }
+
+    public function test_task_board_respects_visibility_scope_for_non_admin_user(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $otherUser = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($otherUser->id);
+
+        $role = Role::create([
+            'name' => 'task-board-visibility-viewer',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('tasks.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+        $otherUser->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        $visibleProject = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+        ]);
+        $hiddenProject = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $otherUser->id,
+        ]);
+
+        $visibleTask = Task::factory()->create([
+            'organization_id' => $org->id,
+            'project_id' => $visibleProject->id,
+            'title' => 'Visible Task',
+        ]);
+        Task::factory()->create([
+            'organization_id' => $org->id,
+            'project_id' => $hiddenProject->id,
+            'title' => 'Hidden Task',
+            'assignees' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.board', ['organization' => $org->slug]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('tasks.total', 1)
+                ->has('tasks.data', 1)
+                ->where('tasks.data.0.id', $visibleTask->id)
+                ->where('tasks.data.0.title', 'Visible Task')
+            );
+    }
+
+    public function test_task_board_pagination_links_preserve_query_string(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $user = User::factory()->create([
+            'active_organization_id' => $org->id,
+        ]);
+        $org->users()->attach($user->id);
+
+        $role = Role::create([
+            'name' => 'task-board-query-links-viewer',
+            'guard_name' => 'web',
+            'team_id' => $org->id,
+        ]);
+        $role->givePermissionTo('tasks.view');
+        app(PermissionRegistrar::class)->setPermissionsTeamId($org->id);
+        $user->assignRole($role);
+
+        $client = $this->createClientForOrg($org);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+            'project_manager_id' => $user->id,
+        ]);
+        Task::factory()->count(55)->create([
+            'organization_id' => $org->id,
+            'project_id' => $project->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.board', [
+                'organization' => $org->slug,
+                'status' => 'todo',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('tasks.links', static function ($links): bool {
+                    return collect($links)
+                        ->pluck('url')
+                        ->filter()
+                        ->contains(static fn (mixed $url): bool => is_string($url) && str_contains($url, 'status=todo'));
+                })
+            );
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Project file attachment.
  *
  * @property int $id
+ * @property int $organization_id
  * @property int $project_id
  * @property int $user_id
  * @property string $filename
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class ProjectFile extends Model
 {
     protected $fillable = [
-        'project_id', 'user_id', 'filename', 'path', 'mime_type', 'size',
+        'organization_id', 'project_id', 'user_id', 'filename', 'path', 'mime_type', 'size',
         'is_visible_to_client',
     ];
 
@@ -32,6 +33,11 @@ final class ProjectFile extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function user(): BelongsTo

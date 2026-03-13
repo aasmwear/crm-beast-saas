@@ -23,10 +23,15 @@ interface BoardTask {
   project: ProjectSummary
   can_update: boolean
 }
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedTasks = {
+  data: BoardTask[]
+  links: PaginationLink[]
+}
 
 const props = defineProps<{
   organization: { id: number; name: string; slug: string }
-  tasks: BoardTask[]
+  tasks: PaginatedTasks
   projectId?: number // Optional: if viewing a single project's task board
 }>()
 
@@ -43,7 +48,7 @@ const orgSlug = computed(() => {
 const { subscribeToProject, unsubscribeAll, isReady } = useRealtime()
 
 // Track local task state (for realtime updates)
-const localTasks = ref<BoardTask[]>([...props.tasks])
+const localTasks = ref<BoardTask[]>([...(props.tasks.data ?? [])])
 
 // Subscribe to realtime updates if viewing a specific project
 onMounted(() => {
@@ -345,5 +350,27 @@ function onColumnChange(task: BoardTask, event: Event) {
       :organization-slug="orgSlug"
       @close="closeDrawer"
     />
+
+    <div
+      v-if="props.tasks.links && props.tasks.links.length > 1"
+      class="border-t border-white/10 pt-4"
+    >
+      <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+        <Link
+          v-for="link in props.tasks.links"
+          :key="link.label + (link.url || '')"
+          :href="link.url || '#'"
+          class="rounded-full px-3 py-1"
+          :class="[
+            link.active
+              ? 'bg-white/20 text-white'
+              : link.url
+                ? 'text-white/70 hover:bg-white/10'
+                : 'text-white/30 cursor-default',
+          ]"
+          v-html="link.label"
+        />
+      </nav>
+    </div>
   </PageShell>
 </template>

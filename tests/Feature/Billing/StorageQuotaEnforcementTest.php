@@ -64,6 +64,7 @@ final class StorageQuotaEnforcementTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('project_files', [
+            'organization_id' => $org->id,
             'project_id' => $project->id,
             'filename' => 'document.pdf',
         ]);
@@ -94,6 +95,7 @@ final class StorageQuotaEnforcementTest extends TestCase
         $user->assignRole($ownerRole);
 
         DB::table('project_files')->insert([
+            'organization_id' => $org->id,
             'project_id' => $project->id,
             'user_id' => $user->id,
             'filename' => 'existing.bin',
@@ -164,6 +166,7 @@ final class StorageQuotaEnforcementTest extends TestCase
         $largeUser->assignRole($ownerRole);
 
         DB::table('project_files')->insert([
+            'organization_id' => $smallOrg->id,
             'project_id' => $smallProject->id,
             'user_id' => $smallUser->id,
             'filename' => 'existing.bin',

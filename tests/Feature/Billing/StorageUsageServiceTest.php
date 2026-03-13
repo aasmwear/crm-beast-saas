@@ -61,6 +61,7 @@ final class StorageUsageServiceTest extends TestCase
         ]);
 
         DB::table('project_files')->insert([
+            'organization_id' => $org->id,
             'project_id' => $project->id,
             'user_id' => $uploader->id,
             'filename' => 'large.bin',
