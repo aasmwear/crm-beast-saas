@@ -27,13 +27,10 @@ final class ClientsPipelineController extends Controller
             ->forOrg($organization->id)
             ->visibleTo($user)
             ->orderBy('status')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+            ->select(['id', 'company_name', 'status']);
 
-        $clients = $query->get([
-            'id',
-            'company_name',
-            'status',
-        ]);
+        $clients = $query->paginate(50)->withQueryString();
 
         return Inertia::render('Clients/Pipeline', [
             'organizationSlug' => $organization->slug,

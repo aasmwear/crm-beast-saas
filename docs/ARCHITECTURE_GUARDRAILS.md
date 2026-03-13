@@ -7,7 +7,7 @@
 ## Multi-Tenancy
 
 - **Route pattern:** All tenant routes must be under `/org/{organization:slug}/...`
-- **Tenant resolution:** `ResolveTenant` middleware resolves org from route and sets Spatie team context
+- **Tenant resolution:** `ResolveTenant` middleware resolves org from route and sets Spatie team context. The `active_organization_id` column is canonical; no per-request schema checks.
 - **No cross-tenant leakage:** Every org-scoped query MUST filter by `organization_id` or equivalent
 - **Tenant-owned attachments:** `project_files` MUST always carry `organization_id`; read/write paths must scope by `organization_id` plus parent id (`project_id`) for defense-in-depth
 - **Validation hardening:** Foreign-key inputs (e.g. `client_id`, `department_id`, assignee user IDs) MUST use org-scoped validation rules (`Rule::exists(...)->where('organization_id', $org->id)` or organization membership pivot checks)

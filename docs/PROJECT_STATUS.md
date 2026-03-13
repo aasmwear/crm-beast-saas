@@ -39,6 +39,18 @@
 
 ## Last PR Notes
 
+- **Scale pass two: indexes, pipeline pagination, portal bounding, ResolveTenant cleanup (rescue-mission):**
+  - **Indexes:** Added migration with 6 composite indexes: `idx_projects_org_status`, `idx_projects_org_pm`, `idx_project_files_org_project`, `idx_stripe_webhook_events_org`, `idx_clients_org_status`, `idx_activities_subject`.
+  - **Clients Pipeline:** Replaced unbounded `->get()` with `paginate(50)->withQueryString()`; Pipeline.vue now consumes `clients.data`/`clients.links` and renders pagination controls.
+  - **Portal Dashboard:** Replaced unbounded project load with `limit(50)` to bound memory for clients with many projects (low-risk; no pagination UI).
+  - **ResolveTenant:** Removed per-request `Schema::hasColumn('users', 'active_organization_id')` check; column is canonical.
+  - **Tests:** ClientsPipelinePaginationTest (paginated, query string, visibility), PortalDashboardProjectsBoundedTest, ResolveTenantActiveOrgTest.
+  - **QA checklist:**
+    1. Clients Pipeline with >50 clients: 50 per page, pagination links work, filters preserved.
+    2. Portal dashboard with 60+ projects: only 50 rendered.
+    3. Switch org via nav: user's active_organization_id updates.
+    4. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Task board scale hardening + assignee index (rescue-mission):**
   - **Goal:** Apply highest-priority scale fixes from audit for task visibility and task board loading.
   - **Indexes:** Added PostgreSQL GIN index `tasks_assignees_gin_idx` on `tasks.assignees` (`jsonb_path_ops`) to accelerate `whereJsonContains('assignees', ...)` visibility checks; added composite index `tasks_organization_id_status_idx` on `(organization_id, status)` for tenant/status board access patterns.

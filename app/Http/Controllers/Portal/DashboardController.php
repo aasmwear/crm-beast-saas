@@ -32,6 +32,7 @@ final class DashboardController extends Controller
             ->where('client_id', $user->client_id)
             ->select(['id', 'client_id', 'title', 'status', 'start_date', 'end_date'])
             ->orderByDesc('id')
+            ->limit(50)
             ->get();
 
         $invoices = Invoice::query()

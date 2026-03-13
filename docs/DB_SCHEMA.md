@@ -19,16 +19,16 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| clients | id, organization_id, company_name, fronter_id, closer_id, ... | FK, cascade | (org_id, assigned_account_manager_id) |
+| clients | id, organization_id, company_name, fronter_id, closer_id, ... | FK, cascade | (org_id, assigned_account_manager_id), (org_id, status) |
 | client_contacts | id, client_id, name, email, phone | via client | client_id |
 
 ### Projects
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| projects | id, organization_id, client_id, title, project_manager_id | FK, cascade | (org_id, client_id), (org_id, project_code) unique |
+| projects | id, organization_id, client_id, title, project_manager_id | FK, cascade | (org_id, client_id), (org_id, project_code) unique, (org_id, status), (org_id, project_manager_id) |
 | project_messages | id, organization_id, project_id, author_id | FK, cascade | (org_id, project_id) |
-| project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id |
+| project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id, (org_id, project_id) |
 | project_user | id, project_id, user_id | via project | — |
 | comments | id, organization_id, user_id, morphs(commentable) | FK, cascade | (org_id, created_at) |
 
@@ -60,6 +60,7 @@
 | subscription_items | (Cashier) | — | — |
 | organization_subscriptions | id, organization_id, plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit | FK, unique org | plan_key, status |
 | organization_addons | id, organization_id, addon_key, quantity, value_int, mode (augment\|set), active, starts_at, ends_at | FK, cascade | (org_id, addon_key) |
+| stripe_webhook_events | id, organization_id, stripe_event_id, type, status | FK, nullOnDelete | stripe_event_id unique, organization_id |
 
 ### Settings
 
@@ -79,7 +80,7 @@
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
 | audit_logs | id, organization_id, actor_id, action, entity, entity_id | FK, cascade | (org_id, entity, entity_id) |
-| activities | id, organization_id, user_id, morphs(subject), description | FK, cascade | (org_id, created_at) |
+| activities | id, organization_id, user_id, morphs(subject), description | FK, cascade | (org_id, created_at), (subject_type, subject_id) |
 
 ### HRM / Users
 

@@ -11,10 +11,20 @@ type ClientLite = {
   status: string | null
 }
 
+type PaginationLink = { url: string | null; label: string; active: boolean }
+type PaginatedClients = {
+  data: ClientLite[]
+  links: PaginationLink[]
+  total?: number
+}
+
 const props = defineProps<{
   organizationSlug: string
-  clients: ClientLite[]
+  clients: PaginatedClients
 }>()
+
+/** Client rows for current page (from paginated payload). */
+const clientRows = computed(() => props.clients?.data ?? [])
 
 // --- SAFE ROUTE LOGIC ---
 const routeGlobal = (window as any).route
@@ -53,7 +63,7 @@ const cols = [
 ]
 
 function byCol(key: string) {
-  return props.clients.filter(
+  return clientRows.value.filter(
     (c) => (c.status || 'lead').toLowerCase() === key,
   )
 }
@@ -148,6 +158,28 @@ const clientCardClass =
           </p>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="props.clients?.links && props.clients.links.length > 1"
+      class="mt-6 border-t border-white/10 pt-4"
+    >
+      <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
+        <Link
+          v-for="link in props.clients.links"
+          :key="(link.url || '') + link.label"
+          :href="link.url || '#'"
+          class="rounded-full px-3 py-1"
+          :class="[
+            link.active
+              ? 'bg-white/20 text-white'
+              : link.url
+                ? 'text-white/70 hover:bg-white/10'
+                : 'text-white/30 cursor-default',
+          ]"
+          v-html="link.label"
+        />
+      </nav>
     </div>
   </div>
 </template>

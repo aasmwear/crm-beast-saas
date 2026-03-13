@@ -6,7 +6,6 @@ use App\Models\Organization;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -42,10 +41,9 @@ class ResolveTenant
 
             $user = $request->user();
 
-            // Align the user's active org to the route's org if schema supports it.
+            // Align the user's active org to the route's org (column is canonical).
             try {
-                if (Schema::hasColumn('users', 'active_organization_id')
-                    && (int) $user->active_organization_id !== (int) $org->id) {
+                if ((int) $user->active_organization_id !== (int) $org->id) {
                     $user->forceFill(['active_organization_id' => $org->id])->saveQuietly();
                 }
             } catch (\Throwable $e) {
