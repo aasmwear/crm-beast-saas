@@ -39,6 +39,20 @@
 
 ## Last PR Notes
 
+- **Scale pass three: dropdown bounds, eager load limits, N+1 fix, consolidated revenue query, storage cache (rescue-mission):**
+  - **Dropdown/filter bounds:** Replaced unbounded `->get()` with `->limit(200)->get()` for clients, users, projects dropdowns in ProjectController (index/create/edit/show), TaskController (index projects), InvoiceController (create clients/projects), AttendanceController (user filter), ActivityController (user filter), ClientsInertiaController (assignment users).
+  - **Project show eager load limits:** Tasks, files, comments, activities now use `->limit(200)` / `->limit(100)` in ProjectController::show to bound memory on heavy projects.
+  - **Clients show N+1 fix:** Replaced per-contact `User::where('email', ...)->exists()` with batched lookup: collect contact emails, single `User::whereIn('email', ...)->where('client_id', ...)->pluck('email')`, map in memory.
+  - **Monthly revenue consolidation:** DashboardController::monthlyRevenueSeries now uses single grouped query with `date_trunc('month', paid_at)` instead of 6 separate sum queries.
+  - **StorageUsageService per-request cache:** `currentUsageBytes()` caches result keyed by organization_id for the request lifetime; repeated calls (from isOverLimit, wouldExceedLimit, currentUsageGb) avoid redundant SUM queries.
+  - **Tests:** ScalePassThirdTest (project show bounded, clients portal access batch, monthly revenue format, dropdowns bounded), StorageUsageServiceTest extended (repeated calls consistent).
+  - **QA checklist:**
+    1. Projects index/create/edit/show: clients and users dropdowns load; Tasks index: projects filter loads; Invoices create: clients/projects load; Attendance/Activity: user filter loads.
+    2. Project show with many tasks/files/comments: page loads; only up to limits shown.
+    3. Client show with multiple contacts: has_portal_access correct for portal vs non-portal contacts.
+    4. Dashboard monthly revenue chart: 6 months shown; values match paid invoices.
+    5. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Scale pass two: indexes, pipeline pagination, portal bounding, ResolveTenant cleanup (rescue-mission):**
   - **Indexes:** Added migration with 6 composite indexes: `idx_projects_org_status`, `idx_projects_org_pm`, `idx_project_files_org_project`, `idx_stripe_webhook_events_org`, `idx_clients_org_status`, `idx_activities_subject`.
   - **Clients Pipeline:** Replaced unbounded `->get()` with `paginate(50)->withQueryString()`; Pipeline.vue now consumes `clients.data`/`clients.links` and renders pagination controls.

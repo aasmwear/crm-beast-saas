@@ -78,6 +78,7 @@ class ActivityController extends Controller
                 'users.name as name',
             ])
             ->orderBy('users.name')
+            ->limit(200)
             ->get();
 
         return Inertia::render('Activity/Index', [

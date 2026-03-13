@@ -58,6 +58,14 @@
 
 ---
 
+## Scale & Query Safety
+
+- **Dropdown/filter bounds:** Dropdown and filter option queries (clients, users, projects) MUST use `->limit(200)->get()` or similar safe bounds; never unbounded `->get()`.
+- **Show-page eager loads:** Heavy relations (tasks, files, comments, activities) on show pages MUST have safe limits (e.g. `->limit(100)` or `->limit(200)`) to avoid memory blow-up.
+- **Batch lookups:** Avoid per-item `exists()` or `first()` in loops; collect keys and query once, map in memory.
+- **Aggregation consolidation:** Use single grouped queries (e.g. `date_trunc` + `GROUP BY`) instead of looping with per-iteration queries.
+- **Per-request cache:** Services that read expensive aggregates (e.g. StorageUsageService) should cache by org_id per request when called multiple times.
+
 ## Audit & Observability
 
 - **AuditLogger:** Use for sensitive mutations (clients, projects, roles, billing, etc.)

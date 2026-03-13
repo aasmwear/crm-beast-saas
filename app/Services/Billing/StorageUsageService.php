@@ -18,13 +18,23 @@ final class StorageUsageService
 {
     private const BYTES_PER_GB = 1_073_741_824;
 
+    /** @var array<int, int> Per-request cache: org_id => bytes */
+    private static array $usageCache = [];
+
     public function currentUsageBytes(Organization $org): int
     {
+        $key = (int) $org->id;
+        if (array_key_exists($key, self::$usageCache)) {
+            return self::$usageCache[$key];
+        }
+
         $bytes = DB::table('project_files')
-            ->where('project_files.organization_id', (int) $org->id)
+            ->where('project_files.organization_id', $key)
             ->sum('project_files.size');
 
-        return (int) $bytes;
+        self::$usageCache[$key] = (int) $bytes;
+
+        return self::$usageCache[$key];
     }
 
     public function currentUsageGb(Organization $org): float

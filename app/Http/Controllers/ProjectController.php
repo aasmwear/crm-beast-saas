@@ -89,12 +89,14 @@ final class ProjectController extends Controller
         $clients = DB::table('clients')
             ->where('organization_id', $organization->id)
             ->orderBy('company_name')
+            ->limit(200)
             ->get(['id', 'company_name']);
 
         $users = DB::table('users')
             ->where('active_organization_id', $organization->id)
             ->select('id', 'name')
             ->orderBy('name')
+            ->limit(200)
             ->get();
 
         return Inertia::render('Projects/Index', [
@@ -123,6 +125,7 @@ final class ProjectController extends Controller
         $user = $request->user();
 
         // Load related data needed for the show page (budget, price, currency from model/accessors)
+        // Bounded eager loads to avoid heavy show-page payloads at scale
         $project->load([
             'client:id,company_name',
             'manager:id,name',
@@ -132,14 +135,16 @@ final class ProjectController extends Controller
                 $q->select(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'assignees', 'organization_id'])
                     ->where('organization_id', $organization->id)
                     ->visibleTo($user)
-                    ->orderByDesc('id');
+                    ->orderByDesc('id')
+                    ->limit(200);
             },
             'files' => static fn ($q) => $q
                 ->where('organization_id', $organization->id)
                 ->with('user:id,name')
-                ->orderByDesc('created_at'),
-            'comments' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
-            'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
+                ->orderByDesc('created_at')
+                ->limit(100),
+            'comments' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(100),
+            'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(100),
         ]);
 
         // Get all users in this organization for task assignment
@@ -147,6 +152,7 @@ final class ProjectController extends Controller
             ->where('active_organization_id', $organization->id)
             ->select('id', 'name')
             ->orderBy('name')
+            ->limit(200)
             ->get();
 
         $projectArray = $project->toArray();
@@ -208,12 +214,15 @@ final class ProjectController extends Controller
 
         $clients = DB::table('clients')
             ->where('organization_id', $organization->id)
+            ->orderBy('company_name')
+            ->limit(200)
             ->get(['id', 'company_name']);
 
         $cstManagers = DB::table('users')
             ->where('active_organization_id', $organization->id)
             ->select('id', 'name')
             ->orderBy('name')
+            ->limit(200)
             ->get();
 
         return Inertia::render('Projects/Create', [
@@ -287,12 +296,15 @@ final class ProjectController extends Controller
 
         $clients = DB::table('clients')
             ->where('organization_id', $organization->id)
+            ->orderBy('company_name')
+            ->limit(200)
             ->get(['id', 'company_name']);
 
         $cstManagers = DB::table('users')
             ->where('active_organization_id', $organization->id)
             ->select('id', 'name')
             ->orderBy('name')
+            ->limit(200)
             ->get();
 
         return Inertia::render('Projects/Edit', [

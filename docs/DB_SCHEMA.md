@@ -54,7 +54,7 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| invoices | id, organization_id, client_id, project_id, number | FK, cascade | (org_id, client_id) |
+| invoices | id, organization_id, client_id, project_id, number, paid_at | FK, cascade | (org_id, client_id) |
 | invoice_items | id, invoice_id | via invoice | — |
 | subscriptions | (Cashier) | — | — |
 | subscription_items | (Cashier) | — | — |

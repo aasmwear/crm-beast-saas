@@ -149,11 +149,26 @@ class ClientsInertiaController extends Controller
         ]);
 
         $clientData = $client->toArray();
-        $clientData['contacts'] = collect($clientData['contacts'] ?? [])->map(function (array $c) use ($client): array {
-            $email = $c['email'] ?? null;
-            $hasPortalAccess = $email
-                ? User::where('email', $email)->where('client_id', $client->id)->exists()
-                : false;
+        $contacts = $clientData['contacts'] ?? [];
+
+        // Batch lookup: one query for all contacts instead of N+1 exists() per contact
+        $emailsWithPortal = [];
+        $emailsToCheck = array_filter(array_unique(array_map(
+            static fn (array $c): ?string => ! empty($c['email']) ? trim((string) $c['email']) : null,
+            $contacts,
+        )));
+        if ($emailsToCheck !== []) {
+            $emailsWithPortal = User::query()
+                ->where('client_id', $client->id)
+                ->whereIn('email', $emailsToCheck)
+                ->pluck('email')
+                ->all();
+        }
+
+        $emailsWithPortalSet = array_flip($emailsWithPortal);
+        $clientData['contacts'] = collect($contacts)->map(static function (array $c) use ($emailsWithPortalSet): array {
+            $email = ! empty($c['email']) ? trim((string) $c['email']) : null;
+            $hasPortalAccess = $email !== null && isset($emailsWithPortalSet[$email]);
 
             return array_merge($c, ['has_portal_access' => $hasPortalAccess]);
         })->values()->all();
@@ -259,6 +274,7 @@ class ClientsInertiaController extends Controller
             ->select('users.id', 'users.name')
             ->distinct()
             ->orderBy('users.name')
+            ->limit(200)
             ->get();
     }
 }

@@ -78,4 +78,36 @@ final class StorageUsageServiceTest extends TestCase
         $this->assertGreaterThan(1.0, $service->currentUsageGb($org));
         $this->assertTrue($service->isOverLimit($org));
     }
+
+    public function test_repeated_calls_return_consistent_values_per_request(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'acme']);
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $uploader = User::factory()->create(['active_organization_id' => $org->id]);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+        ]);
+
+        DB::table('project_files')->insert([
+            'organization_id' => $org->id,
+            'project_id' => $project->id,
+            'user_id' => $uploader->id,
+            'filename' => 'test.bin',
+            'path' => 'project_files/'.$project->id.'/test.bin',
+            'mime_type' => 'application/octet-stream',
+            'size' => 1000,
+            'is_visible_to_client' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service = app(StorageUsageService::class);
+
+        $first = $service->currentUsageBytes($org);
+        $second = $service->currentUsageBytes($org);
+
+        $this->assertSame(1000, $first);
+        $this->assertSame($first, $second, 'Repeated calls should return same value (per-request cache)');
+    }
 }

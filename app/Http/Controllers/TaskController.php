@@ -99,6 +99,7 @@ final class TaskController extends Controller
             ->where('organization_id', (int) $org->id)
             ->visibleTo($user)
             ->orderBy('title')
+            ->limit(200)
             ->get(['id', 'title']);
 
         return Inertia::render('Tasks/Index', [

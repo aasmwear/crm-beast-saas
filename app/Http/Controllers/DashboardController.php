@@ -357,27 +357,34 @@ class DashboardController extends Controller
 
     /**
      * Monthly revenue for the last 6 months (paid invoices).
+     * Single grouped query instead of 6 separate sum queries.
      *
      * @return array{labels: list<string>, values: list<int>}
      */
     private function monthlyRevenueSeries(?int $orgId): array
     {
+        $start = now()->subMonths(5)->startOfMonth();
+        $end = now()->endOfMonth();
+
+        $rows = Invoice::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->whereRaw('lower(status) = ?', ['paid'])
+            ->whereBetween('paid_at', [$start, $end])
+            ->selectRaw("date_trunc('month', paid_at)::date as month")
+            ->selectRaw('COALESCE(SUM(total_cents), 0) as total')
+            ->groupByRaw("date_trunc('month', paid_at)")
+            ->orderByRaw("date_trunc('month', paid_at)")
+            ->get();
+
+        $byMonth = $rows->keyBy(fn ($r) => Carbon::parse($r->month)->format('Y-m'));
+
         $labels = [];
         $values = [];
-
         for ($i = 5; $i >= 0; $i--) {
             $date = now()->subMonths($i);
             $labels[] = $date->format('M');
-            $start = $date->copy()->startOfMonth();
-            $end = $date->copy()->endOfMonth();
-
-            $sum = Invoice::query()
-                ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
-                ->whereRaw('lower(status) = ?', ['paid'])
-                ->whereBetween('paid_at', [$start, $end])
-                ->sum('total_cents');
-
-            $values[] = (int) $sum;
+            $key = $date->format('Y-m');
+            $values[] = (int) ($byMonth[$key]->total ?? 0);
         }
 
         return ['labels' => $labels, 'values' => $values];

@@ -58,11 +58,13 @@ final class InvoiceController extends Controller
         $clients = Client::query()
             ->where('organization_id', $organization->id)
             ->orderBy('company_name')
+            ->limit(200)
             ->get(['id', 'company_name', 'currency']);
 
         $projects = Project::query()
             ->where('organization_id', $organization->id)
             ->orderBy('title')
+            ->limit(200)
             ->get(['id', 'client_id', 'title']);
 
         return Inertia::render('Invoices/Create', [

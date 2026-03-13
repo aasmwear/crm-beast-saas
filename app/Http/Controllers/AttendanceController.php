@@ -109,6 +109,7 @@ final class AttendanceController extends Controller
         $users = $organization->users()
             ->select('users.id', 'users.name')
             ->orderBy('users.name')
+            ->limit(200)
             ->get();
 
         // Only expose user filter when user can view all attendance.
