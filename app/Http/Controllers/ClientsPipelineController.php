@@ -22,6 +22,8 @@ final class ClientsPipelineController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $search = $request->query('q', '');
+
         /** @var Builder<Client>|BaseBuilder $query */
         $query = Client::query()
             ->forOrg($organization->id)
@@ -30,11 +32,19 @@ final class ClientsPipelineController extends Controller
             ->orderByDesc('created_at')
             ->select(['id', 'company_name', 'status']);
 
+        if (is_string($search) && mb_strlen(trim($search)) >= 1) {
+            $term = '%' . trim($search) . '%';
+            $query->where('company_name', 'ilike', $term);
+        }
+
         $clients = $query->paginate(50)->withQueryString();
 
         return Inertia::render('Clients/Pipeline', [
             'organizationSlug' => $organization->slug,
             'clients' => $clients,
+            'filters' => [
+                'q' => is_string($search) ? trim($search) : '',
+            ],
         ]);
     }
 

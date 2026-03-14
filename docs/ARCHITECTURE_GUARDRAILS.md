@@ -63,6 +63,7 @@
 
 ## Scale & Query Safety
 
+- **Pipeline computed grouping:** Pipeline/board views that group items by status MUST use a single computed map (O(n) grouping) instead of repeated filter calls per column. Example: `clientsByStatus` in Pipeline.vue groups once; template does O(1) lookups.
 - **Dropdown/filter bounds:** Dropdown and filter option queries (clients, users, projects) MUST use `->limit(200)->get()` or similar safe bounds; never unbounded `->get()`.
 - **Show-page eager loads:** Heavy relations (tasks, files, comments, activities) on show pages MUST have safe limits (e.g. `->limit(100)` or `->limit(200)`) to avoid memory blow-up.
 - **Batch lookups:** Avoid per-item `exists()` or `first()` in loops; collect keys and query once, map in memory.

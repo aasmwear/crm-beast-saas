@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { router, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PageShell from '@/Components/ui/PageShell.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -21,12 +22,9 @@ type PaginatedClients = {
 const props = defineProps<{
   organizationSlug: string
   clients: PaginatedClients
+  filters?: { q?: string }
 }>()
 
-/** Client rows for current page (from paginated payload). */
-const clientRows = computed(() => props.clients?.data ?? [])
-
-// --- SAFE ROUTE LOGIC ---
 const routeGlobal = (window as any).route
 
 const r = (name: string, params: any = {}, absolute = false, config?: any) => {
@@ -37,159 +35,229 @@ const r = (name: string, params: any = {}, absolute = false, config?: any) => {
 }
 
 const org = computed(() => {
-  // Prefer explicit slug from backend
-  if (props.organizationSlug) {
-    return props.organizationSlug
-  }
-
-  // Fallback: try to read from Ziggy's stored params
+  if (props.organizationSlug) return props.organizationSlug
   try {
     const p = (routeGlobal as any)?.params ?? {}
     if (p.organization) return p.organization
-  } catch {
-    // ignore
-  }
-
-  // Final fallback for local/dev
+  } catch { /* ignore */ }
   return 'acme'
 })
-// -----------------------
 
-const cols = [
-  { key: 'lead', title: 'Lead' },
-  { key: 'active', title: 'Active' },
-  { key: 'paused', title: 'Paused' },
-  { key: 'churned', title: 'Churned' },
-]
+const COLUMNS = [
+  { key: 'lead', title: 'Lead', color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
+  { key: 'active', title: 'Active', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+  { key: 'inactive', title: 'Inactive', color: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30' },
+  { key: 'paused', title: 'Paused', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+  { key: 'churned', title: 'Churned', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
+] as const
 
-function byCol(key: string) {
-  return clientRows.value.filter(
-    (c) => (c.status || 'lead').toLowerCase() === key,
+const clientsByStatus = computed(() => {
+  const map: Record<string, ClientLite[]> = {}
+  for (const col of COLUMNS) {
+    map[col.key] = []
+  }
+  for (const client of props.clients?.data ?? []) {
+    const status = (client.status || 'lead').toLowerCase()
+    if (map[status]) {
+      map[status].push(client)
+    } else {
+      map.lead.push(client)
+    }
+  }
+  return map
+})
+
+// --- Search ---
+const searchQuery = ref(props.filters?.q ?? '')
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+
+watch(() => props.filters?.q, (v) => { searchQuery.value = v ?? '' })
+
+function onSearchInput() {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    router.get(
+      r('clients.pipeline', { organization: org.value }),
+      { q: searchQuery.value || null },
+      { preserveScroll: true, preserveState: true, replace: true },
+    )
+  }, 300)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  router.get(
+    r('clients.pipeline', { organization: org.value }),
+    {},
+    { preserveScroll: true, preserveState: true, replace: true },
   )
 }
 
-function startDrag(e: DragEvent, id: number) {
+// --- Drag and drop with optimistic update ---
+const dragClientId = ref<number | null>(null)
+const dragOverColumn = ref<string | null>(null)
+
+function startDrag(e: DragEvent, client: ClientLite) {
   if (!e.dataTransfer) return
   e.dataTransfer.dropEffect = 'move'
   e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('text/plain', id.toString())
+  e.dataTransfer.setData('text/plain', client.id.toString())
+  dragClientId.value = client.id
 }
 
-function drop(e: DragEvent, status: string) {
+function onDragEnd() {
+  dragClientId.value = null
+  dragOverColumn.value = null
+}
+
+function onDragOver(e: DragEvent, colKey: string) {
+  e.preventDefault()
+  dragOverColumn.value = colKey
+}
+
+function onDragLeave(colKey: string) {
+  if (dragOverColumn.value === colKey) {
+    dragOverColumn.value = null
+  }
+}
+
+function drop(e: DragEvent, targetStatus: string) {
+  dragOverColumn.value = null
   const id = Number(e.dataTransfer?.getData('text/plain') || 0)
+  dragClientId.value = null
   if (!id) return
 
+  const client = (props.clients?.data ?? []).find(c => c.id === id)
+  if (!client || (client.status || 'lead').toLowerCase() === targetStatus) return
+
+  const previousStatus = client.status
+  client.status = targetStatus
+
   router.post(
-    r('clients.pipeline.update', {
-      organization: org.value,
-      client: id,
-    }),
-    { status },
-    { preserveScroll: true },
+    r('clients.pipeline.update', { organization: org.value, client: id }),
+    { status: targetStatus },
+    {
+      preserveScroll: true,
+      onError: () => { client.status = previousStatus },
+    },
   )
 }
-
-const clientCardClass =
-  'card-neo-small text-white p-3 rounded-xl border border-white/10 shadow hover:shadow-xl transition duration-150 cursor-move'
 </script>
 
 <template>
-  <div>
-    <div class="mb-6">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-semibold tracking-tight text-white">
-            Client Pipeline
-          </h1>
-          <p class="text-white/60 mt-1">
-            Drag &amp; drop cards across stages to update status.
-          </p>
+  <PageShell
+    :header="{
+      breadcrumb: `Organization • ${String(org).toUpperCase()}`,
+      title: 'Client Pipeline',
+      subtitle: `${props.clients?.total ?? 0} clients across ${COLUMNS.length} stages. Drag cards to update status.`,
+    }"
+  >
+    <template #header-actions>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search clients…"
+            class="rounded-full border border-white/15 bg-black/40 px-3 py-1.5 pl-8 text-xs text-white/80 placeholder-white/40 focus:border-emerald-400 focus:outline-none focus:ring-0 w-48"
+            @input="onSearchInput"
+          >
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 text-xs"
+            @click="clearSearch"
+          >
+            ✕
+          </button>
         </div>
         <Link
           :href="r('clients.index', { organization: org })"
-          class="btn-capsule bg-[var(--primary)] text-white hover:opacity-90"
+          class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-white/10"
         >
-          View as List
+          List view
         </Link>
       </div>
-    </div>
+    </template>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <!-- Pipeline columns -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
       <div
-        v-for="c in cols"
-        :key="c.key"
-        class="card-neo rounded-xl p-4 min-h-[400px]"
-        @dragover.prevent
-        @drop="drop($event, c.key)"
+        v-for="col in COLUMNS"
+        :key="col.key"
+        class="rounded-2xl border border-white/10 bg-black/30 backdrop-blur min-h-[360px] flex flex-col transition-colors duration-150"
+        :class="[dragOverColumn === col.key && 'border-emerald-400/50 bg-emerald-500/5']"
+        @dragover="onDragOver($event, col.key)"
+        @dragleave="onDragLeave(col.key)"
+        @drop="drop($event, col.key)"
       >
-        <div
-          class="text-lg font-medium text-white mb-4 border-b border-white/10 pb-2"
-        >
-          {{ c.title }}
-          <span class="text-white/50 text-sm ml-1">
-            ({{ byCol(c.key).length }})
+        <!-- Column header -->
+        <div class="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+          <span
+            class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+            :class="col.color"
+          >
+            {{ col.title }}
+          </span>
+          <span class="text-[11px] text-white/40 font-medium">
+            {{ clientsByStatus[col.key]?.length ?? 0 }}
           </span>
         </div>
 
-        <div class="space-y-3">
+        <!-- Cards -->
+        <div class="flex-1 p-3 space-y-2 overflow-y-auto">
           <Link
-            v-for="cl in byCol(c.key)"
-            :key="cl.id"
-            :href="
-              r('clients.show', {
-                organization: org,
-                client: cl.id,
-              })
-            "
-            :class="clientCardClass"
+            v-for="client in clientsByStatus[col.key]"
+            :key="client.id"
+            :href="r('clients.show', { organization: org, client: client.id })"
+            class="block rounded-xl border border-white/10 bg-black/40 p-3 text-sm font-medium text-white shadow hover:border-white/20 hover:shadow-lg transition duration-150 cursor-move"
+            :class="[dragClientId === client.id && 'opacity-40']"
             draggable="true"
-            @dragstart="startDrag($event, cl.id)"
+            @dragstart="startDrag($event, client)"
+            @dragend="onDragEnd"
           >
-            <div class="font-medium text-white">
-              {{ cl.company_name }}
-            </div>
+            {{ client.company_name }}
           </Link>
 
           <p
-            v-if="byCol(c.key).length === 0"
-            class="text-sm text-white/50 pt-2"
+            v-if="(clientsByStatus[col.key]?.length ?? 0) === 0"
+            class="px-1 py-6 text-center text-xs text-white/30"
           >
-            No clients in this stage.
+            No clients in {{ col.title.toLowerCase() }}.
           </p>
         </div>
       </div>
     </div>
 
+    <!-- Pagination -->
     <div
-      v-if="props.clients?.links && props.clients.links.length > 1"
-      class="mt-6 border-t border-white/10 pt-4"
+      v-if="props.clients?.links && props.clients.links.length > 3"
+      class="border-t border-white/10 pt-4"
     >
       <nav class="flex flex-wrap items-center justify-end gap-1 text-xs">
-        <Link
-          v-for="link in props.clients.links"
-          :key="(link.url || '') + link.label"
-          :href="link.url || '#'"
-          class="rounded-full px-3 py-1"
-          :class="[
-            link.active
-              ? 'bg-white/20 text-white'
-              : link.url
-                ? 'text-white/70 hover:bg-white/10'
-                : 'text-white/30 cursor-default',
-          ]"
-          v-html="link.label"
-        />
+        <template v-for="link in props.clients.links" :key="(link.url || '') + link.label">
+          <button
+            v-if="link.url"
+            type="button"
+            class="rounded-md px-3 py-1.5 text-xs font-medium"
+            :class="[
+              link.active
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white/5 text-white/70 hover:bg-white/10',
+            ]"
+            v-html="link.label"
+            @click="router.get(link.url!, {}, { preserveScroll: true, preserveState: true })"
+          />
+          <span
+            v-else
+            class="rounded-md px-3 py-1.5 text-xs text-white/30"
+            v-html="link.label"
+          />
+        </template>
       </nav>
     </div>
-  </div>
+  </PageShell>
 </template>
-
-<style scoped>
-.card-neo-small {
-  /* Subtle neon border on hover */
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-.card-neo-small:hover {
-  box-shadow: 0 0 0 1px var(--primary);
-}
-</style>

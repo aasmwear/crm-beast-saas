@@ -39,6 +39,32 @@
 
 ## Last PR Notes
 
+- **Clients Pipeline UX + performance polish (rescue-mission):**
+  - **Goal:** Improve pipeline responsiveness, usability, and enterprise feel without redesigning the module.
+  - **Performance:** Replaced repeated `byCol()` filter calls (12 full-array passes per render) with a single computed `clientsByStatus` map — O(n) grouping once, O(1) column lookups. Eliminates redundant recomputation on every render cycle.
+  - **Backend:** Added `q` search param to `ClientsPipelineController::index`; filters by `company_name` via `ilike`. Returns `filters.q` prop for frontend hydration. Pagination via `withQueryString()` preserves search across pages.
+  - **Frontend (Pipeline.vue rewrite):**
+    - Uses `PageShell` for consistent layout with all other CRM pages.
+    - Added `inactive` column (was missing despite being a valid backend status).
+    - Color-coded status badges per column (lead=sky, active=emerald, inactive=zinc, paused=amber, churned=rose).
+    - Debounced search input (300ms) with clear button.
+    - Optimistic drag-drop: card moves immediately to target column; reverts on server error.
+    - Drag-over visual feedback (column highlight).
+    - Dragged card gets opacity treatment.
+    - Pagination uses `router.get` buttons (not `<Link>` to avoid full page replace).
+    - Empty-state messages per column.
+    - Total client count in subtitle.
+  - **Tests:** Extended ClientsPipelinePaginationTest (now 9 tests): search filters by company name, search preserves query in pagination links, status update works, invalid status rejected, empty search returns all, filters prop returned.
+  - **QA checklist:**
+    1. Pipeline page: type in search → results filter after 300ms; clear button resets.
+    2. All 5 columns visible (Lead, Active, Inactive, Paused, Churned) with color badges and counts.
+    3. Drag card from Lead to Active → card moves immediately; server persists; page refresh shows new status.
+    4. Drag card to same column → no request fired.
+    5. Column highlights on drag-over; dragged card shows reduced opacity.
+    6. Paginate with search → page 2 preserves `q=` in URL.
+    7. PageShell header with breadcrumb, title, subtitle, search, List view button.
+    8. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Attendance history filters (rescue-mission):**
   - **Goal:** Add practical attendance history filters to improve day-to-day usability and review workflows.
   - **Backend:** AttendanceController::index now validates query params: date_from, date_to (nullable|date), user_id (nullable|integer, org-scoped when canViewAll; rejected when view-own tries another user), status (open|closed|approved), approved (yes|no). Applied filters: date range on clock_in_at, status, approved (approved_at IS [NOT] NULL). Tenant scoping preserved; pagination uses withQueryString() so filters persist.
