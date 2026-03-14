@@ -14,6 +14,19 @@ Super Admins and Support staff can view a **read-only org subscriptions overview
 - See **webhook support indicators** per org: last webhook status (OK/Failed/Received), last processed timestamp, recent failed count (last 7 days). Use these for quick operational health.
 - **Support links:** "View" → platform org detail; "Billing →" → tenant billing page (`/org/{slug}/billing`). The Billing link opens in a new tab; the customer must log in to view their billing. No impersonation — support-only reference.
 
+### Platform Org Health Dashboard
+
+Platform operators can access a **read-only Org Health Dashboard** at `/admin/organizations/health`. Use it to:
+
+- See an at-a-glance summary of how many orgs are healthy, warning, or critical.
+- Review per-org health signals: plan, billing status, Stripe linkage, seat usage vs limit, storage usage vs limit, webhook failure indicators.
+- Health flags are auto-computed: **billing** (past_due/unpaid = critical; canceled/incomplete = warning), **seats** (at limit = critical; >=90% = warning), **storage** (over limit = critical; >=90% = warning), **webhooks** (>=3 failed/7d = critical; any failed = warning).
+- Filter by search (org name/slug), billing status, or health state.
+- Drill down to the Org Subscriptions page (pre-filtered by slug) for overrides or deeper investigation.
+- Open tenant billing page in a new tab (customer must log in; no impersonation).
+
+**Note:** This is a read-only diagnostic dashboard. No mutation controls are exposed here. Use the Org Subscriptions page for manual billing overrides.
+
 ### Platform-admin manual billing overrides
 
 Super Admins and Support staff can perform **manual billing overrides** from the Org Subscriptions page (`/admin/organizations/subscriptions`):

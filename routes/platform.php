@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Platform\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Platform\DashboardController;
+use App\Http\Controllers\Platform\Organizations\OrgHealthController;
 use App\Http\Controllers\Platform\Organizations\SubscriptionsController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +53,9 @@ Route::middleware('auth:platform')->group(function () {
 
     // Organizations Management
     Route::prefix('/organizations')->name('organizations.')->group(function () {
+        Route::get('/health', [OrgHealthController::class, 'index'])
+            ->name('health');
+
         Route::get('/subscriptions', [SubscriptionsController::class, 'index'])
             ->name('subscriptions');
 

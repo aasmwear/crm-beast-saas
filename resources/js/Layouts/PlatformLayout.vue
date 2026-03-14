@@ -51,14 +51,14 @@
           </Link>
 
           <Link
-            href="#"
+            :href="route('platform.organizations.health')"
             class="platform-nav-item"
+            :class="{ 'active': isCurrent('platform.organizations.health') }"
           >
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
-            <span>System Health</span>
-            <span class="ml-auto text-xs bg-purple-600/20 text-purple-400 px-2 py-0.5 rounded-full">Soon</span>
+            <span>Org Health</span>
           </Link>
 
           <div class="pt-4 mt-4 border-t border-white/10">

@@ -747,3 +747,16 @@
 - **Pages:** Tasks/Index (list), Tasks/Board (Kanban). Both use PageShell; List/Board switcher in header-actions.
 - **Board optimization:** Computed `tasksByColumnKey` groups tasks once; counts and v-for use O(1) lookups. No repeated filtering per column.
 - **QA:** Open `/org/{org}/tasks` (List) and `/org/{org}/tasks/board` (Board). With tasks: verify column counts match task distribution; use status dropdown to move task; confirm counts update correctly. Open task drawer; filters work on Index.
+
+## Platform: Org Health Dashboard
+
+- **Page:** `/admin/organizations/health` (route: `platform.organizations.health`)
+- **Purpose:** Read-only operational health overview for platform operators. Surfaces billing, seat, storage, and webhook health per tenant org.
+- **Health signals:** Plan/status, Stripe linkage, seat usage vs limit, storage usage vs limit, webhook failure count (7d), computed health flags (healthy/warning/critical).
+- **Health flag rules:** Billing critical (past_due/unpaid), billing warning (canceled/incomplete), seats critical (at limit), seats warning (>=90%), storage critical (over limit), storage warning (>=90%), webhooks critical (>=3 failed/7d), webhooks warning (any failed/7d).
+- **Filters:** Search (name/slug), billing status, health state (healthy/warning/critical).
+- **Drilldown links:** Org Subscriptions (pre-filtered), tenant billing (new tab).
+- **N+1 prevention:** Batch-loads seats, storage, and webhook stats per page.
+- **Nav:** Sidebar "Org Health" link replaces placeholder "System Health" stub.
+- **Tests:** `OrgHealthDashboardTest` — access control (platform admin, tenant user, guest), health fields, flags, fallback (no subscription, no webhooks), filters, pagination.
+- **QA:** Visit `/admin/organizations/health`. Verify summary cards, table rows, health badges. Filter by status/health. Click Subscriptions drilldown. Confirm pagination with >20 orgs.

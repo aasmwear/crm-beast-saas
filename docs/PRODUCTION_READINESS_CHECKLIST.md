@@ -42,6 +42,7 @@
 - [x] **Platform org billing overview** — Read-only `/admin/organizations/subscriptions` for Super Admin / platform staff. Shows plan, status, Stripe linkage, seats, add-ons, entitlements. Search and filter by status/plan.
 - [x] **Platform webhook support indicators** — Org Subscriptions page shows per-org webhook status (OK/Failed), last processed timestamp, recent failed count (7d). `stripe_webhook_events.organization_id` stores org when resolvable. Support links: platform org detail, tenant billing (new tab).
 - [x] **Platform-admin manual billing overrides** — Super Admin/Support can override plan_key, seat_limit, and add-ons from Org Subscriptions page. Internal operator controls; do **not** mutate Stripe. All actions audited. Changes reflected immediately in entitlements and tenant billing read model.
+- [x] **Platform Org Health Dashboard** — Read-only `/admin/organizations/health` for platform operators. Surfaces billing status, seat usage, storage usage, webhook failure indicators, and computed health flags (healthy/warning/critical) per tenant org. Batch-loads to avoid N+1. Filters by search, billing status, health state. Drilldown links to Org Subscriptions and tenant billing. Feature-tested for access control and data integrity.
 
 ---
 
