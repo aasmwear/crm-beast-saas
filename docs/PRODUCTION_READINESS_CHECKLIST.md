@@ -45,6 +45,8 @@
 - [x] **Platform Revenue / MRR Dashboard** — Read-only `/admin/revenue` for platform operators. Estimated MRR from canonical plan data (active+trialing orgs, Pro=$79/mo, Enterprise excluded). Subscription status counts, plan distribution, total seats, Stripe linkage. Drilldown links to Org Health, Org Subscriptions, Past Due. Feature-tested for access control and metric accuracy.
 - [x] **Platform Org Health Dashboard** — Read-only `/admin/organizations/health` for platform operators. Surfaces billing status, seat usage, storage usage, webhook failure indicators, and computed health flags (healthy/warning/critical) per tenant org. Batch-loads to avoid N+1. Filters by search, billing status, health state. Drilldown links to Org Subscriptions and tenant billing. Feature-tested for access control and data integrity.
 
+- [x] **Platform Feature Usage Dashboard** — Read-only `/admin/feature-usage` for platform operators. Surfaces module adoption (clients, projects, tasks, attendance, invoices) and billing setup metrics. Per-module: orgs_with_any and total_records. Summary: orgs using any module, avg modules/org. Billing: Stripe-linked, subscriptions, active add-ons. Drilldown links to Org Health, Org Subscriptions, Revenue. Feature-tested for access control and metric accuracy.
+
 ---
 
 ## Other sections

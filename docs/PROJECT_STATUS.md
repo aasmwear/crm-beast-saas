@@ -39,6 +39,25 @@
 
 ## Last PR Notes
 
+- **Platform Feature Usage Dashboard (rescue-mission):**
+  - **Goal:** Read-only platform operator dashboard surfacing module adoption and feature usage metrics derived from local DB.
+  - **Route:** `GET /admin/feature-usage` → `platform.feature-usage` (auth:platform).
+  - **Controller:** `FeatureUsageDashboardController::index` — batched queries for module adoption (clients, projects, tasks, attendance, invoices), billing setup metrics (Stripe-linked, subscriptions, active add-ons), and summary stats (orgs using any module, avg modules/org).
+  - **Metrics:** Per-module: orgs_with_any, total_records, label. Billing: stripe_linked, has_subscription, has_active_subscription, has_active_addons. Summary: total_orgs, orgs_using_any_module, avg_modules_per_org, modules_tracked.
+  - **Frontend:** `Platform/FeatureUsage/Index.vue` — summary cards, module adoption bar chart with per-module icons/colors, billing setup breakdown, detailed adoption table (orgs using, %, total records, avg/org), data methodology notes, drilldown links to Org Health, Org Subscriptions, Revenue.
+  - **Nav:** "Feature Usage" added to PlatformLayout sidebar between Org Health and Settings.
+  - **Tests:** `FeatureUsageDashboardTest` — 13 tests: access control (platform admin, tenant user, guest), client/project/task/attendance adoption counts, soft-deleted exclusion, billing setup metrics, summary orgs-using-any, zero-state (no orgs, orgs with no usage), modules tracked count, adoption labels.
+  - **Docs:** PROJECT_STATUS.md, OBSERVABILITY_AND_RUNBOOK.md, PRODUCTION_READINESS_CHECKLIST.md updated.
+  - **QA checklist:**
+    1. Platform admin → `/admin/feature-usage` → summary cards, adoption bars, billing setup, adoption table visible.
+    2. Create orgs with clients/projects/tasks → adoption counts reflect correctly.
+    3. Soft-deleted records excluded from counts.
+    4. Zero state: no orgs → all zeros, clean UI.
+    5. Nav sidebar: "Feature Usage" link between Org Health and Settings.
+    6. Drilldown links: Org Health, Org Subscriptions, Revenue navigate correctly.
+    7. Tenant user / guest → redirected to login.
+    8. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Clients Pipeline UX + performance polish (rescue-mission):**
   - **Goal:** Improve pipeline responsiveness, usability, and enterprise feel without redesigning the module.
   - **Performance:** Replaced repeated `byCol()` filter calls (12 full-array passes per render) with a single computed `clientsByStatus` map — O(n) grouping once, O(1) column lookups. Eliminates redundant recomputation on every render cycle.
@@ -761,6 +780,20 @@
 - **Nav:** Sidebar "Revenue" link between Org Subscriptions and Org Health.
 - **Tests:** `RevenueDashboardTest` — access control, subscription counts, plan distribution, MRR estimation, enterprise note, Stripe linkage, seat counts, fallbacks (no orgs, no subscriptions, legacy plans).
 - **QA:** Visit `/admin/revenue`. Verify KPI cards reflect org data. Create pro/starter/enterprise subscriptions; verify MRR breakdown. Verify plan distribution bar. Click drilldown links.
+
+## Platform: Feature Usage Dashboard
+
+- **Page:** `/admin/feature-usage` (route: `platform.feature-usage`)
+- **Purpose:** Read-only feature/module adoption overview for platform operators. Helps founders/operators understand how organizations use CRM Beast modules.
+- **Summary cards:** Total orgs, orgs using any module (count + %), avg modules per org, billing configured (active subscriptions + Stripe-linked).
+- **Module adoption:** Clients, Projects, Tasks, Attendance, Invoices — bar chart with orgs_with_any, total_records, and per-module icons. Soft-deleted records excluded.
+- **Billing setup:** Stripe-linked count, any subscription, active/trialing subscription, active add-ons — with percentages.
+- **Adoption table:** Detailed per-module breakdown: orgs using, % of total, total records, avg records per adopting org.
+- **Methodology notes:** Explains what "usage" means, data source (live DB), soft-delete exclusion, avg calculation.
+- **Drilldown links:** Org Health, Org Subscriptions, Revenue.
+- **Nav:** "Feature Usage" in sidebar between Org Health and Settings.
+- **Tests:** `FeatureUsageDashboardTest` — 13 tests covering access control, per-module adoption, soft-delete exclusion, billing metrics, summary stats, zero-state, and labels.
+- **QA:** Visit `/admin/feature-usage`. Verify cards, bars, table reflect org/module data. Create orgs with records → counts update. Soft-deleted excluded. Zero-state clean.
 
 ## Platform: Org Health Dashboard
 

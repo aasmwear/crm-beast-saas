@@ -40,6 +40,18 @@ Platform operators can access a **read-only Org Health Dashboard** at `/admin/or
 
 **Note:** This is a read-only diagnostic dashboard. No mutation controls are exposed here. Use the Org Subscriptions page for manual billing overrides.
 
+### Platform Feature Usage Dashboard
+
+Platform operators can access a **read-only Feature Usage Dashboard** at `/admin/feature-usage`. Use it to:
+
+- See **module adoption** across all tenants: how many orgs have at least one client, project, task, attendance record, or invoice.
+- Review **billing setup metrics**: Stripe-linked orgs, orgs with subscriptions (any, active/trialing), orgs with active add-ons.
+- Monitor **overall engagement**: total orgs, orgs using any module, average modules per org.
+- View a **detailed adoption table** with per-module counts, percentages, total records, and average records per adopting org.
+- Drill down to **Org Health**, **Org Subscriptions**, or **Revenue** for investigation.
+
+**Note:** "Usage" means the org has at least one non-deleted record in that module. Counts are live from DB — no event tracking or sampling involved. Soft-deleted records (clients, projects, tasks, attendance) are excluded.
+
 ### Platform-admin manual billing overrides
 
 Super Admins and Support staff can perform **manual billing overrides** from the Org Subscriptions page (`/admin/organizations/subscriptions`):

@@ -73,6 +73,17 @@
             <span>Org Health</span>
           </Link>
 
+          <Link
+            :href="route('platform.feature-usage')"
+            class="platform-nav-item"
+            :class="{ 'active': isCurrent('platform.feature-usage') }"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 20V10M12 20V4M6 20v-6"/>
+            </svg>
+            <span>Feature Usage</span>
+          </Link>
+
           <div class="pt-4 mt-4 border-t border-white/10">
             <Link
               href="#"

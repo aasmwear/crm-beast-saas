@@ -4,6 +4,7 @@ use App\Http\Controllers\Platform\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Platform\DashboardController;
 use App\Http\Controllers\Platform\Organizations\OrgHealthController;
 use App\Http\Controllers\Platform\Organizations\SubscriptionsController;
+use App\Http\Controllers\Platform\FeatureUsageDashboardController;
 use App\Http\Controllers\Platform\RevenueDashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,10 @@ Route::middleware('auth:platform')->group(function () {
     // Revenue / MRR Dashboard
     Route::get('/revenue', [RevenueDashboardController::class, 'index'])
         ->name('revenue');
+
+    // Feature Usage Dashboard
+    Route::get('/feature-usage', [FeatureUsageDashboardController::class, 'index'])
+        ->name('feature-usage');
 
     // Organizations Management
     Route::prefix('/organizations')->name('organizations.')->group(function () {
