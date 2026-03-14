@@ -51,6 +51,18 @@
           </Link>
 
           <Link
+            :href="route('platform.revenue')"
+            class="platform-nav-item"
+            :class="{ 'active': isCurrent('platform.revenue') }"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+            </svg>
+            <span>Revenue</span>
+          </Link>
+
+          <Link
             :href="route('platform.organizations.health')"
             class="platform-nav-item"
             :class="{ 'active': isCurrent('platform.organizations.health') }"

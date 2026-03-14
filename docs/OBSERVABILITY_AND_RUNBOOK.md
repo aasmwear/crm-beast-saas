@@ -14,6 +14,19 @@ Super Admins and Support staff can view a **read-only org subscriptions overview
 - See **webhook support indicators** per org: last webhook status (OK/Failed/Received), last processed timestamp, recent failed count (last 7 days). Use these for quick operational health.
 - **Support links:** "View" → platform org detail; "Billing →" → tenant billing page (`/org/{slug}/billing`). The Billing link opens in a new tab; the customer must log in to view their billing. No impersonation — support-only reference.
 
+### Platform Revenue / MRR Dashboard
+
+Platform operators can access a **read-only Revenue Dashboard** at `/admin/revenue`. Use it to:
+
+- See **estimated MRR** based on canonical plan data (Starter=$0, Pro=$79/mo, Enterprise=custom/excluded). Clearly labeled as estimated — not derived from Stripe invoices.
+- Monitor subscription health at a glance: active, trialing, past_due, unpaid, canceled, incomplete, no-subscription counts.
+- View **plan distribution** across all tenants (stacked bar + legend).
+- See **MRR breakdown per plan** for active + trialing orgs.
+- See total platform seats and Stripe-linked org count.
+- Drill down to **Org Health**, **Org Subscriptions**, or **Past Due Orgs** (pre-filtered) for investigation.
+
+**Note:** MRR is an internal estimate from canonical `organization_subscriptions` data. It does not reflect actual Stripe invoice amounts, prorations, or discounts. Enterprise orgs are excluded from the MRR estimate since they have custom pricing.
+
 ### Platform Org Health Dashboard
 
 Platform operators can access a **read-only Org Health Dashboard** at `/admin/organizations/health`. Use it to:

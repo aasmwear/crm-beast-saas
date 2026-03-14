@@ -748,6 +748,20 @@
 - **Board optimization:** Computed `tasksByColumnKey` groups tasks once; counts and v-for use O(1) lookups. No repeated filtering per column.
 - **QA:** Open `/org/{org}/tasks` (List) and `/org/{org}/tasks/board` (Board). With tasks: verify column counts match task distribution; use status dropdown to move task; confirm counts update correctly. Open task drawer; filters work on Index.
 
+## Platform: Revenue / MRR Dashboard
+
+- **Page:** `/admin/revenue` (route: `platform.revenue`)
+- **Purpose:** Read-only revenue and subscription health overview for platform operators. Estimated MRR from canonical plan data.
+- **KPI cards:** Estimated MRR, total orgs (with Stripe-linked count), active/trialing count, at-risk count (past_due + unpaid), total seats, canceled, incomplete, no-subscription counts.
+- **MRR estimation:** Based on active + trialing orgs only. Starter=$0/mo, Pro=$79/mo, Enterprise=custom (excluded with note). Clearly labeled "estimated."
+- **Plan distribution:** Stacked bar + legend with plan counts and percentages.
+- **MRR breakdown:** Per-plan count, unit price, subtotal. Enterprise note when present.
+- **Status table:** All subscription statuses with count and percentage of total.
+- **Drilldown links:** Org Health, Org Subscriptions, Past Due Orgs (pre-filtered).
+- **Nav:** Sidebar "Revenue" link between Org Subscriptions and Org Health.
+- **Tests:** `RevenueDashboardTest` — access control, subscription counts, plan distribution, MRR estimation, enterprise note, Stripe linkage, seat counts, fallbacks (no orgs, no subscriptions, legacy plans).
+- **QA:** Visit `/admin/revenue`. Verify KPI cards reflect org data. Create pro/starter/enterprise subscriptions; verify MRR breakdown. Verify plan distribution bar. Click drilldown links.
+
 ## Platform: Org Health Dashboard
 
 - **Page:** `/admin/organizations/health` (route: `platform.organizations.health`)
