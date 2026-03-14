@@ -152,7 +152,7 @@ Tenant admins with `roles.manage` can clone team-scoped roles via "Clone role" i
 | Permission       | Enforced in                         | Description                                    |
 |------------------|-------------------------------------|------------------------------------------------|
 | `attendance.view`| AttendanceController::index         | View attendance index and all users' history   |
-| `attendance.view-own` | AttendanceController::index      | View own attendance only (no user filter)     |
+| `attendance.view-own` | AttendanceController::index      | View own attendance only (no user filter); crafted user_id for another user returns validation error |
 | `attendance.create` | clockIn, clockOut                 | Clock in / clock out (create/update own)       |
 | `attendance.edit` | AttendanceController::update        | Edit status and notes (HR corrections)        |
 | `attendance.delete` | AttendanceController::destroy     | Delete attendance records (soft delete)       |

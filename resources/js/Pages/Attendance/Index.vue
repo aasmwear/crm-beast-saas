@@ -31,6 +31,7 @@ interface AttendanceFilters {
   date_from?: string | null
   date_to?: string | null
   status?: string | null
+  approved?: string | null
 }
 
 interface SimpleUser {
@@ -72,12 +73,19 @@ const selectedUserId = ref<string>(
 const dateFrom = ref<string>(props.filters?.date_from ?? '')
 const dateTo = ref<string>(props.filters?.date_to ?? '')
 const statusFilter = ref<string>(props.filters?.status ?? '')
+const approvedFilter = ref<string>(props.filters?.approved ?? '')
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Any status' },
   { value: 'open', label: 'Open' },
   { value: 'closed', label: 'Closed' },
   { value: 'approved', label: 'Approved' },
+]
+
+const APPROVED_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'Any' },
+  { value: 'yes', label: 'Approved' },
+  { value: 'no', label: 'Not approved' },
 ]
 
 function applyFilters() {
@@ -88,6 +96,7 @@ function applyFilters() {
       date_from: dateFrom.value || null,
       date_to: dateTo.value || null,
       status: statusFilter.value || null,
+      approved: approvedFilter.value || null,
     },
     {
       preserveScroll: true,
@@ -97,11 +106,12 @@ function applyFilters() {
   )
 }
 
-function resetFilters() {
+function clearFilters() {
   selectedUserId.value = ''
   dateFrom.value = ''
   dateTo.value = ''
   statusFilter.value = ''
+  approvedFilter.value = ''
   applyFilters()
 }
 
@@ -393,20 +403,37 @@ function deleteRecord(record: AttendanceRecord) {
             </select>
           </div>
 
+          <!-- Approved filter -->
+          <div class="flex items-center gap-2">
+            <span class="hidden sm:inline">Approved</span>
+            <select
+              v-model="approvedFilter"
+              class="rounded-lg border border-white/15 bg-black/40 px-2 py-1 text-xs text-white/80 focus:border-emerald-400 focus:outline-none focus:ring-0"
+            >
+              <option
+                v-for="opt in APPROVED_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+
           <!-- Actions -->
           <button
             type="button"
             class="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-3 py-1 text-[11px] font-medium text-white hover:bg-white/10"
             @click="applyFilters"
           >
-            Apply
+            Search / Apply
           </button>
           <button
             type="button"
             class="inline-flex items-center rounded-full px-2 py-1 text-[11px] text-white/40 hover:text-white/80"
-            @click="resetFilters"
+            @click="clearFilters"
           >
-            Reset
+            Clear
           </button>
         </div>
       </div>

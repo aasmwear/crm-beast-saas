@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,12 +34,32 @@ final class AttendanceController extends Controller
         $canDelete = $user !== null && ($user->can('attendance.delete') || $user->can('attendance.manage'));
         $canManage = $user !== null && ($user->can('attendance.manage') || $user->can('attendance.approve'));
 
+        $validated = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+            'user_id' => [
+                'nullable',
+                'integer',
+                $canViewAll
+                    ? Rule::exists('organization_user', 'user_id')->where('organization_id', (int) $organization->id)
+                    : Rule::in($user ? [(int) $user->id] : []),
+            ],
+            'status' => ['nullable', 'string', Rule::in(['open', 'closed', 'approved'])],
+            'approved' => ['nullable', 'string', Rule::in(['yes', 'no'])],
+        ]);
+
         $filters = [
-            'user_id' => $request->query('user_id'),
-            'date_from' => $request->query('date_from'),
-            'date_to' => $request->query('date_to'),
-            'status' => $request->query('status'),
+            'user_id' => $validated['user_id'] ?? $request->query('user_id'),
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'approved' => $validated['approved'] ?? null,
         ];
+
+        // Coerce user_id to string for frontend consistency.
+        if ($filters['user_id'] !== null && $filters['user_id'] !== '') {
+            $filters['user_id'] = (string) $filters['user_id'];
+        }
 
         // Users with only view-own cannot filter by another user; enforce self.
         if (! $canViewAll && $user !== null && ! empty($filters['user_id']) && (int) $filters['user_id'] !== (int) $user->id) {
@@ -77,6 +98,12 @@ final class AttendanceController extends Controller
 
         if (! empty($filters['status'])) {
             $query->where('attendance.status', $filters['status']);
+        }
+
+        if ($filters['approved'] === 'yes') {
+            $query->whereNotNull('attendance.approved_at');
+        } elseif ($filters['approved'] === 'no') {
+            $query->whereNull('attendance.approved_at');
         }
 
         $attendance = $query

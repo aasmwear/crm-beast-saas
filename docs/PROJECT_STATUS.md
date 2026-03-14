@@ -39,6 +39,19 @@
 
 ## Last PR Notes
 
+- **Attendance history filters (rescue-mission):**
+  - **Goal:** Add practical attendance history filters to improve day-to-day usability and review workflows.
+  - **Backend:** AttendanceController::index now validates query params: date_from, date_to (nullable|date), user_id (nullable|integer, org-scoped when canViewAll; rejected when view-own tries another user), status (open|closed|approved), approved (yes|no). Applied filters: date range on clock_in_at, status, approved (approved_at IS [NOT] NULL). Tenant scoping preserved; pagination uses withQueryString() so filters persist.
+  - **Frontend:** Attendance/Index.vue adds approved dropdown (Any, Approved, Not approved); Apply and Clear buttons; all filters wired to query params. User dropdown only when canViewAll.
+  - **Tests:** AttendanceFiltersTest — date range, status, approved filters work; user filter only for canViewAll; view-own user gets 302+validation error on crafted user_id; query string persists across pagination; invalid status/approved return 302.
+  - **QA checklist:**
+    1. Attendance page: set date from/to, status, approved → Apply → filtered results.
+    2. Clear → all filters reset, full history (or own for view-own).
+    3. User with attendance.view: user dropdown visible; filter by another user → see that user's records.
+    4. User with attendance.view-own only: no user dropdown; craft ?user_id=999 → redirect with validation error.
+    5. Paginate with status=closed → pagination links preserve status=closed.
+    6. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Role cloning in tenant Role Maker (rescue-mission):**
   - **Backend:** `POST /org/{organization}/settings/roles/{role}/clone` — clones team-scoped roles only. Creates new role with name `{original}-copy` (or `-copy-2`, `-copy-3` if exists). Copies all permissions from source. Global roles cannot be cloned; cross-tenant clone blocked. Audit: `cloned` action with source/new role ids and names.
   - **Frontend:** "Clone role" button for editable team-scoped roles in Roles.vue; after clone, new role is auto-selected (uses `created_role_id` flash). Success feedback via flash message.
