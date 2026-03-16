@@ -39,6 +39,26 @@
 
 ## Last PR Notes
 
+- **Platform System Performance Dashboard (rescue-mission):**
+  - **Goal:** Read-only platform operator dashboard surfacing infrastructure readiness, queue health, webhook reliability, storage pressure, and at-risk org counts from existing app/DB signals.
+  - **Route:** `GET /admin/system-performance` → `platform.system-performance` (auth:platform).
+  - **Controller:** `SystemPerformanceDashboardController::index` — batched read queries for readiness (DB, cache, queue config), failed jobs summary (24h/7d/total + recent 5), webhook health (processed/failed counts, orgs affected, recent 5 failures), storage pressure (orgs near/over limit with progress), at-risk orgs (past_due/unpaid billing + 3+ webhook failures), platform summary (total orgs/users/subscriptions/Stripe-linked).
+  - **Metrics:** Readiness: status + per-subsystem check detail. Queue: failed_last_24h, failed_last_7d, total_failed, recent_failures. Webhooks: total_events, processed_count, failed_count, failed_last_24h/7d, orgs_with_failures_7d, recent_failures. Storage: orgs_over_limit, orgs_near_limit, total_storage_used_gb, top-10 pressure details. At-risk: billing_at_risk, webhook_at_risk, past_due_count, unpaid_count, orgs_3plus_webhook_failures.
+  - **Frontend:** `Platform/SystemPerformance/Index.vue` — summary cards (system status, failed jobs 24h, webhook failures 7d, at-risk orgs), infrastructure readiness detail, queue health detail with recent failures, webhook reliability with recent failure table, storage pressure with per-org progress bars, operational risk summary, drilldown links to Org Health / Org Subscriptions / Revenue / Feature Usage.
+  - **Nav:** "System Performance" added to PlatformLayout sidebar after Feature Usage and before Settings.
+  - **Tests:** `SystemPerformanceDashboardTest` — 13 tests: access control (platform admin, tenant user, guest), readiness healthy + driver info, queue health counts, webhook health counts + 24h filtering, at-risk billing/webhook counts, storage zero-state, platform summary counts, full zero-state (no orgs), queue zero-state.
+  - **Docs:** PROJECT_STATUS.md, OBSERVABILITY_AND_RUNBOOK.md, PRODUCTION_READINESS_CHECKLIST.md updated.
+  - **QA checklist:**
+    1. Platform admin → `/admin/system-performance` → summary cards, readiness detail, queue health, webhook health, storage pressure, risk summary visible.
+    2. System status card shows green "healthy" when DB/cache/queue all OK.
+    3. Create failed_jobs entries → failed jobs 24h/7d counts update; recent failures list populated.
+    4. Create failed webhook events → webhook failures 7d count updates; recent failure table populated; orgs affected count correct.
+    5. Zero state: no orgs, no failed jobs, no webhooks → all zeros, clean UI.
+    6. Nav sidebar: "System Performance" link after Feature Usage.
+    7. Drilldown links: Org Health, Org Subscriptions, Revenue, Feature Usage navigate correctly.
+    8. Tenant user / guest → redirected to login.
+    9. Run `./vendor/bin/sail artisan test` and `./vendor/bin/sail npm run build`.
+
 - **Platform Feature Usage Dashboard (rescue-mission):**
   - **Goal:** Read-only platform operator dashboard surfacing module adoption and feature usage metrics derived from local DB.
   - **Route:** `GET /admin/feature-usage` → `platform.feature-usage` (auth:platform).
@@ -794,6 +814,21 @@
 - **Nav:** "Feature Usage" in sidebar between Org Health and Settings.
 - **Tests:** `FeatureUsageDashboardTest` — 13 tests covering access control, per-module adoption, soft-delete exclusion, billing metrics, summary stats, zero-state, and labels.
 - **QA:** Visit `/admin/feature-usage`. Verify cards, bars, table reflect org/module data. Create orgs with records → counts update. Soft-deleted excluded. Zero-state clean.
+
+## Platform: System Performance Dashboard
+
+- **Page:** `/admin/system-performance` (route: `platform.system-performance`)
+- **Purpose:** Read-only infrastructure and operational health overview for platform operators. Aggregates system readiness, queue health, webhook reliability, storage pressure, and at-risk org signals in one view.
+- **Readiness:** Live DB, cache, and queue config checks — same logic as `/_readiness` endpoint. Per-subsystem status badges with driver info.
+- **Queue health:** Failed job counts (24h, 7d, all-time), queue driver, 5 most recent failures (queue name, timestamp).
+- **Webhook reliability:** Total events, processed/failed counts, failed last 24h/7d, orgs affected by failures in last 7d, 5 most recent failures (event type, Stripe event ID, timestamp).
+- **Storage pressure:** Orgs over limit, orgs near limit (≥90%), total platform storage used, top-10 per-org progress bars with used/limit/pct.
+- **At-risk orgs:** Past-due count, unpaid count, orgs with 3+ webhook failures in 7d.
+- **Platform summary:** Total orgs, total users, active subscriptions, Stripe-linked orgs.
+- **Drilldown links:** Org Health, Org Subscriptions, Revenue, Feature Usage.
+- **Nav:** Sidebar "System Performance" link after Feature Usage, before Settings separator.
+- **Tests:** `SystemPerformanceDashboardTest` — 13 tests covering access control (platform admin, tenant user, guest), readiness checks, queue health counts, webhook health counts and filtering, at-risk billing/webhook counts, storage zero-state, platform summary, full zero-state, queue zero-state, readiness driver info.
+- **QA:** Visit `/admin/system-performance`. Verify summary cards, readiness detail, queue/webhook sections, storage pressure bars, risk summary. Insert failed_jobs and webhook failures → counts update. Zero state → all zeros, clean UI.
 
 ## Platform: Org Health Dashboard
 

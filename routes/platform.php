@@ -6,6 +6,7 @@ use App\Http\Controllers\Platform\Organizations\OrgHealthController;
 use App\Http\Controllers\Platform\Organizations\SubscriptionsController;
 use App\Http\Controllers\Platform\FeatureUsageDashboardController;
 use App\Http\Controllers\Platform\RevenueDashboardController;
+use App\Http\Controllers\Platform\SystemPerformanceDashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -60,6 +61,10 @@ Route::middleware('auth:platform')->group(function () {
     // Feature Usage Dashboard
     Route::get('/feature-usage', [FeatureUsageDashboardController::class, 'index'])
         ->name('feature-usage');
+
+    // System Performance Dashboard
+    Route::get('/system-performance', [SystemPerformanceDashboardController::class, 'index'])
+        ->name('system-performance');
 
     // Organizations Management
     Route::prefix('/organizations')->name('organizations.')->group(function () {

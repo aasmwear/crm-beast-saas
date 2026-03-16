@@ -40,6 +40,20 @@ Platform operators can access a **read-only Org Health Dashboard** at `/admin/or
 
 **Note:** This is a read-only diagnostic dashboard. No mutation controls are exposed here. Use the Org Subscriptions page for manual billing overrides.
 
+### Platform System Performance Dashboard
+
+Platform operators can access a **read-only System Performance Dashboard** at `/admin/system-performance`. Use it to:
+
+- See a **live readiness snapshot** of the platform (database, cache, queue subsystem health) — the same checks as `/_readiness` but embedded in the dashboard UI.
+- Monitor **queue health**: total failed jobs, failed in last 24h / 7d, queue driver, and the 5 most recent failures with queue name and timestamp.
+- Monitor **webhook reliability**: total events processed vs failed, failures in last 24h / 7d, number of orgs affected by failures in last 7d, and the 5 most recent failure details (event type, Stripe event ID, timestamp).
+- Assess **storage pressure**: how many orgs are over their storage limit, how many are near limit (≥90%), total platform storage used, and per-org progress bars for the top 10 at-risk orgs.
+- See **at-risk org counts**: orgs with past_due or unpaid billing status, orgs with 3+ webhook failures in 7 days.
+- See **platform summary**: total orgs, total users, active subscriptions, Stripe-linked orgs.
+- **Quick links** to drill down into Org Health, Org Subscriptions, Revenue, and Feature Usage dashboards.
+
+**Note:** This is a read-only diagnostic dashboard. No mutation controls are exposed. All metrics are derived from existing tables (`failed_jobs`, `stripe_webhook_events`, `project_files`, `organization_subscriptions`) with batched queries to avoid N+1.
+
 ### Platform Feature Usage Dashboard
 
 Platform operators can access a **read-only Feature Usage Dashboard** at `/admin/feature-usage`. Use it to:
