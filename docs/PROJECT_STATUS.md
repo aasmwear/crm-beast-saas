@@ -40,6 +40,21 @@
 
 ## Last PR Notes
 
+- **Data Lifecycle & Retention Guardrails (rescue-mission):**
+  - **Goal:** Architecture, docs, and safe groundwork for data lifecycle management. No destructive operations.
+  - **New doc:** `docs/DATA_LIFECYCLE.md` — hot-growth table inventory, retention categories (hot/warm/cold), operator rules, future archive/prune candidates, implementation roadmap (3 phases).
+  - **Retention config:** `config/lifecycle.php` — per-table retention windows and categories. Advisory only; no destructive job reads these yet.
+  - **RetentionPolicy service:** `app/Services/RetentionPolicy.php` — value object for programmatic access to retention config. Cutoff date computation, category helpers (`isHot()`, `isWarm()`, `isCold()`, `hasLifecycleAction()`).
+  - **Lifecycle report command:** `php artisan lifecycle:report` — read-only artisan command. Shows row counts, aged-out row counts, and status for all configured tables. Never modifies data.
+  - **Doc updates:** ARCHITECTURE_GUARDRAILS.md (new Data Lifecycle section), OBSERVABILITY_AND_RUNBOOK.md (lifecycle reporting section), PRODUCTION_READINESS_CHECKLIST.md (data lifecycle checklist), DB_SCHEMA.md (lifecycle reference table).
+  - **Tests:** RetentionPolicyTest (5 unit tests: config parsing, cutoff dates, category helpers, all() loader, defaults). LifecycleReportTest (5 feature tests: runs successfully, shows all tables, detects aged-out rows, shows OK for fresh data, non-destructive).
+  - **QA checklist:**
+    1. Run `sail artisan lifecycle:report` → see table with audit_logs, activities, stripe_webhook_events, failed_jobs. Status shows OK or candidate counts.
+    2. Insert an old audit_log row (>90 days) → re-run report → see ARCHIVE candidates.
+    3. Verify `config/lifecycle.php` loads correctly in tinker: `config('lifecycle.tables')`.
+    4. Verify `RetentionPolicy::all()` returns expected policies.
+    5. Run `./vendor/bin/sail artisan test` and `npm run build`.
+
 - **Custom Fields Phase 2 (rescue-mission):**
   - **Goal:** Stronger validation, client filtering by custom fields, groundwork for reporting/search.
   - **Validation hardening:** Select values must be one of configured options (ValidationException if invalid). Multiselect values must all be within configured options (ValidationException if any invalid). Type-safe validation for text/number/date unchanged.

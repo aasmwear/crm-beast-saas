@@ -324,6 +324,33 @@ grep "stripe\." storage/logs/laravel.log
 
 ---
 
+## Data Lifecycle Reporting
+
+### Lifecycle report command
+
+```bash
+# Show retention status for all hot-growth tables (read-only)
+sail artisan lifecycle:report
+```
+
+Outputs a table with: table name, retention category (hot/warm/cold), retention window, total rows, aged-out row count, and status (OK / ARCHIVE candidates / PRUNE candidates).
+
+**This command never modifies data.** Use it to:
+- Monitor table growth trends
+- Identify tables that need archival or pruning
+- Validate retention window configuration
+
+### Retention configuration
+
+Retention windows are defined in `config/lifecycle.php`. Categories:
+- **hot** — keep indefinitely (core entities: clients, projects, tasks, invoices)
+- **warm** — archive after window (audit_logs 90d, activities 90d, notifications 60d)
+- **cold** — prune after window (stripe_webhook_events 90d, failed_jobs 30d)
+
+See `docs/DATA_LIFECYCLE.md` for the full policy, operator rules, and implementation roadmap.
+
+---
+
 ## Quick Triage Flowchart
 
 ```

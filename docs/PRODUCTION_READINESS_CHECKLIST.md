@@ -51,6 +51,22 @@
 
 ---
 
+---
+
+## Data Lifecycle & Retention
+
+- [x] **Retention policy documented** — `docs/DATA_LIFECYCLE.md` defines hot/warm/cold categories, retention windows, operator rules, and implementation roadmap.
+- [x] **Retention config** — `config/lifecycle.php` declares per-table retention windows (audit_logs 90d, activities 90d, stripe_webhook_events 90d, failed_jobs 30d, etc.).
+- [x] **Lifecycle report command** — `php artisan lifecycle:report` shows row counts and aged-out candidates. Read-only, non-destructive.
+- [x] **RetentionPolicy service** — Value object for programmatic access to retention config (cutoff dates, category checks).
+- [ ] **Webhook event pruning** — `lifecycle:prune-webhooks` command (Phase 2).
+- [ ] **Failed jobs scheduled pruning** — `queue:prune-failed --hours=720` in scheduler (Phase 2).
+- [ ] **Audit log archival** — `audit_logs_archive` table + migration job (Phase 3).
+- [ ] **Activity archival** — `activities_archive` table + migration job (Phase 3).
+- [ ] **Notification pruning** — Delete read notifications > 180 days (Phase 3).
+
+---
+
 ## Other sections
 
 _Add additional checklist sections (Security, Performance, etc.) as needed._

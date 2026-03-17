@@ -76,3 +76,18 @@
 - **AuditLogger:** Use for sensitive mutations (clients, projects, roles, billing, etc.)
 - **Readiness:** `GET /_readiness` for load-balancer probes
 - **Structured logs:** Use dot-notation keys for webhook/billing failures
+
+---
+
+## Data Lifecycle & Retention
+
+- **Policy doc:** `docs/DATA_LIFECYCLE.md` defines retention categories (hot/warm/cold), windows, and operator rules
+- **Config:** `config/lifecycle.php` declares per-table retention windows and categories
+- **Reporting:** `php artisan lifecycle:report` shows row counts and aged-out candidates (read-only, non-destructive)
+- **Service:** `RetentionPolicy` value object provides programmatic access to retention config (cutoff dates, category checks)
+- **Operator rules:**
+  - Never delete `audit_logs` without archiving first
+  - Never bulk-prune `attendance` (legal/HR retention)
+  - `stripe_webhook_events` > 90 days and `failed_jobs` > 30 days are safe to prune
+  - All lifecycle jobs must be tenant-scoped and idempotent
+  - Log all lifecycle actions to `audit_logs`

@@ -124,6 +124,24 @@
 10. **Naming mismatch: notifications_center vs notifications** — Migration history shows rename from custom `notifications` to `notification_events`; Laravel `notifications` is separate. Ensure no orphan `notifications_center` table.
 
 ---
+---
+
+## Data Lifecycle
+
+Hot-growth tables have defined retention categories in `config/lifecycle.php`. Run `php artisan lifecycle:report` for current status. See `docs/DATA_LIFECYCLE.md` for full policy.
+
+| Table | Category | Retention Window |
+|-------|----------|-----------------|
+| `audit_logs` | warm | 90 days → archive |
+| `activities` | warm | 90 days → archive |
+| `notifications` | warm | 60 days → prune read |
+| `notification_events` | warm | 60 days → prune |
+| `stripe_webhook_events` | cold | 90 days → prune |
+| `failed_jobs` | cold | 30 days → prune |
+| `comments` | warm | 180 days → archive with parent |
+
+---
+
 # Note: Orphans default to first org only if subject/commentable missing.
 
 ## Validation Commands
