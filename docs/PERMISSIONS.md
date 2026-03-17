@@ -28,6 +28,7 @@
 | activity    | ✓    | —      | —      | —      | —     | —                                  |
 | roles       | ✓    | —      | —      | —      | ✓     | assign                             |
 | api_keys    | ✓    | ✓      | —      | ✓      | —     | —                                  |
+| custom_fields | —   | —      | —      | —      | ✓     | —                                  |
 
 ---
 

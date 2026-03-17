@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useForm, usePage, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PageShell from '@/Components/ui/PageShell.vue';
+import CustomFieldsSection from '@/Components/Clients/CustomFieldsSection.vue';
 defineOptions({ layout: AuthenticatedLayout });
 // ---------- Route & props ----------
 const routeGlobal = window.route;
@@ -40,6 +41,7 @@ const form = useForm({
     new_note_sales: '',
     new_note_cst: '',
     new_note_tech: '',
+    custom_values: { ...(props.customValues ?? {}) },
 });
 const submit = () => {
     form.put(r('clients.update', {
@@ -440,6 +442,31 @@ if (__VLS_ctx.form.errors.gbp_access) {
     });
     (__VLS_ctx.form.errors.gbp_access);
 }
+if ((__VLS_ctx.customFields ?? []).length) {
+    /** @type {[typeof CustomFieldsSection, ]} */ ;
+    // @ts-ignore
+    const __VLS_8 = __VLS_asFunctionalComponent(CustomFieldsSection, new CustomFieldsSection({
+        ...{ 'onUpdate:modelValue': {} },
+        fields: (__VLS_ctx.customFields ?? []),
+        modelValue: (__VLS_ctx.form.custom_values ?? {}),
+    }));
+    const __VLS_9 = __VLS_8({
+        ...{ 'onUpdate:modelValue': {} },
+        fields: (__VLS_ctx.customFields ?? []),
+        modelValue: (__VLS_ctx.form.custom_values ?? {}),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_8));
+    let __VLS_11;
+    let __VLS_12;
+    let __VLS_13;
+    const __VLS_14 = {
+        'onUpdate:modelValue': (...[$event]) => {
+            if (!((__VLS_ctx.customFields ?? []).length))
+                return;
+            __VLS_ctx.form.custom_values = $event;
+        }
+    };
+    var __VLS_10;
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "border-t border-white/10 pt-6 space-y-4" },
 });
@@ -707,6 +734,7 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             Link: Link,
             PageShell: PageShell,
+            CustomFieldsSection: CustomFieldsSection,
             r: r,
             client: client,
             org: org,

@@ -24,6 +24,7 @@
 | Settings | ✅ | RBAC; tabs: Organization, Branding, Work Hours, Notifications, Integrations, Modules, API Keys |
 | Billing | 🟡 | Stripe/Cashier self-serve in place (checkout, webhook sync, portal access, invoice history UX); keep iterating on operational hardening |
 | HRM | ✅ | RBAC enforced: hrm.view/create/edit/delete/manage; UserPolicy + hrm.*; scopeBindings; UI hiding |
+| Custom Fields | ✅ | custom-fields.manage; org-scoped; Client entity; Settings → Custom Fields; Client create/edit dynamic fields |
 
 ---
 
@@ -38,6 +39,37 @@
 ---
 
 ## Last PR Notes
+
+- **Custom Fields Phase 2 (rescue-mission):**
+  - **Goal:** Stronger validation, client filtering by custom fields, groundwork for reporting/search.
+  - **Validation hardening:** Select values must be one of configured options (ValidationException if invalid). Multiselect values must all be within configured options (ValidationException if any invalid). Type-safe validation for text/number/date unchanged.
+  - **Client update fix:** ClientController::update now syncs custom_values via CustomFieldValueService::syncForEntity (was previously missing).
+  - **Client filtering:** ClientsInertiaController::index supports `cf[slug]=value` query params. Filterable types: text (contains), number (exact), date (exact), select (exact). Tenant-scoped; only known org slugs applied.
+  - **Frontend:** Clients Index.vue adds compact custom field filter section when customFields exist. Filters preserve pagination; Reset clears all including cf.
+  - **Tests:** CustomFieldTest extended — invalid select rejected; invalid multiselect rejected; client filtering by custom field works; org isolation preserved for cf filter (9 tests).
+  - **QA checklist:**
+    1. Create select field with options [A,B,C]. Create client with tier=Invalid → validation error, no save.
+    2. Create multiselect field. Submit [A, Hacked] → validation error.
+    3. Clients index: with custom fields defined, see Custom filter section; filter by tier=Premium → only matching clients.
+    4. Reset clears cf filters. Pagination preserves cf in URL.
+    5. Org B user, cf[tier]=X → only org B clients; no cross-tenant leakage.
+    6. Run `./vendor/bin/sail artisan test` and `npm run build`.
+
+- **Custom Fields System v1 (rescue-mission):**
+  - **Goal:** Core extensibility layer for tenant-defined custom fields on entities.
+  - **Schema:** `custom_fields` (org, entity, label, slug, type, options, is_required, sort_order), `custom_field_values` (custom_field_id, entity_type, entity_id, value_text/number/date/json). Unique per org+entity+slug; values unique per field+entity.
+  - **Models:** CustomField, CustomFieldValue; Client has customFieldValues().
+  - **Controllers:** CustomFieldController (index/store/update/destroy); ClientController store/update accept custom_values, CustomFieldValueService::syncForEntity.
+  - **Validation:** Type-safe (text, number, date, select, multiselect); org-scoped; required-field checks.
+  - **UI:** Settings → Custom Fields (list, add, edit, delete); Clients Create/Edit render dynamic fields via CustomFieldsSection.
+  - **Permission:** custom-fields.manage (Owner, Manager, Super Admin).
+  - **Tests:** CustomFieldTest — 403 without permission; field creation; value saving on client create; org isolation (404 cross-tenant); index 403.
+  - **QA checklist:**
+    1. Owner → Settings → Custom Fields → Create field (label, type text/number/date/select/multiselect, options for select).
+    2. Create Client → Custom fields section visible when fields exist; values persist.
+    3. Edit Client → Custom values pre-filled; save updates values.
+    4. User without custom-fields.manage → 403 on Custom Fields page, no tab/link.
+    5. Run `./vendor/bin/sail artisan test tests/Feature/CustomFields/` and `npm run build`.
 
 - **Platform System Performance Dashboard (rescue-mission):**
   - **Goal:** Read-only platform operator dashboard surfacing infrastructure readiness, queue health, webhook reliability, storage pressure, and at-risk org counts from existing app/DB signals.

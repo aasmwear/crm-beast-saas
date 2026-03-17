@@ -45,6 +45,7 @@ const props = defineProps<{
   features?: Record<string, boolean | number>
   featureCatalog?: Array<{ key: string; label: string; description: string; type: string; default: boolean | number }>
   canViewApiKeys?: boolean
+  canViewCustomFields?: boolean
   apiKeys?: Array<{
     id: number
     name: string
@@ -963,6 +964,22 @@ const visibleTabs = computed(() => {
           class="inline-flex items-center rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 hover:bg-white/10"
         >
           Open Roles & Permissions →
+        </a>
+      </section>
+
+      <!-- Custom Fields (when permitted) -->
+      <section v-if="canViewCustomFields" class="card-neo p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white/80">
+          Custom Fields
+        </h2>
+        <p class="text-sm text-white/60">
+          Define custom fields for Clients and other entities.
+        </p>
+        <a
+          :href="r('custom-fields.index', { organization: org })"
+          class="inline-flex items-center rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 hover:bg-white/10"
+        >
+          Open Custom Fields →
         </a>
       </section>
 

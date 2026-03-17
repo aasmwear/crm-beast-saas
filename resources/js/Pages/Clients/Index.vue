@@ -16,27 +16,49 @@ const routeGlobal = (window as any).route
 const r = (name: string, params: any = {}, absolute = false, config?: any) =>
   routeGlobal ? routeGlobal(name, params, absolute, config) : '#'
 
+// Custom field def for filter UI
+type CustomFieldFilterDef = {
+  slug: string
+  label: string
+  type: string
+  options: string[]
+}
+
 // Props from Inertia
-const props = defineProps<{
-  organizationSlug: string
-  filters: {
-    status: string | null
-    industry: string | null
-    search: string | null
-    q: string | null
-  }
-  canCreate?: boolean
-  canImport?: boolean
-  canExport?: boolean
-  clients: {
-    data: Array<any>
-    links: Array<{
-      url: string | null
-      label: string
-      active: boolean
-    }>
-  }
-}>()
+const props = withDefaults(
+  defineProps<{
+    organizationSlug: string
+    filters: {
+      status: string | null
+      industry: string | null
+      search: string | null
+      q: string | null
+      cf?: Record<string, string | number>
+    }
+    customFields?: CustomFieldFilterDef[]
+    canCreate?: boolean
+    canImport?: boolean
+    canExport?: boolean
+    clients: {
+      data: Array<any>
+      links: Array<{
+        url: string | null
+        label: string
+        active: boolean
+      }>
+    }
+  }>(),
+  {
+    customFields: () => [],
+    filters: () => ({
+      status: null,
+      industry: null,
+      search: null,
+      q: null,
+      cf: {},
+    }),
+  },
+)
 
 // Reactive resolution of the organization slug
 const org = computed(() => {
@@ -52,6 +74,9 @@ const org = computed(() => {
 const search = ref(props.filters.search ?? props.filters.q ?? '')
 const status = ref(props.filters.status ?? '')
 const industry = ref(props.filters.industry ?? '')
+const cfValues = ref<Record<string, string>>(
+  { ...(props.filters.cf ?? {}) } as Record<string, string>,
+)
 
 // Keep local state in sync when Inertia updates props
 watch(
@@ -60,7 +85,12 @@ watch(
     search.value = f.search ?? f.q ?? ''
     status.value = f.status ?? ''
     industry.value = f.industry ?? ''
+    cfValues.value = { ...(f.cf ?? {}) } as Record<string, string>
   },
+)
+
+const hasActiveCfFilters = computed(() =>
+  Object.values(cfValues.value).some((v) => v !== '' && v != null),
 )
 
 // Options for the status filter (maps to `clients.status` column)
@@ -73,14 +103,27 @@ const statusOptions = [
   { value: 'churned', label: 'Churned' },
 ]
 
+// Build cf filter object (only non-empty values)
+function buildCfParams(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [slug, v] of Object.entries(cfValues.value)) {
+    if (v != null && String(v).trim() !== '') {
+      out[slug] = String(v).trim()
+    }
+  }
+  return out
+}
+
 // Apply filters + search via Inertia GET
 function applyFilters() {
+  const cf = buildCfParams()
   router.get(
     r('clients.index', { organization: org.value }),
     {
       search: search.value || null,
       status: status.value || null,
       industry: industry.value || null,
+      cf: Object.keys(cf).length ? cf : undefined,
     },
     {
       preserveScroll: true,
@@ -98,10 +141,18 @@ function resetFilters() {
   search.value = ''
   status.value = ''
   industry.value = ''
+  cfValues.value = {}
   applyFilters()
 }
 
 // Helper function to apply the status chip styling
+function getCfValue(slug: string): string {
+  return cfValues.value[slug] ?? ''
+}
+function setCfValue(slug: string, v: string) {
+  cfValues.value = { ...cfValues.value, [slug]: v }
+}
+
 function getStatusClass(statusValue: string | null | undefined) {
   const base =
     'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium '
@@ -189,7 +240,7 @@ function getStatusClass(statusValue: string | null | undefined) {
             Search
           </button>
           <button
-            v-if="search || status || industry"
+            v-if="search || status || industry || hasActiveCfFilters"
             @click="resetFilters"
             class="text-xs text-white/60 hover:text-white underline-offset-2 hover:underline"
           >
@@ -221,6 +272,47 @@ function getStatusClass(statusValue: string | null | undefined) {
             class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
+      </div>
+
+      <!-- Custom field filters (compact, only when custom fields exist) -->
+      <div
+        v-if="customFields && customFields.length"
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+      >
+        <span class="text-xs text-white/50">Custom:</span>
+        <template v-for="f in customFields" :key="f.slug">
+          <template v-if="f.type === 'select'">
+            <select
+              :value="cfValues[f.slug] ?? ''"
+              class="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+              @change="
+                (e) => {
+                  cfValues[f.slug] = (e.target as HTMLSelectElement).value
+                  applyFilters()
+                }
+              "
+            >
+              <option value="">— {{ f.label }} —</option>
+              <option v-for="opt in (f.options ?? [])" :key="opt" :value="opt">
+                {{ opt }}
+              </option>
+            </select>
+          </template>
+          <template v-else>
+            <input
+              :value="cfValues[f.slug] ?? ''"
+              :type="f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'"
+              :placeholder="f.label"
+              class="w-28 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+              @input="
+                (e) => {
+                  cfValues[f.slug] = (e.target as HTMLInputElement).value
+                }
+              "
+              @keyup.enter="applyFilters"
+            />
+          </template>
+        </template>
       </div>
 
       <!-- Clients Table -->

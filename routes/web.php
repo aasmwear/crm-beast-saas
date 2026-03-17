@@ -23,6 +23,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\ClientContactController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\PortalAccessController;
 use App\Http\Controllers\ClientsImportController;
 use App\Http\Controllers\ClientsInertiaController;
@@ -363,6 +364,16 @@ Route::prefix('org/{organization:slug}')
         Route::post('/settings/features', [SettingsController::class, 'updateFeatures'])->name('settings.features');
         Route::post('/settings/api-keys', [SettingsApiKeysController::class, 'store'])->name('settings.api-keys.store');
         Route::delete('/settings/api-keys/{apiKey}', [SettingsApiKeysController::class, 'destroy'])->name('settings.api-keys.destroy')->scopeBindings();
+
+        /*
+        |------------------------------
+        | Custom Fields — /settings/custom-fields
+        |------------------------------
+        */
+        Route::get('/settings/custom-fields', [CustomFieldController::class, 'index'])->name('custom-fields.index');
+        Route::post('/settings/custom-fields', [CustomFieldController::class, 'store'])->name('custom-fields.store');
+        Route::put('/settings/custom-fields/{customField}', [CustomFieldController::class, 'update'])->name('custom-fields.update')->scopeBindings();
+        Route::delete('/settings/custom-fields/{customField}', [CustomFieldController::class, 'destroy'])->name('custom-fields.destroy')->scopeBindings();
 
         /*
         |------------------------------

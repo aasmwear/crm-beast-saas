@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\CustomField;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -43,8 +44,24 @@ class ClientsInertiaController extends Controller
             $search = $request->query('q');
         }
 
+        // Custom field filters: cf[slug]=value
+        $cfFilters = $request->query('cf', []);
+        if (! is_array($cfFilters)) {
+            $cfFilters = [];
+        }
+
         /** @var User $user */
         $user = $request->user();
+
+        // Load filterable custom fields (text, number, date, select) for this org
+        $filterableFields = CustomField::query()
+            ->forOrg((int) $organization->id)
+            ->forEntity(CustomField::ENTITY_CLIENT)
+            ->whereIn('type', [CustomField::TYPE_TEXT, CustomField::TYPE_NUMBER, CustomField::TYPE_DATE, CustomField::TYPE_SELECT])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'label', 'slug', 'type', 'options'])
+            ->keyBy('slug');
 
         /** @var Builder<Client>|BaseBuilder $query */
         $query = Client::query()
@@ -81,16 +98,57 @@ class ClientsInertiaController extends Controller
                             ->orWhereRaw('LOWER(COALESCE(address, \'\')) LIKE ?', [$like]);
                     });
                 }
-            )
-            ->orderByDesc('id');
+            );
+
+        // Apply custom field filters (tenant-scoped; only known slugs)
+        foreach ($cfFilters as $slug => $rawValue) {
+            if (! is_string($slug) || $slug === '') {
+                continue;
+            }
+            $field = $filterableFields->get($slug);
+            if ($field === null) {
+                continue;
+            }
+            $val = is_string($rawValue) ? trim($rawValue) : (is_numeric($rawValue) ? (string) $rawValue : '');
+            if ($val === '') {
+                continue;
+            }
+            $fieldId = $field->id;
+            $fieldType = $field->type;
+            $query->whereHas('customFieldValues', static function (Builder $q) use ($fieldId, $fieldType, $val): void {
+                $q->where('custom_field_id', $fieldId);
+                match ($fieldType) {
+                    CustomField::TYPE_TEXT => $q->where('value_text', 'like', '%' . addcslashes($val, '%_\\') . '%'),
+                    CustomField::TYPE_NUMBER => $q->where('value_number', (float) $val),
+                    CustomField::TYPE_DATE => $q->where('value_date', $val),
+                    CustomField::TYPE_SELECT => $q->where('value_text', $val),
+                    default => null,
+                };
+            });
+        }
+
+        $query->orderByDesc('id');
 
         $clients = $query
             ->withCount('projects')
             ->paginate(10)
             ->withQueryString();
 
-        /** @var User $user */
-        $user = $request->user();
+        // Build customFields for filter UI (compact shape)
+        $customFieldsForFilter = $filterableFields->values()->map(fn (CustomField $f) => [
+            'slug' => $f->slug,
+            'label' => $f->label,
+            'type' => $f->type,
+            'options' => $f->options ?? [],
+        ])->values()->all();
+
+        // Normalize cf filters for Vue (string|number values only)
+        $cfForProps = [];
+        foreach ($cfFilters as $slug => $rawValue) {
+            if (is_string($rawValue) || is_numeric($rawValue)) {
+                $cfForProps[$slug] = $rawValue;
+            }
+        }
 
         return Inertia::render('Clients/Index', [
             'organizationSlug' => $organization->slug,
@@ -100,7 +158,9 @@ class ClientsInertiaController extends Controller
                 'industry' => is_string($industry) ? $industry : null,
                 'search' => is_string($search) ? $search : null, // canonical
                 'q' => is_string($search) ? $search : null,      // alias for tests / old links
+                'cf' => $cfForProps,
             ],
+            'customFields' => $customFieldsForFilter,
             'clients' => $clients,
             'canCreate' => $user->can('create', Client::class),
             'canImport' => $user->can('clients.import'),
@@ -113,10 +173,27 @@ class ClientsInertiaController extends Controller
         $this->authorize('create', Client::class);
 
         $users = $this->assignmentUsersForOrganization((int) $organization->id);
+        $customFields = CustomField::query()
+            ->forOrg((int) $organization->id)
+            ->forEntity(CustomField::ENTITY_CLIENT)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'label', 'slug', 'type', 'options', 'is_required'])
+            ->map(fn (CustomField $f) => [
+                'id' => $f->id,
+                'label' => $f->label,
+                'slug' => $f->slug,
+                'type' => $f->type,
+                'options' => $f->options,
+                'is_required' => $f->is_required,
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('Clients/Create', [
             'organizationSlug' => $organization->slug,
             'users' => $users,
+            'customFields' => $customFields,
         ]);
     }
 
@@ -212,11 +289,42 @@ class ClientsInertiaController extends Controller
         $this->authorize('update', $client);
 
         $users = $this->assignmentUsersForOrganization((int) $organization->id);
+        $customFields = CustomField::query()
+            ->forOrg((int) $organization->id)
+            ->forEntity(CustomField::ENTITY_CLIENT)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'label', 'slug', 'type', 'options', 'is_required'])
+            ->map(fn (CustomField $f) => [
+                'id' => $f->id,
+                'label' => $f->label,
+                'slug' => $f->slug,
+                'type' => $f->type,
+                'options' => $f->options,
+                'is_required' => $f->is_required,
+            ])
+            ->values()
+            ->all();
+
+        $customValues = $client->customFieldValues()
+            ->with('customField:id,slug,type')
+            ->get()
+            ->mapWithKeys(function ($v) {
+                $slug = $v->customField?->slug;
+                if ($slug === null) {
+                    return [];
+                }
+
+                return [$slug => $v->getValue()];
+            })
+            ->all();
 
         return Inertia::render('Clients/Edit', [
             'organizationSlug' => $organization->slug,
             'client' => $client,
             'users' => $users,
+            'customFields' => $customFields,
+            'customValues' => $customValues,
             'canEdit' => request()->user()?->can('update', $client) ?? false,
             'canDelete' => request()->user()?->can('delete', $client) ?? false,
         ]);

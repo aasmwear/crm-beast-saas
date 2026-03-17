@@ -104,6 +104,7 @@ final class SettingsController extends Controller
             'featureCatalog' => $featureCatalog,
             'apiKeys' => $apiKeys,
             'canViewApiKeys' => $canViewApiKeys,
+            'canViewCustomFields' => $request->user()?->can('custom-fields.manage') ?? false,
         ]);
     }
 

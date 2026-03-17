@@ -152,6 +152,11 @@ class Organization extends Model
     /**
      * @return HasMany<OrganizationApiKey, \App\Models\Organization>
      */
+    public function customFields(): HasMany
+    {
+        return $this->hasMany(CustomField::class);
+    }
+
     public function apiKeys(): HasMany
     {
         /** @var HasMany<OrganizationApiKey, \App\Models\Organization> $rel */

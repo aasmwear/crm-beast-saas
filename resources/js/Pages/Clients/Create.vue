@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useForm, usePage, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import PageShell from '@/Components/ui/PageShell.vue'
+import CustomFieldsSection from '@/Components/Clients/CustomFieldsSection.vue'
 
 defineOptions({ layout: AuthenticatedLayout })
 
@@ -35,6 +36,8 @@ type ClientForm = {
   notes_sales: string | null
   notes_cst: string | null
   notes_tech: string | null
+
+  custom_values: Record<string, string | number | string[] | null>
 }
 
 type PageProps = {
@@ -49,9 +52,19 @@ const r = (name: string, params: any = {}, absolute = false, config?: any) =>
 
 const page = usePage<PageProps>()
 
+type CustomFieldDef = {
+  id: number
+  label: string
+  slug: string
+  type: string
+  options: string[] | null
+  is_required: boolean
+}
+
 const props = defineProps<{
   organizationSlug: string
   users: UserBrief[]
+  customFields?: CustomFieldDef[]
 }>()
 
 const org = computed(() => {
@@ -84,6 +97,8 @@ const form = useForm<ClientForm>({
   notes_sales: null,
   notes_cst: null,
   notes_tech: null,
+
+  custom_values: {} as Record<string, string | number | string[] | null>,
 })
 
 const submit = () => {
@@ -453,6 +468,14 @@ const gbpAccessOptions = [
           </div>
         </div>
       </div>
+
+      <!-- Custom Fields -->
+      <CustomFieldsSection
+        v-if="(customFields ?? []).length"
+        :fields="customFields ?? []"
+        :model-value="form.custom_values ?? {}"
+        @update:model-value="form.custom_values = $event"
+      />
 
       <!-- Notes -->
       <div class="border-t border-white/10 pt-6 space-y-4">

@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Services\AuditLogger;
+use App\Services\CustomFieldValueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -191,6 +192,7 @@ final class ClientController extends Controller
                 'lead', 'active', 'inactive', 'paused', 'churned',
                 'Lead', 'Active', 'Inactive', 'Paused', 'Churned',
             ])],
+            'custom_values' => ['nullable', 'array'],
         ]);
 
         if (isset($data['status']) && is_string($data['status'])) {
@@ -207,11 +209,14 @@ final class ClientController extends Controller
         $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
         $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
 
+        $customValues = $data['custom_values'] ?? [];
+        unset($data['custom_values']);
+
         $fillable = array_flip((new Client)->getFillable());
         $data = array_intersect_key($data, $fillable);
         $data['organization_id'] = (int) $org->id;
 
-        return DB::transaction(function () use ($data, $org, $request): RedirectResponse {
+        return DB::transaction(function () use ($data, $customValues, $org, $request): RedirectResponse {
             try {
                 // Log the data being inserted for debugging
                 Log::info('Creating client with data:', [
@@ -223,6 +228,15 @@ final class ClientController extends Controller
                 ]);
 
                 $client = Client::query()->create($data);
+
+                if ($customValues !== []) {
+                    CustomFieldValueService::syncForEntity(
+                        (int) $org->id,
+                        'client',
+                        (int) $client->id,
+                        $customValues
+                    );
+                }
 
                 AuditLogger::log(
                     organization: $org,
@@ -334,6 +348,7 @@ final class ClientController extends Controller
                 'lead', 'active', 'inactive', 'paused', 'churned',
                 'Lead', 'Active', 'Inactive', 'Paused', 'Churned',
             ])],
+            'custom_values' => ['nullable', 'array'],
         ]);
 
         if (isset($data['status']) && is_string($data['status'])) {
@@ -345,6 +360,9 @@ final class ClientController extends Controller
         $data['notes_sales'] = $data['notes_sales'] ?? $data['notes_by_sales'] ?? null;
         $data['notes_cst'] = $data['notes_cst'] ?? $data['notes_by_cst'] ?? null;
         $data['notes_tech'] = $data['notes_tech'] ?? $data['notes_by_tech'] ?? null;
+
+        $customValues = $data['custom_values'] ?? [];
+        unset($data['custom_values']);
 
         $user = $request->user();
         $prefix = '[' . now()->format('Y-m-d H:i') . '] ' . $user->name . ' (#'
@@ -364,11 +382,20 @@ final class ClientController extends Controller
         $fillable = array_flip((new Client)->getFillable());
         $data = array_intersect_key($data, $fillable);
 
-        return DB::transaction(function () use ($client, $data, $organization, $request): RedirectResponse {
+        return DB::transaction(function () use ($client, $data, $customValues, $organization, $request): RedirectResponse {
             try {
                 $before = $client->getOriginal();
 
                 $client->update($data);
+
+                if ($customValues !== []) {
+                    CustomFieldValueService::syncForEntity(
+                        (int) $organization->id,
+                        'client',
+                        (int) $client->id,
+                        $customValues
+                    );
+                }
 
                 AuditLogger::log(
                     organization: $organization,

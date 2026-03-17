@@ -127,6 +127,19 @@ final class Client extends Model
     }
 
     /**
+     * Custom field values for this client.
+     *
+     * @return HasMany<CustomFieldValue, Client>
+     *
+     * @phpstan-return HasMany<CustomFieldValue, $this>
+     */
+    public function customFieldValues(): HasMany
+    {
+        return $this->hasMany(CustomFieldValue::class, 'entity_id')
+            ->where('entity_type', 'client');
+    }
+
+    /**
      * Fronter (sales lead) relation - single user responsible for initial contact.
      *
      * @return BelongsTo<User, Client>

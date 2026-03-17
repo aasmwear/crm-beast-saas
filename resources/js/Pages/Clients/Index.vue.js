@@ -11,7 +11,16 @@ const page = usePage();
 // Centralized route helper (Ziggy)
 const routeGlobal = window.route;
 const r = (name, params = {}, absolute = false, config) => routeGlobal ? routeGlobal(name, params, absolute, config) : '#';
-const props = defineProps();
+const props = withDefaults(defineProps(), {
+    customFields: () => [],
+    filters: () => ({
+        status: null,
+        industry: null,
+        search: null,
+        q: null,
+        cf: {},
+    }),
+});
 // Reactive resolution of the organization slug
 const org = computed(() => {
     return (props.organizationSlug ||
@@ -23,12 +32,15 @@ const org = computed(() => {
 const search = ref(props.filters.search ?? props.filters.q ?? '');
 const status = ref(props.filters.status ?? '');
 const industry = ref(props.filters.industry ?? '');
+const cfValues = ref({ ...(props.filters.cf ?? {}) });
 // Keep local state in sync when Inertia updates props
 watch(() => props.filters, (f) => {
     search.value = f.search ?? f.q ?? '';
     status.value = f.status ?? '';
     industry.value = f.industry ?? '';
+    cfValues.value = { ...(f.cf ?? {}) };
 });
+const hasActiveCfFilters = computed(() => Object.values(cfValues.value).some((v) => v !== '' && v != null));
 // Options for the status filter (maps to `clients.status` column)
 const statusOptions = [
     { value: '', label: 'All statuses' },
@@ -38,12 +50,24 @@ const statusOptions = [
     { value: 'paused', label: 'Paused' },
     { value: 'churned', label: 'Churned' },
 ];
+// Build cf filter object (only non-empty values)
+function buildCfParams() {
+    const out = {};
+    for (const [slug, v] of Object.entries(cfValues.value)) {
+        if (v != null && String(v).trim() !== '') {
+            out[slug] = String(v).trim();
+        }
+    }
+    return out;
+}
 // Apply filters + search via Inertia GET
 function applyFilters() {
+    const cf = buildCfParams();
     router.get(r('clients.index', { organization: org.value }), {
         search: search.value || null,
         status: status.value || null,
         industry: industry.value || null,
+        cf: Object.keys(cf).length ? cf : undefined,
     }, {
         preserveScroll: true,
         preserveState: true,
@@ -57,9 +81,16 @@ function resetFilters() {
     search.value = '';
     status.value = '';
     industry.value = '';
+    cfValues.value = {};
     applyFilters();
 }
 // Helper function to apply the status chip styling
+function getCfValue(slug) {
+    return cfValues.value[slug] ?? '';
+}
+function setCfValue(slug, v) {
+    cfValues.value = { ...cfValues.value, [slug]: v };
+}
 function getStatusClass(statusValue) {
     const base = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ';
     if (!statusValue) {
@@ -82,6 +113,16 @@ function getStatusClass(statusValue) {
     }
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
+const __VLS_withDefaultsArg = (function (t) { return t; })({
+    customFields: () => [],
+    filters: () => ({
+        status: null,
+        industry: null,
+        search: null,
+        q: null,
+        cf: {},
+    }),
+});
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
@@ -196,7 +237,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     ...{ onClick: (__VLS_ctx.doSearch) },
     ...{ class: "btn-capsule text-sm" },
 });
-if (__VLS_ctx.search || __VLS_ctx.status || __VLS_ctx.industry) {
+if (__VLS_ctx.search || __VLS_ctx.status || __VLS_ctx.industry || __VLS_ctx.hasActiveCfFilters) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.resetFilters) },
         ...{ class: "text-xs text-white/60 hover:text-white underline-offset-2 hover:underline" },
@@ -223,6 +264,50 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ class: "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" },
 });
 (__VLS_ctx.industry);
+if (__VLS_ctx.customFields && __VLS_ctx.customFields.length) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "text-xs text-white/50" },
+    });
+    for (const [f] of __VLS_getVForSourceType((__VLS_ctx.customFields))) {
+        (f.slug);
+        if (f.type === 'select') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+                ...{ onChange: ((e) => {
+                        __VLS_ctx.cfValues[f.slug] = e.target.value;
+                        __VLS_ctx.applyFilters();
+                    }) },
+                value: (__VLS_ctx.cfValues[f.slug] ?? ''),
+                ...{ class: "rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+                value: "",
+            });
+            (f.label);
+            for (const [opt] of __VLS_getVForSourceType(((f.options ?? [])))) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+                    key: (opt),
+                    value: (opt),
+                });
+                (opt);
+            }
+        }
+        else {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onInput: ((e) => {
+                        __VLS_ctx.cfValues[f.slug] = e.target.value;
+                    }) },
+                ...{ onKeyup: (__VLS_ctx.applyFilters) },
+                value: (__VLS_ctx.cfValues[f.slug] ?? ''),
+                type: (f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'),
+                placeholder: (f.label),
+                ...{ class: "w-28 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" },
+            });
+        }
+    }
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "card-neo overflow-hidden" },
 });
@@ -432,6 +517,42 @@ var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
 /** @type {__VLS_StyleScopedClasses['focus:ring-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['focus:ring-[var(--primary)]']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-lg']} */ ;
+/** @type {__VLS_StyleScopedClasses['border']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-white/5']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/50']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-white/5']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-[var(--primary)]']} */ ;
+/** @type {__VLS_StyleScopedClasses['w-28']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['border']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-white/10']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-white/5']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white/80']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder-white/40']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-[var(--primary)]']} */ ;
 /** @type {__VLS_StyleScopedClasses['card-neo']} */ ;
 /** @type {__VLS_StyleScopedClasses['overflow-hidden']} */ ;
 /** @type {__VLS_StyleScopedClasses['inline-flex']} */ ;
@@ -505,6 +626,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             search: search,
             status: status,
             industry: industry,
+            cfValues: cfValues,
+            hasActiveCfFilters: hasActiveCfFilters,
             statusOptions: statusOptions,
             applyFilters: applyFilters,
             doSearch: doSearch,
@@ -513,11 +636,13 @@ const __VLS_self = (await import('vue')).defineComponent({
         };
     },
     __typeProps: {},
+    props: {},
 });
 export default (await import('vue')).defineComponent({
     setup() {
         return {};
     },
     __typeProps: {},
+    props: {},
 });
 ; /* PartiallyEnd: #4569/main.vue */
