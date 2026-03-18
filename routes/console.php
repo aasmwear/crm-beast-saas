@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 
 Artisan::command('inspire', function (): void {
@@ -65,3 +66,17 @@ Artisan::command('user:super-admin {email} {--name=} {--password=} {--attach-all
 
     return 0;
 })->purpose('Create or update a Super Admin user (bypasses all authorization)');
+
+/*
+|--------------------------------------------------------------------------
+| Lifecycle Prune Schedule (Phase 2)
+|--------------------------------------------------------------------------
+|
+| Prune cold-data tables daily. Each command defaults to dry-run; --execute
+| triggers actual deletion. Operators must ensure cron runs schedule:run.
+| Run manually with dry-run first: php artisan lifecycle:prune-webhooks
+|
+*/
+Schedule::command('lifecycle:prune-webhooks', ['--execute'])->dailyAt('02:00');
+Schedule::command('lifecycle:prune-failed', ['--execute'])->dailyAt('02:05');
+Schedule::command('lifecycle:prune-batches', ['--execute'])->dailyAt('02:10');

@@ -94,12 +94,33 @@ Data that serves no business purpose after a defined period. Can be deleted outr
 | `Attendance::SoftDeletes` | Individual attendance records | No | `deleted_at` set; recoverable |
 | `CustomField cascadeOnDelete` | Field → values | Yes | Values auto-deleted when field definition is removed |
 | **`lifecycle:report` command** | Read-only reporting | No | Reports row counts and age distribution per table |
+| **`lifecycle:prune-webhooks`** | stripe_webhook_events | Yes (with `--execute`) | Dry-run default; 90d retention; Stripe Dashboard is source of truth |
+| **`lifecycle:prune-failed`** | failed_jobs | Yes (with `--execute`) | Dry-run default; 30d retention; uses Laravel failer |
+| **`lifecycle:prune-batches`** | job_batches | Yes (with `--execute`) | Dry-run default; 30d retention; uses Laravel batch repo |
 
 ---
 
 ## Retention Config
 
-Application-level retention windows are defined in `config/lifecycle.php`. These are advisory — no destructive job uses them yet. The `lifecycle:report` command reads them to flag tables that exceed their retention window.
+Application-level retention windows are defined in `config/lifecycle.php`. The `lifecycle:report` command reads them to flag tables that exceed their retention window. The `lifecycle:prune-*` commands use them for cutoff date computation.
+
+### Safe Prune Commands (Phase 2)
+
+All prune commands default to **dry-run** (read-only). Use `--execute` to perform deletion:
+
+```bash
+# Dry-run: show candidates, no deletion
+sail artisan lifecycle:prune-webhooks
+sail artisan lifecycle:prune-failed
+sail artisan lifecycle:prune-batches
+
+# Execute: actually delete aged-out rows
+sail artisan lifecycle:prune-webhooks --execute
+sail artisan lifecycle:prune-failed --execute
+sail artisan lifecycle:prune-batches --execute
+```
+
+Scheduled runs (in `routes/console.php`): daily at 02:00, 02:05, 02:10 UTC respectively. Ensure `schedule:run` is in cron.
 
 ---
 
@@ -112,11 +133,12 @@ Application-level retention windows are defined in `config/lifecycle.php`. These
 - [x] Create `lifecycle:report` artisan command (read-only)
 - [x] Update architecture/operations docs
 
-### Phase 2 (next PR)
-- [ ] `lifecycle:prune-webhooks` — delete processed `stripe_webhook_events` older than configured window
-- [ ] Schedule `queue:prune-failed --hours=720` in `routes/console.php`
-- [ ] Schedule `queue:prune-batches --hours=720` in `routes/console.php`
-- [ ] Add `--dry-run` / `--execute` flags to prune commands
+### Phase 2 (done)
+- [x] `lifecycle:prune-webhooks` — delete `stripe_webhook_events` older than configured window (dry-run default, `--execute` to delete)
+- [x] `lifecycle:prune-failed` — prune `failed_jobs` using config retention (dry-run default, `--execute` to delete)
+- [x] `lifecycle:prune-batches` — prune `job_batches` using config retention (dry-run default, `--execute` to delete)
+- [x] Schedule all three prune commands daily at 02:00 / 02:05 / 02:10 in `routes/console.php`
+- [x] All prune commands: dry-run by default; require `--execute` to perform deletion
 
 ### Phase 3 (future)
 - [ ] `audit_logs_archive` table + migration job

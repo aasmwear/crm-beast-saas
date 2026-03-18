@@ -57,8 +57,14 @@ final class LifecycleReportCommand extends Command
             $cutoff = $policy->cutoffDate($now);
             $col = $policy->createdAtColumn;
 
+            /** @var array{age_column_type?: string}|null $tableConfig */
+            $tableConfig = config("lifecycle.tables.{$table}");
+            $cutoffValue = ($tableConfig['age_column_type'] ?? null) === 'integer'
+                ? $cutoff->timestamp
+                : $cutoff;
+
             $agedOutRows = DB::table($table)
-                ->where($col, '<', $cutoff)
+                ->where($col, '<', $cutoffValue)
                 ->count();
 
             $status = 'OK';

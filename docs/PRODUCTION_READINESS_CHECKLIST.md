@@ -59,8 +59,9 @@
 - [x] **Retention config** — `config/lifecycle.php` declares per-table retention windows (audit_logs 90d, activities 90d, stripe_webhook_events 90d, failed_jobs 30d, etc.).
 - [x] **Lifecycle report command** — `php artisan lifecycle:report` shows row counts and aged-out candidates. Read-only, non-destructive.
 - [x] **RetentionPolicy service** — Value object for programmatic access to retention config (cutoff dates, category checks).
-- [ ] **Webhook event pruning** — `lifecycle:prune-webhooks` command (Phase 2).
-- [ ] **Failed jobs scheduled pruning** — `queue:prune-failed --hours=720` in scheduler (Phase 2).
+- [x] **Webhook event pruning** — `lifecycle:prune-webhooks` (dry-run default, `--execute` to delete); scheduled daily.
+- [x] **Failed jobs scheduled pruning** — `lifecycle:prune-failed` (dry-run default, `--execute`); scheduled daily.
+- [x] **Queue batches pruning** — `lifecycle:prune-batches` (dry-run default, `--execute`); scheduled daily.
 - [ ] **Audit log archival** — `audit_logs_archive` table + migration job (Phase 3).
 - [ ] **Activity archival** — `activities_archive` table + migration job (Phase 3).
 - [ ] **Notification pruning** — Delete read notifications > 180 days (Phase 3).

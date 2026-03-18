@@ -79,6 +79,15 @@ return [
             'description' => 'Failed queue jobs; safe to prune after investigation window',
         ],
 
+        'job_batches' => [
+            'category' => 'cold',
+            'retention_days' => 30,
+            'created_at_column' => 'finished_at',
+            'age_column_type' => 'integer', // Laravel stores unix timestamps in job_batches
+            'org_scoped' => false,
+            'description' => 'Queue batch metadata; safe to prune when batches are finished',
+        ],
+
         'comments' => [
             'category' => 'warm',
             'retention_days' => 180,

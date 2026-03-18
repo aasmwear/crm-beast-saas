@@ -40,6 +40,22 @@
 
 ## Last PR Notes
 
+- **Lifecycle Phase 2: Safe Prune Commands (rescue-mission):**
+  - **Goal:** Operator-safe pruning for cold-data targets with dry-run by default and explicit `--execute` for deletion.
+  - **New commands:** `lifecycle:prune-webhooks`, `lifecycle:prune-failed`, `lifecycle:prune-batches` — all dry-run by default; `--execute` required for actual deletion.
+  - **Targets:** stripe_webhook_events (90d), failed_jobs (30d), job_batches (30d). Uses `config/lifecycle.php` and RetentionPolicy.
+  - **Schedule:** Daily at 02:00, 02:05, 02:10 UTC in `routes/console.php`. Ensure `schedule:run` is in cron.
+  - **Config:** Added `job_batches` to lifecycle.php; added `age_column_type` => `integer` for job_batches (Laravel uses unix timestamps).
+  - **LifecycleReportCommand fix:** Handles integer timestamp columns (job_batches.finished_at) for aged-out count.
+  - **Tests:** LifecyclePruneWebhooksTest (5), LifecyclePruneFailedTest (4), LifecyclePruneBatchesTest (3). All pass.
+  - **Docs:** DATA_LIFECYCLE.md, OBSERVABILITY_AND_RUNBOOK.md, PRODUCTION_READINESS_CHECKLIST.md updated.
+  - **QA checklist:**
+    1. Run `sail artisan lifecycle:prune-webhooks` (no --execute) → see candidate count, no rows deleted.
+    2. Insert aged webhook event (>90 days) → run with `--execute` → row deleted.
+    3. Run `sail artisan lifecycle:prune-failed` and `lifecycle:prune-batches` dry-run and execute.
+    4. Verify `sail artisan schedule:list` shows the three prune commands.
+    5. Run `./vendor/bin/sail artisan test` and `npm run build`.
+
 - **Data Lifecycle & Retention Guardrails (rescue-mission):**
   - **Goal:** Architecture, docs, and safe groundwork for data lifecycle management. No destructive operations.
   - **New doc:** `docs/DATA_LIFECYCLE.md` — hot-growth table inventory, retention categories (hot/warm/cold), operator rules, future archive/prune candidates, implementation roadmap (3 phases).

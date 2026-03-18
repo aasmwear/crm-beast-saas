@@ -345,7 +345,25 @@ Outputs a table with: table name, retention category (hot/warm/cold), retention 
 Retention windows are defined in `config/lifecycle.php`. Categories:
 - **hot** — keep indefinitely (core entities: clients, projects, tasks, invoices)
 - **warm** — archive after window (audit_logs 90d, activities 90d, notifications 60d)
-- **cold** — prune after window (stripe_webhook_events 90d, failed_jobs 30d)
+- **cold** — prune after window (stripe_webhook_events 90d, failed_jobs 30d, job_batches 30d)
+
+### Safe prune commands (Phase 2)
+
+Prune commands default to **dry-run** (no deletion). Use `--execute` to delete:
+
+```bash
+# Dry-run: show candidates only
+sail artisan lifecycle:prune-webhooks
+sail artisan lifecycle:prune-failed
+sail artisan lifecycle:prune-batches
+
+# Execute: actually delete aged-out rows
+sail artisan lifecycle:prune-webhooks --execute
+sail artisan lifecycle:prune-failed --execute
+sail artisan lifecycle:prune-batches --execute
+```
+
+Scheduled: daily at 02:00, 02:05, 02:10 UTC. Ensure `schedule:run` is in cron.
 
 See `docs/DATA_LIFECYCLE.md` for the full policy, operator rules, and implementation roadmap.
 
