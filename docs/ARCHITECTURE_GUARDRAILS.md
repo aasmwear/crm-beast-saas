@@ -79,6 +79,20 @@
 
 ---
 
+## Metrics Read-Model (v1)
+
+- **Table:** `org_daily_metrics` stores daily per-org snapshots (clients, projects, tasks, open_tasks, attendance, activities, invoices, revenue_cents, outstanding_cents, users).
+- **Grain:** One row per org per day. Unique constraint on `(organization_id, metric_date)`.
+- **Service:** `OrgMetricsSnapshotService` computes and upserts metrics. Idempotent; safe to re-run.
+- **Command:** `php artisan metrics:snapshot-orgs` (defaults to yesterday; supports `--date` and `--org` filters).
+- **Schedule:** Daily at 01:00 UTC via `routes/console.php`.
+- **Admin dashboard hybrid:** The tenant admin dashboard (`/org/{org}/dashboard`) now reads from `org_daily_metrics` when snapshot coverage exists for the requested date range. Snapshots are preferred; live-query fallback remains for missing or insufficient data. KPIs (revenue, outstanding), stats (clients/projects/tasks created-in-range), and series (clients30d, projects30d, tasks30d) use snapshots when sufficient. active_projects, monthly_revenue, project_status, workload, activities stay live.
+- **Platform Feature Usage hybrid:** The platform Feature Usage dashboard (`FeatureUsageDashboardController`) uses `org_daily_metrics` for **module adoption aggregates** (orgs_with_any, total_records per module, and `summary.orgs_using_any_module`) when there is **full coverage**: row count for **yesterday** (app timezone) equals `organizations` count. Same snapshot columns as MODULES: clients, projects, tasks, attendance, invoices. **Billing setup** metrics (Stripe, subscriptions, addons) stay live — not in the snapshot. If any org is missing a row for that date (partial snapshot, new org before next run, etc.), the controller falls back entirely to live table counts for adoption so aggregates are never mixed.
+- **Migration path:** Other platform dashboards (e.g. revenue, org health) can adopt the same pattern where read-model columns exist.
+- **Soft-delete aware:** Snapshot queries exclude soft-deleted rows for clients, tasks, and attendance.
+
+---
+
 ## Data Lifecycle & Retention
 
 - **Policy doc:** `docs/DATA_LIFECYCLE.md` defines retention categories (hot/warm/cold), windows, and operator rules

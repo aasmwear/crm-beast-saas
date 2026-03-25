@@ -369,6 +369,43 @@ See `docs/DATA_LIFECYCLE.md` for the full policy, operator rules, and implementa
 
 ---
 
+## Org Metrics Snapshots
+
+### Snapshot command
+
+```bash
+# Snapshot all orgs for yesterday (default)
+sail artisan metrics:snapshot-orgs
+
+# Snapshot a specific date
+sail artisan metrics:snapshot-orgs --date=2026-03-15
+
+# Snapshot a single org
+sail artisan metrics:snapshot-orgs --date=2026-03-15 --org=42
+```
+
+Generates daily per-org snapshots in `org_daily_metrics` (clients, projects, tasks, open_tasks, attendance, activities, invoices, revenue_cents, outstanding_cents, users). Idempotent upsert; safe to re-run.
+
+### Admin dashboard hybrid
+
+The tenant admin dashboard (`/org/{org}/dashboard`) uses `org_daily_metrics` when snapshot data exists for the requested date range. Snapshots are preferred; live-query fallback is used when data is missing or insufficient. This reduces live query load without changing dashboard UI behavior.
+
+### Platform Feature Usage hybrid
+
+The platform Feature Usage dashboard aggregates module adoption from **yesterday’s** `org_daily_metrics` rows when **every** organization has a snapshot for that date (`row count === Organization::count()`). Otherwise it uses the same live queries as before. Billing setup figures (Stripe link, subscriptions, addons) are always live. Operators should run `metrics:snapshot-orgs` daily so platform adoption stays current; partial backfills show live adoption until all orgs have rows for the reference day.
+
+### Scheduled
+
+Daily at 01:00 UTC. Ensure `schedule:run` is in cron.
+
+### Troubleshooting
+
+- **Missing metrics:** Verify `schedule:run` is executing. Re-run manually with `--date` for any missed day.
+- **Wrong counts:** Re-run the snapshot for the date. Upsert will correct the values.
+- **Backfill:** Loop over dates: `for d in 2026-03-01 2026-03-02 ...; do sail artisan metrics:snapshot-orgs --date=$d; done`
+
+---
+
 ## Quick Triage Flowchart
 
 ```

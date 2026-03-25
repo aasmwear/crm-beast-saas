@@ -7,12 +7,15 @@ use App\Models\Client;
 use App\Models\Organization;
 use App\Models\OrganizationAddon;
 use App\Models\OrganizationSubscription;
+use App\Models\OrgDailyMetric;
 use App\Models\Platform\PlatformAdmin;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\OrgMetricsSnapshotService;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -31,6 +34,12 @@ class FeatureUsageDashboardTest extends TestCase
             'password' => Hash::make('password'),
             'is_active' => true,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_platform_admin_can_access_feature_usage_dashboard(): void
@@ -311,6 +320,112 @@ class FeatureUsageDashboardTest extends TestCase
             ->where('adoption.tasks.label', 'Tasks')
             ->where('adoption.attendance.label', 'Attendance')
             ->where('adoption.invoices.label', 'Invoices')
+        );
+    }
+
+    public function test_adoption_uses_snapshot_when_full_coverage_exists(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-20 12:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+
+        $org = Organization::factory()->create();
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $asOf = $yesterday->endOfDay();
+        $client->forceFill([
+            'created_at' => $asOf,
+            'updated_at' => $asOf,
+        ])->saveQuietly();
+
+        app(OrgMetricsSnapshotService::class)->snapshotOrg($org, $yesterday);
+
+        $this->assertSame(1, OrgDailyMetric::query()->where('metric_date', $yesterday->toDateString())->count());
+
+        Client::factory()->create(['organization_id' => $org->id]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.feature-usage'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('adoption.clients.total_records', 1)
+            ->where('adoption.clients.orgs_with_any', 1)
+        );
+    }
+
+    public function test_adoption_falls_back_to_live_when_snapshot_incomplete(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-20 12:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+
+        $org1 = Organization::factory()->create();
+        $org2 = Organization::factory()->create();
+        Client::factory()->create(['organization_id' => $org1->id]);
+        Client::factory()->create(['organization_id' => $org2->id]);
+
+        app(OrgMetricsSnapshotService::class)->snapshotOrg($org1, $yesterday);
+
+        $this->assertSame(1, OrgDailyMetric::query()->where('metric_date', $yesterday->toDateString())->count());
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.feature-usage'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('adoption.clients.orgs_with_any', 2)
+            ->where('adoption.clients.total_records', 2)
+        );
+    }
+
+    public function test_snapshot_adoption_aggregates_each_org_once(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-20 12:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+        $asOf = $yesterday->endOfDay();
+        $snapshot = app(OrgMetricsSnapshotService::class);
+
+        $orgA = Organization::factory()->create();
+        $orgB = Organization::factory()->create();
+
+        $a1 = Client::factory()->create(['organization_id' => $orgA->id]);
+        $a1->forceFill(['created_at' => $asOf, 'updated_at' => $asOf])->saveQuietly();
+
+        $b1 = Client::factory()->create(['organization_id' => $orgB->id]);
+        $b2 = Client::factory()->create(['organization_id' => $orgB->id]);
+        $b1->forceFill(['created_at' => $asOf, 'updated_at' => $asOf])->saveQuietly();
+        $b2->forceFill(['created_at' => $asOf, 'updated_at' => $asOf])->saveQuietly();
+
+        $snapshot->snapshotOrg($orgA, $yesterday);
+        $snapshot->snapshotOrg($orgB, $yesterday);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.feature-usage'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('adoption.clients.total_records', 3)
+            ->where('adoption.clients.orgs_with_any', 2)
+            ->where('total_orgs', 2)
+        );
+    }
+
+    public function test_inertia_props_shape_unchanged_with_snapshot_path(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-21 10:00:00'));
+        $org = Organization::factory()->create();
+        app(OrgMetricsSnapshotService::class)->snapshotOrg($org, CarbonImmutable::yesterday());
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.feature-usage'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Platform/FeatureUsage/Index')
+            ->has('total_orgs')
+            ->has('adoption.clients.orgs_with_any')
+            ->has('adoption.clients.total_records')
+            ->has('adoption.clients.label')
+            ->has('billing_setup')
+            ->has('summary.modules_tracked')
         );
     }
 }

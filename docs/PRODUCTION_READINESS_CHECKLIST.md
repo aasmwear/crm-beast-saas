@@ -68,6 +68,18 @@
 
 ---
 
+## Metrics Read-Model
+
+- [x] **org_daily_metrics table** — Migration creates `org_daily_metrics` with daily per-org snapshot columns and unique `(organization_id, metric_date)`.
+- [x] **Snapshot service** — `OrgMetricsSnapshotService` computes and upserts daily metrics. Idempotent.
+- [x] **Snapshot command** — `metrics:snapshot-orgs` with `--date` and `--org` options. Defaults to yesterday.
+- [x] **Scheduler** — Daily at 01:00 UTC in `routes/console.php`.
+- [x] **Tests** — 10 tests: row creation, upsert, metric accuracy, org isolation, soft-delete exclusion, command options.
+- [ ] **Dashboard migration** — Tenant admin dashboard can switch to read model for stats/KPIs (future PR).
+- [ ] **Platform dashboard migration** — Feature Usage / Revenue dashboards can use read model (future PR).
+
+---
+
 ## Other sections
 
 _Add additional checklist sections (Security, Performance, etc.) as needed._

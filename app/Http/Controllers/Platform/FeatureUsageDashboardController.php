@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
+use App\Models\OrgDailyMetric;
 use App\Models\Organization;
 use App\Models\OrganizationSubscription;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -32,13 +34,35 @@ final class FeatureUsageDashboardController extends Controller
         'invoices' => ['table' => 'invoices', 'org_col' => 'organization_id', 'soft_delete' => false, 'label' => 'Invoices'],
     ];
 
+    /**
+     * org_daily_metrics column for each MODULES key (cumulative counts as of metric_date EOD).
+     *
+     * @var array<string, string>
+     */
+    private const MODULE_SNAPSHOT_COLUMN = [
+        'clients' => 'clients_count',
+        'projects' => 'projects_count',
+        'tasks' => 'tasks_count',
+        'attendance' => 'attendance_count',
+        'invoices' => 'invoices_count',
+    ];
+
     public function index(Request $request): Response
     {
         $totalOrgs = Organization::count();
 
-        $adoption = $this->loadAdoptionMetrics();
+        $snapshotDate = $this->platformSnapshotReferenceDate();
+        $useSnapshotAdoption = $this->hasFullPlatformSnapshotCoverage($snapshotDate);
+
+        if ($useSnapshotAdoption) {
+            $adoption = $this->loadAdoptionMetricsFromSnapshot($snapshotDate);
+            $orgsUsingAny = $this->countOrgsUsingAnyModuleFromSnapshot($snapshotDate);
+        } else {
+            $adoption = $this->loadAdoptionMetrics();
+            $orgsUsingAny = $this->countOrgsUsingAnyModule();
+        }
+
         $billingSetup = $this->loadBillingSetupMetrics();
-        $orgsUsingAny = $this->countOrgsUsingAnyModule();
         $avgModules = $this->computeAvgModulesPerOrg($totalOrgs, $adoption);
 
         return Inertia::render('Platform/FeatureUsage/Index', [
@@ -52,6 +76,96 @@ final class FeatureUsageDashboardController extends Controller
                 'modules_tracked' => count(self::MODULES),
             ],
         ]);
+    }
+
+    /**
+     * Aligns with scheduled snapshots: "yesterday" in app timezone.
+     */
+    private function platformSnapshotReferenceDate(): CarbonImmutable
+    {
+        return CarbonImmutable::yesterday();
+    }
+
+    /**
+     * Full coverage: one org_daily_metrics row per organization for the reference date.
+     * Otherwise adoption aggregates would mix snapshot and missing orgs incorrectly.
+     */
+    private function hasFullPlatformSnapshotCoverage(CarbonImmutable $date): bool
+    {
+        $dateStr = $date->toDateString();
+        $totalOrgs = Organization::count();
+        $rowCount = OrgDailyMetric::query()
+            ->where('metric_date', $dateStr)
+            ->count();
+
+        return $rowCount === $totalOrgs;
+    }
+
+    /**
+     * @return array<string, array{orgs_with_any: int, total_records: int, label: string}>
+     */
+    private function loadAdoptionMetricsFromSnapshot(CarbonImmutable $date): array
+    {
+        $dateStr = $date->toDateString();
+        $columns = [];
+        foreach (self::MODULE_SNAPSHOT_COLUMN as $key => $col) {
+            $columns[] = 'COALESCE(SUM(' . $col . '), 0) AS ' . $key . '_total';
+            $columns[] = 'COALESCE(SUM(CASE WHEN ' . $col . ' > 0 THEN 1 ELSE 0 END), 0) AS ' . $key . '_orgs';
+        }
+
+        $row = DB::table('org_daily_metrics')
+            ->where('metric_date', $dateStr)
+            ->selectRaw(implode(', ', $columns))
+            ->first();
+
+        if ($row === null) {
+            return $this->emptyAdoptionMetrics();
+        }
+
+        $result = [];
+        foreach (self::MODULES as $key => $config) {
+            $totalKey = $key . '_total';
+            $orgsKey = $key . '_orgs';
+            $result[$key] = [
+                'orgs_with_any' => (int) ($row->{$orgsKey} ?? 0),
+                'total_records' => (int) ($row->{$totalKey} ?? 0),
+                'label' => $config['label'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, array{orgs_with_any: int, total_records: int, label: string}>
+     */
+    private function emptyAdoptionMetrics(): array
+    {
+        $result = [];
+        foreach (self::MODULES as $key => $config) {
+            $result[$key] = [
+                'orgs_with_any' => 0,
+                'total_records' => 0,
+                'label' => $config['label'],
+            ];
+        }
+
+        return $result;
+    }
+
+    private function countOrgsUsingAnyModuleFromSnapshot(CarbonImmutable $date): int
+    {
+        $dateStr = $date->toDateString();
+        $conditions = [];
+        foreach (self::MODULE_SNAPSHOT_COLUMN as $col) {
+            $conditions[] = $col . ' > 0';
+        }
+        $predicate = implode(' OR ', $conditions);
+
+        return (int) DB::table('org_daily_metrics')
+            ->where('metric_date', $dateStr)
+            ->whereRaw('(' . $predicate . ')')
+            ->count();
     }
 
     /**

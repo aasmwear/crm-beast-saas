@@ -40,6 +40,47 @@
 
 ## Last PR Notes
 
+- **Platform Feature Usage hybrid (rescue-mission):**
+  - **Goal:** Use `org_daily_metrics` for platform module adoption aggregates where safe; keep live fallback; no UI change.
+  - **Hybrid rule:** Adoption metrics (`adoption.*` per module and `summary.orgs_using_any_module`) read from snapshots for **yesterday** (app timezone) only when snapshot row count for that date equals organization count (full coverage). Otherwise full live adoption queries. **Billing setup** remains 100% live (not in read model).
+  - **Mapping:** clients → `clients_count`, projects → `projects_count`, tasks → `tasks_count`, attendance → `attendance_count`, invoices → `invoices_count`. `orgs_with_any` = orgs with count > 0; `total_records` = sum of counts (as-of EOD semantics from `OrgMetricsSnapshotService`).
+  - **Tests:** `FeatureUsageDashboardTest` extended — snapshot path when full coverage, live fallback when incomplete, per-org aggregation sanity, Inertia shape unchanged.
+  - **Docs:** PROJECT_STATUS.md, ARCHITECTURE_GUARDRAILS.md, OBSERVABILITY_AND_RUNBOOK.md.
+  - **QA checklist:**
+    1. Run `sail artisan metrics:snapshot-orgs` → open Platform → Feature Usage; adoption should reflect yesterday’s snapshot when all orgs have rows.
+    2. New org with no snapshot row for yesterday → adoption falls back to live until the next daily snapshot covers all orgs.
+    3. Billing block unchanged (Stripe/subscription/addon counts still live).
+    4. `./vendor/bin/sail artisan test tests/Feature/Platform/FeatureUsageDashboardTest.php` and full suite + `npm run build`.
+
+- **Admin Dashboard Hybrid Metrics Migration (rescue-mission):**
+  - **Goal:** Migrate tenant admin dashboard to use `org_daily_metrics` read model in a safe hybrid mode. Reduces live query load without changing dashboard UI.
+  - **Hybrid rule:** Use `org_daily_metrics` when snapshot data exists for the requested date range; fall back to live queries when snapshots are missing or insufficient. Live-query fallback remains intentionally.
+  - **Migration:** `DashboardController::adminDashboard` now prefers snapshots for: total_revenue, outstanding_revenue (KPIs); clients, projects, tasks stats (created-in-range); clients30d, projects30d, tasks30d series (daily deltas). active_projects, monthly_revenue, project_status, workload, activities stay live (not in snapshot or different aggregation).
+  - **Coverage logic:** `hasSufficientSnapshotCoverageForKpis` (≥1 row), `hasSufficientSnapshotCoverageForStats` (end_date row), `hasSufficientSnapshotCoverageForSeries` (consecutive rows from start-1 through end).
+  - **Tests:** `DashboardHybridMetricsTest` — 4 tests: snapshot-backed values when rows exist, safe fallback when missing, chart series correctness, org isolation.
+  - **Docs:** PROJECT_STATUS.md, ARCHITECTURE_GUARDRAILS.md, OBSERVABILITY_AND_RUNBOOK.md updated.
+  - **QA checklist:**
+    1. Run `sail artisan metrics:snapshot-orgs` for yesterday → visit tenant admin dashboard → KPIs/stats/charts load.
+    2. New org with no snapshots → dashboard falls back to live; values correct.
+    3. Change date range via DateRangeButton → snapshot used when coverage exists, live when not.
+    4. Run `./vendor/bin/sail artisan test tests/Feature/Dashboard/` and `npm run build`.
+
+- **Metrics Snapshot / Read-Model Foundation (rescue-mission):**
+  - **Goal:** Foundation for 10M+ record scale: daily org-level metrics read model. No dashboard rewrites.
+  - **Schema:** `org_daily_metrics` table with unique `(organization_id, metric_date)`. Columns: clients_count, projects_count, tasks_count, open_tasks_count, attendance_count, activities_count, invoices_count, revenue_cents, outstanding_cents, users_count.
+  - **Service:** `OrgMetricsSnapshotService` — idempotent upsert; soft-delete aware; chunks orgs in batches of 100.
+  - **Command:** `metrics:snapshot-orgs` — defaults to yesterday; `--date` for specific dates; `--org` for single org. Safe to re-run.
+  - **Scheduler:** Daily at 01:00 UTC in `routes/console.php`. Runs after midnight to capture previous day.
+  - **Tests:** 10 tests: row creation, upsert idempotency, metric accuracy (clients/projects/tasks/open_tasks/invoices/revenue/outstanding/activities/users), org isolation, soft-delete exclusion, command with/without flags, default date, nonexistent org error.
+  - **Docs:** ARCHITECTURE_GUARDRAILS.md (Metrics Read-Model section), OBSERVABILITY_AND_RUNBOOK.md (snapshot commands), PRODUCTION_READINESS_CHECKLIST.md (metrics checklist), PROJECT_STATUS.md.
+  - **QA checklist:**
+    1. Run `sail artisan migrate` → `org_daily_metrics` table created.
+    2. Run `sail artisan metrics:snapshot-orgs` → snapshots all orgs for yesterday.
+    3. Run `sail artisan metrics:snapshot-orgs --date=2026-03-18` → specific date.
+    4. Re-run same date → upsert; row count unchanged; values updated.
+    5. Run `sail artisan metrics:snapshot-orgs --org=1` → single org only.
+    6. Run `./vendor/bin/sail artisan test` and `npm run build`.
+
 - **Lifecycle Phase 2: Safe Prune Commands (rescue-mission):**
   - **Goal:** Operator-safe pruning for cold-data targets with dry-run by default and explicit `--execute` for deletion.
   - **New commands:** `lifecycle:prune-webhooks`, `lifecycle:prune-failed`, `lifecycle:prune-batches` — all dry-run by default; `--execute` required for actual deletion.

@@ -80,3 +80,14 @@ Artisan::command('user:super-admin {email} {--name=} {--password=} {--attach-all
 Schedule::command('lifecycle:prune-webhooks', ['--execute'])->dailyAt('02:00');
 Schedule::command('lifecycle:prune-failed', ['--execute'])->dailyAt('02:05');
 Schedule::command('lifecycle:prune-batches', ['--execute'])->dailyAt('02:10');
+
+/*
+|--------------------------------------------------------------------------
+| Metrics Snapshot Schedule
+|--------------------------------------------------------------------------
+|
+| Daily org metrics snapshot. Runs after midnight to capture the previous
+| day's data. Idempotent upsert; safe to re-run.
+|
+*/
+Schedule::command('metrics:snapshot-orgs')->dailyAt('01:00');
