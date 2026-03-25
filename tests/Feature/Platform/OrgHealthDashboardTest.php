@@ -3,11 +3,14 @@
 namespace Tests\Feature\Platform;
 
 use App\Models\Organization;
-use App\Models\OrganizationAddon;
 use App\Models\OrganizationSubscription;
+use App\Models\OrgDailyMetric;
 use App\Models\Platform\PlatformAdmin;
 use App\Models\StripeWebhookEvent;
 use App\Models\User;
+use App\Services\OrgMetricsSnapshotService;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -27,6 +30,12 @@ class OrgHealthDashboardTest extends TestCase
             'password' => Hash::make('password'),
             'is_active' => true,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_platform_admin_can_access_org_health_dashboard(): void
@@ -393,5 +402,141 @@ class OrgHealthDashboardTest extends TestCase
         $data = $response->viewData('page')['props']['organizations']['data'][0];
         $this->assertEmpty($data['health_flags']);
         $this->assertEquals('healthy', $data['health_state']);
+    }
+
+    public function test_seats_active_uses_snapshot_users_count_when_row_exists(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-22 12:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+
+        $org = Organization::factory()->create(['slug' => 'snapshot-seats']);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'pro',
+            'status' => 'active',
+            'seats_included' => 25,
+        ]);
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, ['is_owner' => true]);
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+
+        app(OrgMetricsSnapshotService::class)->snapshotOrg($org, $yesterday);
+
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.seats_active', 2)
+        );
+    }
+
+    public function test_seats_active_falls_back_to_live_without_snapshot_row(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-22 12:00:00'));
+
+        $org = Organization::factory()->create(['slug' => 'live-seats-only']);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'starter',
+            'status' => 'active',
+            'seats_included' => 5,
+        ]);
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+
+        $this->assertSame(0, OrgDailyMetric::query()->count());
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.seats_active', 2)
+        );
+    }
+
+    public function test_seats_hybrid_per_org_isolation_on_same_page(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-25 10:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+        $snapshot = app(OrgMetricsSnapshotService::class);
+
+        $orgSnap = Organization::factory()->create(['name' => 'Apple Health Co', 'slug' => 'apple-health']);
+        OrganizationSubscription::create([
+            'organization_id' => $orgSnap->id,
+            'plan_key' => 'pro',
+            'status' => 'active',
+            'seats_included' => 25,
+        ]);
+        $orgSnap->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        $snapshot->snapshotOrg($orgSnap, $yesterday);
+        for ($i = 0; $i < 4; $i++) {
+            $orgSnap->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        }
+
+        $orgLive = Organization::factory()->create(['name' => 'Zebra Health Co', 'slug' => 'zebra-health']);
+        OrganizationSubscription::create([
+            'organization_id' => $orgLive->id,
+            'plan_key' => 'starter',
+            'status' => 'active',
+            'seats_included' => 5,
+        ]);
+        for ($i = 0; $i < 3; $i++) {
+            $orgLive->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        }
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $data = $response->viewData('page')['props']['organizations']['data'];
+        $this->assertCount(2, $data);
+        $this->assertSame('Apple Health Co', $data[0]['name']);
+        $this->assertSame(1, $data[0]['seats_active']);
+        $this->assertSame('Zebra Health Co', $data[1]['name']);
+        $this->assertSame(3, $data[1]['seats_active']);
+    }
+
+    public function test_billing_and_webhooks_still_live_when_snapshot_seats_used(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-03-22 12:00:00'));
+        $yesterday = CarbonImmutable::yesterday();
+
+        $org = Organization::factory()->create([
+            'name' => 'Billing Webhook Org',
+            'slug' => 'bw-org',
+            'stripe_id' => 'cus_bw',
+        ]);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'pro',
+            'status' => 'past_due',
+            'seats_included' => 25,
+        ]);
+        $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        app(OrgMetricsSnapshotService::class)->snapshotOrg($org, $yesterday);
+
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_bw_1',
+            'type' => 'invoice.payment_failed',
+            'status' => 'failed',
+            'notes' => 'Test',
+            'organization_id' => $org->id,
+            'created_at' => now()->subDay(),
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.status', 'past_due')
+            ->where('organizations.data.0.has_stripe_id', true)
+            ->where('organizations.data.0.health_flags.billing', 'critical')
+            ->where('organizations.data.0.webhook.recent_failed_count', 1)
+            ->where('organizations.data.0.health_flags.webhooks', 'warning')
+        );
     }
 }

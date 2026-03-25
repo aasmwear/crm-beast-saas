@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Platform\Organizations;
 
 use App\Http\Controllers\Controller;
+use App\Models\OrgDailyMetric;
 use App\Models\Organization;
 use App\Models\StripeWebhookEvent;
 use App\Services\Billing\EntitlementsService;
 use App\Services\Billing\SeatCounter;
 use App\Services\Billing\StorageUsageService;
 use App\Support\PlanCatalog;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -19,6 +21,10 @@ use Inertia\Response;
 /**
  * Read-only Org Health Dashboard for platform operators.
  * Surfaces billing, seat, storage, and webhook health indicators per tenant.
+ *
+ * Hybrid read-model: `seats_active` uses `org_daily_metrics.users_count` for yesterday
+ * when a row exists for that org (same query semantics as live seat counting in
+ * OrgMetricsSnapshotService). Otherwise live counts. Billing, webhooks, and storage stay live.
  */
 final class OrgHealthController extends Controller
 {
@@ -27,6 +33,14 @@ final class OrgHealthController extends Controller
         private SeatCounter $seatCounter,
         private StorageUsageService $storageUsage,
     ) {
+    }
+
+    /**
+     * Aligns with scheduled snapshots and other platform hybrid dashboards (app timezone).
+     */
+    private function orgHealthSnapshotReferenceDate(): CarbonImmutable
+    {
+        return CarbonImmutable::yesterday();
     }
 
     public function index(Request $request): Response
@@ -62,7 +76,7 @@ final class OrgHealthController extends Controller
 
         $orgIds = $paginator->getCollection()->pluck('id')->all();
         $webhookStats = $this->loadWebhookStats($orgIds);
-        $seatCounts = $this->loadSeatCounts($orgIds);
+        $seatCounts = $this->loadSeatCountsWithSnapshotFallback($orgIds);
         $storageSummaries = $this->loadStorageSummaries($paginator->getCollection());
 
         $organizations = $paginator->getCollection()->map(function (Organization $org) use ($webhookStats, $seatCounts, $storageSummaries) {
@@ -144,12 +158,13 @@ final class OrgHealthController extends Controller
     }
 
     /**
-     * Batch-load active seat counts to avoid N+1.
+     * Active tenant users per org (excludes portal/client-linked users).
+     * Same definition as `OrgMetricsSnapshotService` users_count.
      *
      * @param  array<int>  $orgIds
      * @return array<int, int>
      */
-    private function loadSeatCounts(array $orgIds): array
+    private function loadSeatCountsLive(array $orgIds): array
     {
         if (count($orgIds) === 0) {
             return [];
@@ -164,6 +179,44 @@ final class OrgHealthController extends Controller
             ->pluck('cnt', 'organization_id')
             ->mapWithKeys(fn ($cnt, $orgId) => [(int) $orgId => (int) $cnt])
             ->all();
+    }
+
+    /**
+     * Prefer `users_count` from yesterday's org_daily_metrics per org when present; else live.
+     *
+     * @param  array<int>  $orgIds
+     * @return array<int, int>
+     */
+    private function loadSeatCountsWithSnapshotFallback(array $orgIds): array
+    {
+        if (count($orgIds) === 0) {
+            return [];
+        }
+
+        $live = $this->loadSeatCountsLive($orgIds);
+        $dateStr = $this->orgHealthSnapshotReferenceDate()->toDateString();
+
+        $snapshotRows = OrgDailyMetric::query()
+            ->where('metric_date', $dateStr)
+            ->whereIn('organization_id', $orgIds)
+            ->get(['organization_id', 'users_count']);
+
+        $fromSnapshot = [];
+        foreach ($snapshotRows as $row) {
+            $fromSnapshot[(int) $row->organization_id] = (int) $row->users_count;
+        }
+
+        $result = [];
+        foreach ($orgIds as $orgId) {
+            $orgId = (int) $orgId;
+            if (array_key_exists($orgId, $fromSnapshot)) {
+                $result[$orgId] = $fromSnapshot[$orgId];
+            } else {
+                $result[$orgId] = (int) ($live[$orgId] ?? 0);
+            }
+        }
+
+        return $result;
     }
 
     /**

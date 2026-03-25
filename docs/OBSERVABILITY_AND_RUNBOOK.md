@@ -394,6 +394,10 @@ The tenant admin dashboard (`/org/{org}/dashboard`) uses `org_daily_metrics` whe
 
 The platform Feature Usage dashboard aggregates module adoption from **yesterday’s** `org_daily_metrics` rows when **every** organization has a snapshot for that date (`row count === Organization::count()`). Otherwise it uses the same live queries as before. Billing setup figures (Stripe link, subscriptions, addons) are always live. Operators should run `metrics:snapshot-orgs` daily so platform adoption stays current; partial backfills show live adoption until all orgs have rows for the reference day.
 
+### Platform Org Health (seats snapshot)
+
+The Org Health dashboard uses **per-org** `users_count` from yesterday’s snapshot for the displayed **`seats_active`** when a row exists for that org and date; otherwise it uses the live seat query (same definition as the snapshot job). Billing, webhooks, and storage stay live. If seat counts look one day stale for an org, re-run `metrics:snapshot-orgs` or wait for the scheduled job.
+
 ### Scheduled
 
 Daily at 01:00 UTC. Ensure `schedule:run` is in cron.

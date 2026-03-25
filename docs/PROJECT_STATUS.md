@@ -40,6 +40,18 @@
 
 ## Last PR Notes
 
+- **Platform Org Health partial hybrid (rescue-mission):**
+  - **Goal:** Use `org_daily_metrics` only where semantics match; no UI or schema change.
+  - **Snapshot field:** `seats_active` uses `users_count` from **yesterday’s** row for that org when present (same definition as `OrgMetricsSnapshotService`: tenant users on `organization_user` with `users.client_id` null). **Per-org fallback:** missing row → live seat query for that org only.
+  - **Stays live:** Billing status, Stripe link, seat limits/included from subscription, storage usage/limits, webhook stats, health flags derivation (flags still computed from displayed `seats_active` plus live billing/storage/webhook inputs).
+  - **Tests:** `OrgHealthDashboardTest` — snapshot vs live seats, per-org isolation on one page, billing/webhooks still live with snapshot seats.
+  - **Docs:** PROJECT_STATUS.md, ARCHITECTURE_GUARDRAILS.md, OBSERVABILITY_AND_RUNBOOK.md.
+  - **QA checklist:**
+    1. With snapshots for yesterday, open Platform → Org Health; `seats_active` matches `users_count` for orgs that have a row (may lag live by up to a day).
+    2. Org without a snapshot row for yesterday → `seats_active` matches live membership.
+    3. Billing past_due / webhook failures still surface as before.
+    4. `./vendor/bin/sail artisan test tests/Feature/Platform/OrgHealthDashboardTest.php` and full suite + `npm run build`.
+
 - **Platform Feature Usage hybrid (rescue-mission):**
   - **Goal:** Use `org_daily_metrics` for platform module adoption aggregates where safe; keep live fallback; no UI change.
   - **Hybrid rule:** Adoption metrics (`adoption.*` per module and `summary.orgs_using_any_module`) read from snapshots for **yesterday** (app timezone) only when snapshot row count for that date equals organization count (full coverage). Otherwise full live adoption queries. **Billing setup** remains 100% live (not in read model).
