@@ -21,12 +21,14 @@ final class RetentionPolicy
         public readonly string $createdAtColumn,
         public readonly bool $orgScoped,
         public readonly string $description,
+        public readonly bool $pruneRequiresReadAt = false,
+        public readonly bool $pruneOnly = false,
     ) {}
 
     /**
      * Build a RetentionPolicy from a config/lifecycle.php entry.
      *
-     * @param  array{category: string, retention_days: int, created_at_column: string, org_scoped: bool, description: string}  $config
+     * @param  array{category?: string, retention_days?: int, created_at_column?: string, org_scoped?: bool, description?: string, prune_requires_read_at?: bool, prune_only?: bool}  $config
      */
     public static function fromConfig(string $table, array $config): self
     {
@@ -37,6 +39,8 @@ final class RetentionPolicy
             createdAtColumn: $config['created_at_column'] ?? 'created_at',
             orgScoped: (bool) ($config['org_scoped'] ?? true),
             description: $config['description'] ?? '',
+            pruneRequiresReadAt: (bool) ($config['prune_requires_read_at'] ?? false),
+            pruneOnly: (bool) ($config['prune_only'] ?? false),
         );
     }
 

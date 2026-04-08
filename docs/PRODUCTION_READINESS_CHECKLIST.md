@@ -62,9 +62,10 @@
 - [x] **Webhook event pruning** — `lifecycle:prune-webhooks` (dry-run default, `--execute` to delete); scheduled daily.
 - [x] **Failed jobs scheduled pruning** — `lifecycle:prune-failed` (dry-run default, `--execute`); scheduled daily.
 - [x] **Queue batches pruning** — `lifecycle:prune-batches` (dry-run default, `--execute`); scheduled daily.
+- [x] **Laravel notifications pruning** — `lifecycle:prune-notifications` (read rows only, `created_at` 180d, dry-run default, `--execute`); scheduled daily 02:15 (after other prunes).
+- [x] **Notification events pruning** — `lifecycle:prune-notification-events` (60d on `created_at`, dry-run default, `--execute`); scheduled daily 02:20.
 - [ ] **Audit log archival** — `audit_logs_archive` table + migration job (Phase 3).
 - [ ] **Activity archival** — `activities_archive` table + migration job (Phase 3).
-- [ ] **Notification pruning** — Delete read notifications > 180 days (Phase 3).
 
 ---
 

@@ -333,7 +333,7 @@ grep "stripe\." storage/logs/laravel.log
 sail artisan lifecycle:report
 ```
 
-Outputs a table with: table name, retention category (hot/warm/cold), retention window, total rows, aged-out row count, and status (OK / ARCHIVE candidates / PRUNE candidates).
+Outputs a table with: table name, retention category (hot/warm/cold), retention window, total rows, aged-out row count, and status (OK / ARCHIVE candidates / PRUNE candidates). For **`notifications`**, “Aged Out” counts only **read** rows (`read_at` set) with `created_at` before the cutoff, matching `lifecycle:prune-notifications`.
 
 **This command never modifies data.** Use it to:
 - Monitor table growth trends
@@ -344,7 +344,7 @@ Outputs a table with: table name, retention category (hot/warm/cold), retention 
 
 Retention windows are defined in `config/lifecycle.php`. Categories:
 - **hot** — keep indefinitely (core entities: clients, projects, tasks, invoices)
-- **warm** — archive after window (audit_logs 90d, activities 90d, notifications 60d)
+- **warm** — archive after window (audit_logs 90d, activities 90d); **notifications** / **notification_events** use **prune** commands (see below), not archive tables in this release
 - **cold** — prune after window (stripe_webhook_events 90d, failed_jobs 30d, job_batches 30d)
 
 ### Safe prune commands (Phase 2)
@@ -356,14 +356,35 @@ Prune commands default to **dry-run** (no deletion). Use `--execute` to delete:
 sail artisan lifecycle:prune-webhooks
 sail artisan lifecycle:prune-failed
 sail artisan lifecycle:prune-batches
+sail artisan lifecycle:prune-notifications
+sail artisan lifecycle:prune-notification-events
 
 # Execute: actually delete aged-out rows
 sail artisan lifecycle:prune-webhooks --execute
 sail artisan lifecycle:prune-failed --execute
 sail artisan lifecycle:prune-batches --execute
+sail artisan lifecycle:prune-notifications --execute
+sail artisan lifecycle:prune-notification-events --execute
 ```
 
-Scheduled: daily at 02:00, 02:05, 02:10 UTC. Ensure `schedule:run` is in cron.
+**Scheduled** (`routes/console.php`): **02:00 / 02:05 / 02:10** — webhooks, failed jobs, batches; **02:15** — `lifecycle:prune-notifications` (read rows only, `created_at` **180d**); **02:20** — `lifecycle:prune-notification-events` (**60d** on `created_at`). Times use **`APP_TIMEZONE`** unless overridden on the schedule entry. Ensure `schedule:run` is in cron.
+
+**`lifecycle:prune-notifications`:** only deletes rows with **`read_at` NOT NULL** and **`created_at`** before the cutoff — **unread notifications are never pruned**. Optional **`--organization=`** filters on `notifications.organization_id`.
+
+**`lifecycle:prune-notification-events`:** deletes org-level events past retention on **`created_at`**. Optional **`--organization=`**.
+
+### Archive commands (Phase 3 — audit_logs / activities)
+
+Move aged warm rows into archive tables. **Dry-run by default**; **`--execute`** required to move data. **`--organization=`** optional for single-tenant pilots. **`--batch=`** (default 500) caps rows per loop iteration.
+
+```bash
+sail artisan lifecycle:archive-audit-logs
+sail artisan lifecycle:archive-activities
+sail artisan lifecycle:archive-audit-logs --execute
+sail artisan lifecycle:archive-activities --execute --organization=1
+```
+
+**Scheduled:** weekly Sunday 03:00 UTC with `--execute` in `routes/console.php` (same cron host timezone must run `schedule:run` so UTC applies as configured). Manual CLI without flags remains dry-run. Application code continues to read/write **hot** tables only; archives are operator-accessible cold storage until a future unified-read phase.
 
 See `docs/DATA_LIFECYCLE.md` for the full policy, operator rules, and implementation roadmap.
 

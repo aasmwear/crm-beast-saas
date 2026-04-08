@@ -98,8 +98,10 @@
 
 - **Policy doc:** `docs/DATA_LIFECYCLE.md` defines retention categories (hot/warm/cold), windows, and operator rules
 - **Config:** `config/lifecycle.php` declares per-table retention windows and categories
-- **Reporting:** `php artisan lifecycle:report` shows row counts and aged-out candidates (read-only, non-destructive)
-- **Service:** `RetentionPolicy` value object provides programmatic access to retention config (cutoff dates, category checks)
+- **Reporting:** `php artisan lifecycle:report` shows row counts and aged-out candidates (read-only, non-destructive). For `notifications`, aged-out counts are **read** rows only (`read_at` set) with `created_at` before the cutoff.
+- **Warm prune (notifications):** `lifecycle:prune-notifications` and `lifecycle:prune-notification-events` delete aged rows only with `--execute` (dry-run default); optional `--organization=`. Notifications: **read-only** prune by `created_at` age; unread preserved. **Scheduled** daily 02:15 / 02:20 in `routes/console.php` after other prunes. See `docs/DATA_LIFECYCLE.md`.
+- **Archive (Phase 3):** `lifecycle:archive-audit-logs` and `lifecycle:archive-activities` move rows older than the configured window from hot tables to `audit_logs_archive` / `activities_archive`. Dry-run by default; `--execute` performs batched moves. **Scheduled:** weekly Sunday 03:00 UTC with `--execute` in `routes/console.php`. See `docs/DATA_LIFECYCLE.md`.
+- **Service:** `RetentionPolicy` value object provides programmatic access to retention config (cutoff dates, category checks); `App\Services\Lifecycle\WarmTableArchiver` implements warm-table moves.
 - **Operator rules:**
   - Never delete `audit_logs` without archiving first
   - Never bulk-prune `attendance` (legal/HR retention)

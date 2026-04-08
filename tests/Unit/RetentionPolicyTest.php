@@ -26,6 +26,24 @@ final class RetentionPolicyTest extends TestCase
         $this->assertSame('created_at', $policy->createdAtColumn);
         $this->assertTrue($policy->orgScoped);
         $this->assertSame('Audit trail', $policy->description);
+        $this->assertFalse($policy->pruneRequiresReadAt);
+        $this->assertFalse($policy->pruneOnly);
+    }
+
+    public function test_from_config_notification_prune_flags(): void
+    {
+        $policy = RetentionPolicy::fromConfig('notifications', [
+            'category' => 'warm',
+            'retention_days' => 180,
+            'created_at_column' => 'created_at',
+            'org_scoped' => true,
+            'description' => 'x',
+            'prune_requires_read_at' => true,
+            'prune_only' => true,
+        ]);
+
+        $this->assertTrue($policy->pruneRequiresReadAt);
+        $this->assertTrue($policy->pruneOnly);
     }
 
     public function test_cutoff_date_calculation(): void
@@ -111,5 +129,7 @@ final class RetentionPolicyTest extends TestCase
         $this->assertSame('created_at', $policy->createdAtColumn);
         $this->assertTrue($policy->orgScoped);
         $this->assertSame('', $policy->description);
+        $this->assertFalse($policy->pruneRequiresReadAt);
+        $this->assertFalse($policy->pruneOnly);
     }
 }

@@ -63,14 +63,16 @@ final class LifecycleReportCommand extends Command
                 ? $cutoff->timestamp
                 : $cutoff;
 
-            $agedOutRows = DB::table($table)
-                ->where($col, '<', $cutoffValue)
-                ->count();
+            $agedQuery = DB::table($table)->where($col, '<', $cutoffValue);
+            if ($policy->pruneRequiresReadAt) {
+                $agedQuery->whereNotNull('read_at');
+            }
+            $agedOutRows = $agedQuery->count();
 
             $status = 'OK';
             if ($policy->hasLifecycleAction() && $agedOutRows > 0) {
                 $pct = $totalRows > 0 ? round(($agedOutRows / $totalRows) * 100, 1) : 0;
-                $action = $policy->isCold() ? 'PRUNE' : 'ARCHIVE';
+                $action = $policy->isCold() || $policy->pruneOnly ? 'PRUNE' : 'ARCHIVE';
                 $status = "{$action} candidates: {$agedOutRows} ({$pct}%)";
             }
 

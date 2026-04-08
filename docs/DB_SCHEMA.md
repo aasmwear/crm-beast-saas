@@ -79,8 +79,10 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| audit_logs | id, organization_id, actor_id, action, entity, entity_id | FK, cascade | (org_id, entity, entity_id) |
-| activities | id, organization_id, user_id, morphs(subject), description | FK, cascade | (org_id, created_at), (subject_type, subject_id) |
+| audit_logs | id, organization_id, actor_id, action, entity, entity_id, changes (json) | FK, cascade | (org_id, entity, entity_id) |
+| audit_logs_archive | Same as audit_logs + archived_at | unsigned org id (no FK) | (org_id, created_at), (entity, entity_id), archived_at |
+| activities | id, organization_id, user_id, morphs(subject), description, properties (json) | FK, cascade | (org_id, created_at), (subject_type, subject_id) |
+| activities_archive | Same as activities + archived_at | unsigned org id (no FK) | (org_id, created_at), (subject_type, subject_id), archived_at |
 
 ### HRM / Users
 
@@ -132,10 +134,10 @@ Hot-growth tables have defined retention categories in `config/lifecycle.php`. R
 
 | Table | Category | Retention Window |
 |-------|----------|-----------------|
-| `audit_logs` | warm | 90 days → archive |
-| `activities` | warm | 90 days → archive |
-| `notifications` | warm | 60 days → prune read |
-| `notification_events` | warm | 60 days → prune |
+| `audit_logs` | warm | 90 days → `lifecycle:archive-audit-logs --execute` → `audit_logs_archive` |
+| `activities` | warm | 90 days → `lifecycle:archive-activities --execute` → `activities_archive` |
+| `notifications` | warm | 180 days on `created_at` (read rows only) → `lifecycle:prune-notifications --execute` |
+| `notification_events` | warm | 60 days on `created_at` → `lifecycle:prune-notification-events --execute` |
 | `stripe_webhook_events` | cold | 90 days → prune |
 | `failed_jobs` | cold | 30 days → prune |
 | `comments` | warm | 180 days → archive with parent |

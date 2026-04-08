@@ -40,6 +40,38 @@
 
 ## Last PR Notes
 
+- **Lifecycle: notification + notification_events prune (rescue-mission):**
+  - **Goal:** Bound growth on Laravel `notifications` and org `notification_events` using the same dry-run / `--execute` pattern as other lifecycle prunes.
+  - **Commands:** `lifecycle:prune-notifications` — deletes only rows with **`read_at` set** and **`created_at`** older than **180 days** (config); **unread never deleted**; optional `--organization=`. `lifecycle:prune-notification-events` — deletes rows with **`created_at`** older than **60 days**; optional `--organization=`.
+  - **Config:** `config/lifecycle.php` — `notifications.retention_days` = 180, `prune_requires_read_at` + `prune_only`; `notification_events` retains 60d + `prune_only`. **`RetentionPolicy`** extended with `pruneRequiresReadAt` and `pruneOnly`; **`lifecycle:report`** uses them for correct “Aged Out” / PRUNE vs ARCHIVE labels.
+  - **Schedule:** `routes/console.php` — `--execute` daily **02:15** (notifications) and **02:20** (notification_events), after webhook/failed/batch prunes (02:00–02:10). Uses app timezone unless changed.
+  - **Tests:** `LifecyclePruneNotificationsTest`, `LifecyclePruneNotificationEventsTest`, `RetentionPolicyTest` (prune flags), `LifecycleReportTest` (notification PRUNE row; uses `Artisan::output()` because table rendering is not matched by `expectsOutputToContain`).
+  - **Docs:** `docs/DATA_LIFECYCLE.md`, `docs/OBSERVABILITY_AND_RUNBOOK.md`, `docs/PRODUCTION_READINESS_CHECKLIST.md`, `docs/DB_SCHEMA.md`, this file.
+  - **QA:** `sail artisan lifecycle:prune-notifications` (dry-run) → candidate count; `sail artisan schedule:list` → 02:15/02:20 entries; `./vendor/bin/sail artisan test` + `npm run build`.
+
+- **Lifecycle archive — weekly schedule (rescue-mission):**
+  - **Goal:** Run warm-table archival automatically so `audit_logs` and `activities` hot tables stay bounded.
+  - **Change:** `routes/console.php` registers `lifecycle:archive-audit-logs` and `lifecycle:archive-activities` with `--execute`, **weekly Sunday 03:00 UTC** (`weeklyOn(0, '3:00')` + `timezone('UTC')`). Manual CLI without `--execute` remains dry-run; archiver still batched (default `--batch=500`), idempotent, supports `--organization=` for scoped manual runs.
+  - **Why weekly:** Retention is 90 days; newly eligible rows accrue gradually—weekly spreads load vs daily while preventing unbounded growth.
+  - **Tests:** `LifecycleArchiveWarmTablesTest::test_lifecycle_archive_commands_are_registered_in_schedule`; existing archive behavior tests unchanged.
+  - **Docs:** `docs/DATA_LIFECYCLE.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/OBSERVABILITY_AND_RUNBOOK.md`, this file.
+  - **QA:** `./vendor/bin/sail artisan schedule:list` shows both archive lines at `0 3 * * 0`; `sail artisan lifecycle:archive-audit-logs` (no flags) still dry-run; `./vendor/bin/sail artisan test` and `npm run build`.
+
+- **Lifecycle Phase 3 — Archive foundation (rescue-mission):**
+  - **Goal:** Safe technical foundation to move aged `audit_logs` and `activities` to archive tables; no automatic bulk migration; no archive UI or restore path.
+  - **Schema:** `audit_logs_archive`, `activities_archive` — mirror hot columns + `archived_at`; plain `organization_id` (no FK on archive); indexes on org + `created_at` and entity/subject identifiers.
+  - **Retention:** Same as `config/lifecycle.php` warm entries — **90 days** on `created_at`; rows strictly older than cutoff are eligible.
+  - **Commands:** `lifecycle:archive-audit-logs`, `lifecycle:archive-activities` — dry-run default, `--execute` to move, `--batch=500`, `--organization=` for scoped runs. **Scheduled** weekly Sunday 03:00 UTC with `--execute` (see Last PR Notes above).
+  - **Implementation:** `App\Services\Lifecycle\WarmTableArchiver` — batched transactions, idempotent (preserves ids), pre-pass removes hot rows whose id already exists in archive.
+  - **Tests:** `LifecycleArchiveWarmTablesTest` (10) — dry-run, execute, fresh rows stay hot, org preserved, no duplicate archives, reconcile, org scope, activities subject fields, schedule registration.
+  - **Docs:** DATA_LIFECYCLE.md, PROJECT_STATUS.md, ARCHITECTURE_GUARDRAILS.md, OBSERVABILITY_AND_RUNBOOK.md, DB_SCHEMA.md.
+  - **QA checklist:**
+    1. `sail artisan migrate` → archive tables exist.
+    2. `sail artisan lifecycle:archive-audit-logs` (no flags) → shows cutoff and candidate count; hot DB unchanged.
+    3. Staging: `--execute` on a subset (`--organization=`) → rows move to archive; app still reads hot tables only.
+    4. Re-run command → no duplicate archive PKs; `lifecycle:report` still reflects hot table counts.
+    5. `./vendor/bin/sail artisan test` and `npm run build`.
+
 - **Platform Org Health partial hybrid (rescue-mission):**
   - **Goal:** Use `org_daily_metrics` only where semantics match; no UI or schema change.
   - **Snapshot field:** `seats_active` uses `users_count` from **yesterday’s** row for that org when present (same definition as `OrgMetricsSnapshotService`: tenant users on `organization_user` with `users.client_id` null). **Per-org fallback:** missing row → live seat query for that org only.

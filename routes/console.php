@@ -80,6 +80,40 @@ Artisan::command('user:super-admin {email} {--name=} {--password=} {--attach-all
 Schedule::command('lifecycle:prune-webhooks', ['--execute'])->dailyAt('02:00');
 Schedule::command('lifecycle:prune-failed', ['--execute'])->dailyAt('02:05');
 Schedule::command('lifecycle:prune-batches', ['--execute'])->dailyAt('02:10');
+/*
+| Notification lifecycle prunes (warm tables, delete-only — no archive in this release).
+| Run after other daily prunes. Keeps `notifications` / `notification_events` bounded.
+| See docs/DATA_LIFECYCLE.md for read vs unread rules on `notifications`.
+*/
+Schedule::command('lifecycle:prune-notifications', ['--execute'])->dailyAt('02:15');
+Schedule::command('lifecycle:prune-notification-events', ['--execute'])->dailyAt('02:20');
+
+/*
+|--------------------------------------------------------------------------
+| Lifecycle Archive (Phase 3)
+|--------------------------------------------------------------------------
+|
+| Warm-table archival is scheduled so hot `audit_logs` and `activities` do not grow
+| without bound. Rows older than the retention window (90 days on `created_at` from
+| config/lifecycle.php) move to `audit_logs_archive` / `activities_archive`.
+|
+| Why weekly: eligibility is time-based (90 days); most weeks add a small slice of new
+| archivable rows. Weekly runs spread database load while keeping hot tables bounded.
+| Sunday 03:00 UTC targets a typically low-traffic window (operators should confirm
+| against their traffic profile).
+|
+| Safety: manual invocations remain dry-run unless `--execute` is passed. Scheduled
+| entries pass `--execute` only here. `WarmTableArchiver` processes in batches (default
+| `--batch=500`), is idempotent, and supports `--organization=` for scoped manual runs.
+|
+*/
+Schedule::command('lifecycle:archive-audit-logs', ['--execute'])
+    ->weeklyOn(0, '3:00')
+    ->timezone('UTC');
+
+Schedule::command('lifecycle:archive-activities', ['--execute'])
+    ->weeklyOn(0, '3:00')
+    ->timezone('UTC');
 
 /*
 |--------------------------------------------------------------------------

@@ -8,10 +8,12 @@ declare(strict_types=1);
  * These define how long rows should be considered "hot" before becoming
  * candidates for archival or pruning. Values are in days.
  *
- * No destructive job reads these yet — they are used by:
- * - lifecycle:report (read-only reporting command)
+ * Used by:
+ * - lifecycle:report (read-only reporting)
  * - RetentionPolicy value object
- * - Future lifecycle/prune commands (Phase 2+)
+ * - lifecycle:prune-* (Phase 2 — cold tables; --execute deletes)
+ * - lifecycle:prune-notifications / lifecycle:prune-notification-events (warm prune; --execute deletes)
+ * - lifecycle:archive-audit-logs / lifecycle:archive-activities (Phase 3 — warm tables; --execute moves to archive)
  */
 return [
 
@@ -49,10 +51,12 @@ return [
 
         'notifications' => [
             'category' => 'warm',
-            'retention_days' => 60,
+            'retention_days' => 180,
             'created_at_column' => 'created_at',
             'org_scoped' => true,
-            'description' => 'User-facing notifications; prune read after 180 days',
+            'prune_requires_read_at' => true,
+            'prune_only' => true,
+            'description' => 'Laravel DB notifications: prune only READ rows (read_at set) with created_at older than retention_days; unread preserved',
         ],
 
         'notification_events' => [
@@ -60,7 +64,8 @@ return [
             'retention_days' => 60,
             'created_at_column' => 'created_at',
             'org_scoped' => true,
-            'description' => 'Org-level notification events',
+            'prune_only' => true,
+            'description' => 'Org-level notification_events; prune rows older than retention_days on created_at',
         ],
 
         'stripe_webhook_events' => [
