@@ -14,8 +14,40 @@ declare(strict_types=1);
  * - lifecycle:prune-* (Phase 2 — cold tables; --execute deletes)
  * - lifecycle:prune-notifications / lifecycle:prune-notification-events (warm prune; --execute deletes)
  * - lifecycle:archive-audit-logs / lifecycle:archive-activities (Phase 3 — warm tables; --execute moves to archive)
+ * - lifecycle:purge-soft-deleted — hard-delete rows past soft-delete grace (dry-run default; --execute)
  */
 return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Soft-delete hard purge (grace period on deleted_at)
+    |--------------------------------------------------------------------------
+    |
+    | Tables listed here must use Laravel soft deletes (deleted_at). The command
+    | lifecycle:purge-soft-deleted removes rows with deleted_at strictly older than
+    | grace_days. Additional safety rules apply per table (see docs/DATA_LIFECYCLE.md).
+    |
+    | Not scheduled by default — cross-table guards (especially clients) warrant
+    | staging validation before automation.
+    |
+    */
+    'soft_deleted_purge' => [
+        'clients' => [
+            'grace_days' => 30,
+            'org_scoped' => true,
+            'description' => 'Hard-delete trashed clients with no projects and no invoices; custom_field_values (client) removed first',
+        ],
+        'tasks' => [
+            'grace_days' => 30,
+            'org_scoped' => true,
+            'description' => 'Hard-delete trashed tasks; morph comments and activities for those tasks removed first',
+        ],
+        'attendance' => [
+            'grace_days' => 30,
+            'org_scoped' => true,
+            'description' => 'Hard-delete trashed attendance rows',
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
