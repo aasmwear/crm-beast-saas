@@ -118,6 +118,19 @@ class Organization extends Model
     }
 
     /**
+     * Project/task discussion comments (direct tenant scope). Used by scoped route model binding.
+     *
+     * @return HasMany<\App\Models\Comment, \App\Models\Organization>
+     */
+    public function comments(): HasMany
+    {
+        /** @var HasMany<\App\Models\Comment, \App\Models\Organization> $rel */
+        $rel = $this->hasMany(Comment::class);
+
+        return $rel;
+    }
+
+    /**
      * @return HasMany<\App\Models\Attendance, \App\Models\Organization>
      */
     public function attendances(): HasMany

@@ -9,6 +9,7 @@
 - **Route pattern:** All tenant routes must be under `/org/{organization:slug}/...`
 - **Tenant resolution:** `ResolveTenant` middleware resolves org from route and sets Spatie team context. The `active_organization_id` column is canonical; no per-request schema checks.
 - **No cross-tenant leakage:** Every org-scoped query MUST filter by `organization_id` or equivalent
+- **Comments:** Each row has `organization_id` (backfilled from project/task). `CommentController` sets and checks it; `Project::comments()` scopes by parent org when persisted; project show eager-load qualifies `comments.organization_id` to the route org; `DELETE /comments/{comment}` uses scoped binding via `Organization::comments()` so a comment cannot be addressed under another tenant’s slug.
 - **Tenant-owned attachments:** `project_files` MUST always carry `organization_id`; read/write paths must scope by `organization_id` plus parent id (`project_id`) for defense-in-depth
 - **Validation hardening:** Foreign-key inputs (e.g. `client_id`, `department_id`, assignee user IDs) MUST use org-scoped validation rules (`Rule::exists(...)->where('organization_id', $org->id)` or organization membership pivot checks)
 - **Team ID = Organization ID:** Spatie permission/role scoping uses `team_id` = `organization_id`

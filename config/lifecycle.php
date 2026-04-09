@@ -130,7 +130,7 @@ return [
             'retention_days' => 180,
             'created_at_column' => 'created_at',
             'org_scoped' => true,
-            'description' => 'Project/task comments; archive with parent entity',
+            'description' => 'Project/task comments; rows carry organization_id for tenant scope and future retention; no standalone archive job yet—policy follows parent project/task lifecycle',
         ],
 
     ],

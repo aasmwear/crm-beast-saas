@@ -33,12 +33,21 @@
 1. **Permission canonicalization** — Pending: align `clients.update` ↔ `clients.edit`, `tasks.update` ↔ `tasks.edit`, etc. (see PERMISSIONS.md).
 2. ~~**Reports page missing**~~ — Fixed: Reports/Index.vue created, RBAC (reports.view, reports.export), export uses primary_contact_*.
 3. **Unprotected controllers** — No authorize(): NotificationCenterController, SettingsController, SubscriptionController (billing), ClientsImportController. ~~HRMController~~ — fixed: RBAC enforced.
-4. **DB risks** — activities table has no organization_id; comments has no org_id; attendance.organization_id nullable. ~~ReportController export~~ — fixed: now uses primary_contact_email, primary_contact_phone. See docs/DB_SCHEMA.md.
+4. **DB risks** — Track hot-growth / tenant columns in `docs/DB_SCHEMA.md`. **Comments:** tenant + binding + query hardening on rescue-mission (index, `Organization::comments()`, show eager-load). ~~ReportController export~~ — fixed: primary_contact_* fields. Other legacy rows in DB_SCHEMA “Top 10” may still need periodic review.
 5. ~~**Public API auth**~~ — Fixed: Bearer token auth via AuthenticateOrganizationApiKey middleware; GET /api/ping protected.
 
 ---
 
 ## Last PR Notes
+
+- **Comments — tenant safety + lifecycle alignment (rescue-mission):**
+  - **Context:** `comments` already had `organization_id` from an earlier migration; this work completes **defense-in-depth** and **route binding** for scale/lifecycle readiness.
+  - **Schema:** New index **`(organization_id, commentable_type, commentable_id)`** for tenant + polymorphic lookups.
+  - **App:** `Organization::comments()` for scoped `DELETE` route model binding; `Commentable` / `Task::discussionComments()` constrain `comments.organization_id` when the parent is persisted; `ProjectController::show` eager-load qualifies comment org to the route org; task purge deletes comments with optional `organization_id` when `--organization=` is set.
+  - **Model:** `Comment` strict types + typed `scopeForOrganization`.
+  - **Tests:** `tests/Feature/Comments/CommentTenantTest.php` — create sets org, wrong-org destroy 404 (scoped binding), show payload excludes drifted org rows, relation isolation.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/DATA_LIFECYCLE.md`, `config/lifecycle.php` description, this file.
+  - **QA:** Post/delete comment under correct org slug; attempt delete under wrong org slug → 404; project show comments list; `./vendor/bin/sail artisan test` + `npm run build`.
 
 - **Custom field values — direct `organization_id` (rescue-mission):**
   - **Goal:** Scale-safe tenant scoping on `custom_field_values` before row volume grows; no feature redesign, Client entity only.

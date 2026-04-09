@@ -123,9 +123,15 @@ class Task extends Model
     /**
      * Discussion comments (polymorphic). Distinct from the JSON `comments` column used for review feedback.
      */
-    public function discussionComments(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function discussionComments(): MorphMany
     {
-        return $this->morphMany(Comment::class, 'commentable');
+        $relation = $this->morphMany(Comment::class, 'commentable');
+
+        if ($this->exists && $this->organization_id !== null) {
+            $relation->where('comments.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 
     /**

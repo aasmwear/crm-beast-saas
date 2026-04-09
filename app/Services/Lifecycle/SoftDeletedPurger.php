@@ -156,11 +156,14 @@ final class SoftDeletedPurger
                     break;
                 }
 
-                DB::transaction(function () use ($ids, $morphClass): void {
-                    DB::table('comments')
+                DB::transaction(function () use ($ids, $morphClass, $organizationId): void {
+                    $comments = DB::table('comments')
                         ->where('commentable_type', $morphClass)
-                        ->whereIn('commentable_id', $ids)
-                        ->delete();
+                        ->whereIn('commentable_id', $ids);
+                    if ($organizationId !== null) {
+                        $comments->where('organization_id', $organizationId);
+                    }
+                    $comments->delete();
 
                     DB::table('activities')
                         ->where('subject_type', $morphClass)

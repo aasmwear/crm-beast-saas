@@ -32,7 +32,7 @@
 | project_messages | id, organization_id, project_id, author_id | FK, cascade | (org_id, project_id) |
 | project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id, (org_id, project_id) |
 | project_user | id, project_id, user_id | via project | — |
-| comments | id, organization_id, user_id, morphs(commentable) | FK, cascade | (org_id, created_at) |
+| comments | id, organization_id, user_id, morphs(commentable) | FK, cascade | (org_id, created_at), **(organization_id, commentable_type, commentable_id)** |
 
 ### Tasks
 

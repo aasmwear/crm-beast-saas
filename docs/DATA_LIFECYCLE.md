@@ -16,7 +16,7 @@
 | `failed_jobs` | 1 row per job that exhausts retries | ~0–5 | No | No |
 | `attendance` | 1 row per clock-in session per user per day | ~100 | Yes | Yes |
 | `custom_field_values` | 1 row per entity × custom field | Tied to entity count | Via field→org | No |
-| `comments` | 1 row per comment on project/task | ~10–100 | Yes | No |
+| `comments` | 1 row per comment on project/task | ~10–100 | Yes (`organization_id`) | No |
 
 ---
 
@@ -44,7 +44,7 @@ Operationally useful for recent period; historical rows can move to archive tabl
 | `activities` | 90 days | Move rows with `created_at` older than 90 days to `activities_archive` via `lifecycle:archive-activities --execute` |
 | `notifications` | 180 days (read rows) | Laravel `notifications` table: **`lifecycle:prune-notifications`** deletes only rows with **`read_at` set** and **`created_at`** older than 180 days; **unread rows are never pruned** |
 | `notification_events` | 60 days | **`lifecycle:prune-notification-events`** deletes rows with **`created_at`** older than 60 days (org-level feed) |
-| `comments` | 180 days | Keep with parent entity; archive when project is archived |
+| `comments` | 180 days | **Hot table:** direct `organization_id` enables org-scoped queries and future archive/prune jobs. **Today:** no `comments` archive command—rows are removed with trashed tasks (purge) or follow parent entity policy when project-level archive exists. |
 
 ### Category C: Cold (safe to prune after window)
 

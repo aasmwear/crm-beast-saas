@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models\Concerns;
 
 use App\Models\Comment;
@@ -14,6 +16,13 @@ trait Commentable
      */
     public function comments(): MorphMany
     {
-        return $this->morphMany(Comment::class, 'commentable');
+        $relation = $this->morphMany(Comment::class, 'commentable');
+
+        // Persisted parents only: query stubs used for whereHas() would otherwise bind NULL org.
+        if ($this->exists && $this->organization_id !== null) {
+            $relation->where('comments.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 }

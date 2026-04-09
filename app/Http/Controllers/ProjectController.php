@@ -143,7 +143,12 @@ final class ProjectController extends Controller
                 ->with('user:id,name')
                 ->orderByDesc('created_at')
                 ->limit(100),
-            'comments' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(100),
+            'comments' => static function ($q) use ($organization): void {
+                $q->where($q->qualifyColumn('organization_id'), $organization->id)
+                    ->with('user:id,name')
+                    ->orderByDesc('created_at')
+                    ->limit(100);
+            },
             'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(100),
         ]);
 
