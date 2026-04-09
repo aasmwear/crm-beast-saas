@@ -33,6 +33,7 @@
 | project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id, (org_id, project_id) |
 | project_user | id, project_id, user_id | via project | — |
 | comments | id, organization_id, user_id, morphs(commentable) | FK, cascade | (org_id, created_at), **(organization_id, commentable_type, commentable_id)** |
+| comments_archive | Same as comments + **archived_at** | unsigned org id (no FK) | (org_id, created_at), (commentable_type, commentable_id), archived_at |
 
 ### Tasks
 
@@ -142,7 +143,7 @@ Hot-growth tables have defined retention categories in `config/lifecycle.php`. R
 | `notification_events` | warm | 60 days on `created_at` → `lifecycle:prune-notification-events --execute` |
 | `stripe_webhook_events` | cold | 90 days → prune |
 | `failed_jobs` | cold | 30 days → prune |
-| `comments` | warm | 180 days → archive with parent |
+| `comments` | warm | 180 days → `lifecycle:archive-comments --execute` → `comments_archive` |
 
 ---
 

@@ -40,6 +40,15 @@
 
 ## Last PR Notes
 
+- **Comments archive — warm lifecycle Phase 3 (rescue-mission):**
+  - **Goal:** Bound hot `comments` growth; mirror `audit_logs` / `activities` archive pattern (dry-run default, `--execute`, batched, tenant-safe, idempotent).
+  - **Schema:** `comments_archive` — same logical columns as hot + `archived_at`; indexes on `(organization_id, created_at)`, `(commentable_type, commentable_id)`, `archived_at`; no FKs on archive.
+  - **Command:** `lifecycle:archive-comments` — uses `config/lifecycle.php` **180d** warm policy on `created_at`; **`WarmTableArchiver`** extended for `comments` payload columns.
+  - **Schedule:** Weekly Sunday **03:30 UTC** with `--execute` (after audit/activities at 03:00) — documented in `routes/console.php` and `docs/DATA_LIFECYCLE.md`. Rationale: same automation model as other archives; stagger reduces concurrent archive I/O; operators can dry-run manually before first prod week.
+  - **Tests:** `LifecycleArchiveWarmTablesTest` — dry-run, execute, fresh vs aged, archive columns, no duplicate rerun, org scope, schedule registration; `LifecycleReportTest` lists `comments`.
+  - **Docs:** `docs/DATA_LIFECYCLE.md`, `docs/OBSERVABILITY_AND_RUNBOOK.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/DB_SCHEMA.md`, `config/lifecycle.php`, this file.
+  - **QA:** `sail artisan lifecycle:archive-comments` (dry-run) → candidate count; `sail artisan lifecycle:archive-comments --execute --organization=X` on staging; `schedule:list` → Sunday 03:30 UTC line; confirm project show still reads hot `comments` only; `./vendor/bin/sail artisan test` + `npm run build`.
+
 - **Project task progress denormalization (rescue-mission):**
   - **Goal:** Avoid recomputing per-project task completion on every projects index request; keep logic aligned with existing UX (done/completed/closed/finished).
   - **Schema:** `projects` — `tasks_count`, `open_tasks_count`, `completed_tasks_count`, `progress_percent` (defaults 0); backfilled in migration via `ProjectTaskProgressService`.

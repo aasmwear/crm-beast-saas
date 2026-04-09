@@ -373,18 +373,20 @@ sail artisan lifecycle:prune-notification-events --execute
 
 **`lifecycle:prune-notification-events`:** deletes org-level events past retention on **`created_at`**. Optional **`--organization=`**.
 
-### Archive commands (Phase 3 — audit_logs / activities)
+### Archive commands (Phase 3 — audit_logs / activities / comments)
 
 Move aged warm rows into archive tables. **Dry-run by default**; **`--execute`** required to move data. **`--organization=`** optional for single-tenant pilots. **`--batch=`** (default 500) caps rows per loop iteration.
 
 ```bash
 sail artisan lifecycle:archive-audit-logs
 sail artisan lifecycle:archive-activities
+sail artisan lifecycle:archive-comments
 sail artisan lifecycle:archive-audit-logs --execute
 sail artisan lifecycle:archive-activities --execute --organization=1
+sail artisan lifecycle:archive-comments --execute --organization=1
 ```
 
-**Scheduled:** weekly Sunday 03:00 UTC with `--execute` in `routes/console.php` (same cron host timezone must run `schedule:run` so UTC applies as configured). Manual CLI without flags remains dry-run. Application code continues to read/write **hot** tables only; archives are operator-accessible cold storage until a future unified-read phase.
+**Scheduled:** **`lifecycle:archive-audit-logs`** and **`lifecycle:archive-activities`** — weekly Sunday **03:00 UTC** with `--execute`. **`lifecycle:archive-comments`** — weekly Sunday **03:30 UTC** with `--execute` (staggered I/O; **180-day** retention on `comments.created_at` vs **90 days** for audit/activities). Cron must run `schedule:run` so UTC entries apply. Manual CLI without flags remains dry-run. Application code continues to read/write **hot** tables only; **`comments_archive`** (like other archives) is not used by project UI until a future unified-read phase — archiving removes aged rows from the hot table, so they disappear from normal comment lists.
 
 See `docs/DATA_LIFECYCLE.md` for the full policy, operator rules, and implementation roadmap.
 

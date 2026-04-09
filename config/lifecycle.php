@@ -13,7 +13,7 @@ declare(strict_types=1);
  * - RetentionPolicy value object
  * - lifecycle:prune-* (Phase 2 — cold tables; --execute deletes)
  * - lifecycle:prune-notifications / lifecycle:prune-notification-events (warm prune; --execute deletes)
- * - lifecycle:archive-audit-logs / lifecycle:archive-activities (Phase 3 — warm tables; --execute moves to archive)
+ * - lifecycle:archive-audit-logs / lifecycle:archive-activities / lifecycle:archive-comments (Phase 3 — warm tables; --execute moves to archive)
  * - lifecycle:purge-soft-deleted — hard-delete rows past soft-delete grace (dry-run default; --execute)
  */
 return [
@@ -130,7 +130,7 @@ return [
             'retention_days' => 180,
             'created_at_column' => 'created_at',
             'org_scoped' => true,
-            'description' => 'Project/task comments; rows carry organization_id for tenant scope and future retention; no standalone archive job yet—policy follows parent project/task lifecycle',
+            'description' => 'Project/task discussion comments; archive rows with created_at strictly older than 180 days to comments_archive via lifecycle:archive-comments --execute (batched, idempotent, --organization= supported). App UI reads hot table only.',
         ],
 
     ],

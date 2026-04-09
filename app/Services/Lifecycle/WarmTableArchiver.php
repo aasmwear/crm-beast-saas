@@ -136,6 +136,15 @@ final class WarmTableArchiver
             ];
         }
 
+        if ($sourceTable === 'comments') {
+            return [
+                'user_id' => (int) $row->user_id,
+                'body' => (string) $row->body,
+                'commentable_type' => (string) $row->commentable_type,
+                'commentable_id' => (int) $row->commentable_id,
+            ];
+        }
+
         return [];
     }
 

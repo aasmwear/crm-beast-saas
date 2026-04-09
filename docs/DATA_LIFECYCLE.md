@@ -44,7 +44,7 @@ Operationally useful for recent period; historical rows can move to archive tabl
 | `activities` | 90 days | Move rows with `created_at` older than 90 days to `activities_archive` via `lifecycle:archive-activities --execute` |
 | `notifications` | 180 days (read rows) | Laravel `notifications` table: **`lifecycle:prune-notifications`** deletes only rows with **`read_at` set** and **`created_at`** older than 180 days; **unread rows are never pruned** |
 | `notification_events` | 60 days | **`lifecycle:prune-notification-events`** deletes rows with **`created_at`** older than 60 days (org-level feed) |
-| `comments` | 180 days | **Hot table:** direct `organization_id` enables org-scoped queries and future archive/prune jobs. **Today:** no `comments` archive command—rows are removed with trashed tasks (purge) or follow parent entity policy when project-level archive exists. |
+| `comments` | 180 days | Move rows with `created_at` strictly older than 180 days to **`comments_archive`** via **`lifecycle:archive-comments --execute`**. Hot `comments` is what project pages read; archived rows are retained for compliance/history but **not** shown in UI until a future read path exists. |
 
 ### Category C: Cold (safe to prune after window)
 
@@ -81,7 +81,7 @@ Data that serves no business purpose after a defined period. Can be deleted outr
 | `notification_events` → prune | Done | `lifecycle:prune-notification-events` |
 | `stripe_webhook_events` → prune | Done | `lifecycle:prune-webhooks` (Phase 2) |
 | `failed_jobs` → prune | Done | `lifecycle:prune-failed` (Phase 2) |
-| `audit_logs` / `activities` archive | Done | Phase 3 — see below |
+| `audit_logs` / `activities` / `comments` archive | Done | Phase 3 — see below |
 
 ---
 
@@ -101,6 +101,7 @@ Data that serves no business purpose after a defined period. Can be deleted outr
 | **`lifecycle:prune-notification-events`** | `notification_events` | Yes (with `--execute`) | Dry-run default; 60d on `created_at`; **`--organization=`** optional |
 | **`lifecycle:archive-audit-logs`** | audit_logs → audit_logs_archive | Moves rows (with `--execute`) | Dry-run default; 90d retention; batched; idempotent |
 | **`lifecycle:archive-activities`** | activities → activities_archive | Moves rows (with `--execute`) | Dry-run default; 90d retention; batched; idempotent |
+| **`lifecycle:archive-comments`** | comments → comments_archive | Moves rows (with `--execute`) | Dry-run default; **180d** retention on `created_at`; batched; idempotent; **`--organization=`** optional |
 
 ### Hot vs archive (Phase 3)
 
@@ -110,6 +111,8 @@ Data that serves no business purpose after a defined period. Can be deleted outr
 | `audit_logs_archive` | **Archive** — same columns as hot plus `archived_at`; no FKs to org/user (plain IDs); indexed by `organization_id`, `created_at`, `entity`+`entity_id` |
 | `activities` | **Hot** — recent activity feed |
 | `activities_archive` | **Archive** — same columns as hot plus `archived_at`; indexed by `organization_id`, `created_at`, `subject_type`+`subject_id` |
+| `comments` | **Hot** — discussion comments on projects/tasks; app reads/writes here |
+| `comments_archive` | **Archive** — same columns as hot plus `archived_at`; plain `organization_id` (no FK); indexed by `organization_id`+`created_at`, `commentable_type`+`commentable_id`, `archived_at` |
 
 Tenant UIs and APIs continue to query **hot** tables only until a later phase adds unified or archive-aware reads.
 
@@ -153,12 +156,14 @@ Dry-run by default; **`--execute`** moves eligible rows in batches (default `--b
 ```bash
 sail artisan lifecycle:archive-audit-logs
 sail artisan lifecycle:archive-activities
+sail artisan lifecycle:archive-comments
 
 sail artisan lifecycle:archive-audit-logs --execute
 sail artisan lifecycle:archive-activities --execute --organization=42
+sail artisan lifecycle:archive-comments --execute --organization=42
 ```
 
-**Scheduled runs** (in `routes/console.php`): both archive commands run with `--execute` **weekly on Sunday at 03:00 UTC**. Weekly cadence matches the 90-day retention model (only rows past the cutoff are eligible; daily runs would usually move little extra data while adding load). Manual runs without `--execute` stay dry-run. Ensure `schedule:run` is in cron.
+**Scheduled runs** (in `routes/console.php`): **`lifecycle:archive-audit-logs`** and **`lifecycle:archive-activities`** run with `--execute` **weekly on Sunday at 03:00 UTC**. **`lifecycle:archive-comments`** runs **weekly on Sunday at 03:30 UTC** (staggered) with `--execute`. Weekly cadence limits load while keeping hot tables bounded; comments use a **180-day** window vs **90 days** for audit/activities. Manual runs without `--execute` stay dry-run. Ensure `schedule:run` is in cron.
 
 Rows must be strictly **older** than the cutoff (`now - retention_days` on `created_at`). Reruns are safe: primary keys are preserved; duplicates in hot (same `id` as archive) are removed in a reconcile pass.
 
@@ -182,10 +187,10 @@ Rows must be strictly **older** than the cutoff (`now - retention_days` on `crea
 - [x] `lifecycle:prune-notifications` / `lifecycle:prune-notification-events` — warm-table deletes (see Phase 3 checklist); scheduled 02:15 / 02:20
 
 ### Phase 3 (archive foundation — done)
-- [x] `audit_logs_archive` + `activities_archive` tables (migrations)
-- [x] `lifecycle:archive-audit-logs` / `lifecycle:archive-activities` (dry-run default, `--execute`, `--batch`, `--organization`)
-- [x] `WarmTableArchiver` service — batched move, idempotent, reconcile duplicate hot rows
-- [x] Schedule both archive commands weekly (Sunday 03:00 UTC, `--execute`) in `routes/console.php`
+- [x] `audit_logs_archive` + `activities_archive` + `comments_archive` tables (migrations)
+- [x] `lifecycle:archive-audit-logs` / `lifecycle:archive-activities` / `lifecycle:archive-comments` (dry-run default, `--execute`, `--batch`, `--organization`)
+- [x] `WarmTableArchiver` service — batched move, idempotent, reconcile duplicate hot rows (extended for `comments`)
+- [x] Schedule archive commands weekly: audit + activities Sunday **03:00 UTC**; comments Sunday **03:30 UTC** (`--execute`) in `routes/console.php`
 - [x] Notification pruning — `lifecycle:prune-notifications` / `lifecycle:prune-notification-events` (dry-run default, `--execute`, scheduled daily 02:15 / 02:20)
 - [ ] Soft-delete hard-purge job (30-day grace period)
 - [ ] Platform dashboard: data lifecycle health panel

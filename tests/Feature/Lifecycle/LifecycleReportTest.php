@@ -34,7 +34,8 @@ final class LifecycleReportTest extends TestCase
             ->expectsOutputToContain('stripe_webhook_events')
             ->expectsOutputToContain('failed_jobs')
             ->expectsOutputToContain('notifications')
-            ->expectsOutputToContain('notification_events');
+            ->expectsOutputToContain('notification_events')
+            ->expectsOutputToContain('comments');
     }
 
     public function test_lifecycle_report_notifications_prune_candidates_require_read(): void

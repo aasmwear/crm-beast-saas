@@ -78,6 +78,7 @@
 - **AuditLogger:** Use for sensitive mutations (clients, projects, roles, billing, etc.)
 - **Readiness:** `GET /_readiness` for load-balancer probes
 - **Structured logs:** Use dot-notation keys for webhook/billing failures
+- **Warm-table archives:** `lifecycle:archive-audit-logs`, `lifecycle:archive-activities`, and `lifecycle:archive-comments` default to **dry-run**; **`--execute`** moves rows in batches via `WarmTableArchiver` (idempotent, optional **`--organization=`**). Scheduled weekly UTC (audit/activities **03:00**, comments **03:30** — staggered). Product UI reads **hot** `comments` / `audit_logs` / `activities` only; archived rows live in `*_archive` tables until a future read path or restore workflow exists.
 
 ---
 

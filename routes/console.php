@@ -116,6 +116,16 @@ Schedule::command('lifecycle:archive-activities', ['--execute'])
     ->timezone('UTC');
 
 /*
+| Comments archive (warm, 180-day retention on created_at → comments_archive).
+| Scheduled weekly at 03:30 UTC (after audit_logs / activities at 03:00) to stagger I/O.
+| Same safety model: CLI default is dry-run; scheduled entry passes --execute only here.
+| Hot `comments` is what project pages read — archived rows are not shown until a future read path exists.
+*/
+Schedule::command('lifecycle:archive-comments', ['--execute'])
+    ->weeklyOn(0, '3:30')
+    ->timezone('UTC');
+
+/*
 |--------------------------------------------------------------------------
 | Metrics Snapshot Schedule
 |--------------------------------------------------------------------------

@@ -8,6 +8,7 @@ use App\Models\Activity;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
@@ -199,6 +200,124 @@ final class LifecycleArchiveWarmTablesTest extends TestCase
             $commands->contains(fn (string $c) => str_contains($c, 'lifecycle:archive-activities') && str_contains($c, '--execute')),
             'lifecycle:archive-activities --execute should be on the console schedule.',
         );
+
+        $this->assertTrue(
+            $commands->contains(fn (string $c) => str_contains($c, 'lifecycle:archive-comments') && str_contains($c, '--execute')),
+            'lifecycle:archive-comments --execute should be on the console schedule.',
+        );
+    }
+
+    public function test_archive_comments_dry_run_does_not_move_rows(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-06-01 12:00:00'));
+        $org = Organization::factory()->create();
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+        ]);
+        $this->insertOldComment($org->id, $user->id, $project);
+
+        $this->artisan('lifecycle:archive-comments')->assertSuccessful();
+
+        $this->assertSame(1, DB::table('comments')->count());
+        $this->assertSame(0, DB::table('comments_archive')->count());
+    }
+
+    public function test_archive_comments_execute_moves_only_aged_rows(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-06-01 12:00:00'));
+        $org = Organization::factory()->create();
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+        ]);
+        $oldId = $this->insertOldComment($org->id, $user->id, $project);
+        $freshId = $this->insertFreshComment($org->id, $user->id, $project);
+
+        $this->artisan('lifecycle:archive-comments', ['--execute' => true])->assertSuccessful();
+
+        $this->assertNull(DB::table('comments')->where('id', $oldId)->first());
+        $this->assertNotNull(DB::table('comments_archive')->where('id', $oldId)->first());
+        $this->assertNotNull(DB::table('comments')->where('id', $freshId)->first());
+        $this->assertNull(DB::table('comments_archive')->where('id', $freshId)->first());
+    }
+
+    public function test_archive_comments_preserves_org_and_commentable_in_archive(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-06-01 12:00:00'));
+        $org = Organization::factory()->create();
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+        ]);
+        $oldId = $this->insertOldComment($org->id, $user->id, $project);
+
+        $this->artisan('lifecycle:archive-comments', ['--execute' => true])->assertSuccessful();
+
+        $archived = DB::table('comments_archive')->where('id', $oldId)->first();
+        $this->assertNotNull($archived);
+        $this->assertSame($org->id, (int) $archived->organization_id);
+        $this->assertSame($user->id, (int) $archived->user_id);
+        $this->assertSame(Project::class, $archived->commentable_type);
+        $this->assertSame($project->id, (int) $archived->commentable_id);
+        $this->assertNotNull($archived->archived_at);
+    }
+
+    public function test_archive_comments_second_run_does_not_duplicate_archive(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-06-01 12:00:00'));
+        $org = Organization::factory()->create();
+        $user = User::factory()->create();
+        $client = Client::factory()->create(['organization_id' => $org->id]);
+        $project = Project::factory()->create([
+            'organization_id' => $org->id,
+            'client_id' => $client->id,
+        ]);
+        $this->insertOldComment($org->id, $user->id, $project);
+
+        $this->artisan('lifecycle:archive-comments', ['--execute' => true])->assertSuccessful();
+        $this->assertSame(1, DB::table('comments_archive')->count());
+
+        $this->artisan('lifecycle:archive-comments', ['--execute' => true])->assertSuccessful();
+        $this->assertSame(1, DB::table('comments_archive')->count());
+        $this->assertSame(0, DB::table('comments')->count());
+    }
+
+    public function test_archive_comments_respects_organization_scope(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-06-01 12:00:00'));
+        $orgA = Organization::factory()->create();
+        $orgB = Organization::factory()->create();
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+        $clientA = Client::factory()->create(['organization_id' => $orgA->id]);
+        $clientB = Client::factory()->create(['organization_id' => $orgB->id]);
+        $projectA = Project::factory()->create([
+            'organization_id' => $orgA->id,
+            'client_id' => $clientA->id,
+        ]);
+        $projectB = Project::factory()->create([
+            'organization_id' => $orgB->id,
+            'client_id' => $clientB->id,
+        ]);
+        $idA = $this->insertOldComment($orgA->id, $userA->id, $projectA);
+        $idB = $this->insertOldComment($orgB->id, $userB->id, $projectB);
+
+        $this->artisan('lifecycle:archive-comments', [
+            '--execute' => true,
+            '--organization' => (string) $orgA->id,
+        ])->assertSuccessful();
+
+        $this->assertNull(DB::table('comments')->where('id', $idA)->first());
+        $this->assertNotNull(DB::table('comments_archive')->where('id', $idA)->first());
+        $this->assertNotNull(DB::table('comments')->where('id', $idB)->first());
+        $this->assertNull(DB::table('comments_archive')->where('id', $idB)->first());
     }
 
     private function insertOldAuditLog(int $organizationId): int
@@ -255,5 +374,35 @@ final class LifecycleArchiveWarmTablesTest extends TestCase
         ]);
 
         return $id;
+    }
+
+    private function insertOldComment(int $organizationId, int $userId, Project $project): int
+    {
+        $ts = now()->subDays(181)->toDateTimeString();
+
+        return (int) DB::table('comments')->insertGetId([
+            'organization_id' => $organizationId,
+            'user_id' => $userId,
+            'body' => 'old comment',
+            'commentable_type' => Project::class,
+            'commentable_id' => $project->id,
+            'created_at' => $ts,
+            'updated_at' => $ts,
+        ]);
+    }
+
+    private function insertFreshComment(int $organizationId, int $userId, Project $project): int
+    {
+        $ts = now()->subDays(5)->toDateTimeString();
+
+        return (int) DB::table('comments')->insertGetId([
+            'organization_id' => $organizationId,
+            'user_id' => $userId,
+            'body' => 'fresh comment',
+            'commentable_type' => Project::class,
+            'commentable_id' => $project->id,
+            'created_at' => $ts,
+            'updated_at' => $ts,
+        ]);
     }
 }
