@@ -11,6 +11,7 @@ use App\Models\Organization;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -124,6 +125,7 @@ final class CustomFieldTest extends TestCase
             ->where('entity_id', $client->id)
             ->first();
         $this->assertNotNull($value);
+        $this->assertSame((int) $org->id, (int) $value->organization_id);
         $this->assertSame('Annual', $value->value_text);
     }
 
@@ -257,6 +259,7 @@ final class CustomFieldTest extends TestCase
 
         $clientPremium = Client::factory()->create(['organization_id' => $org->id, 'company_name' => 'Premium Corp']);
         CustomFieldValue::query()->create([
+            'organization_id' => $org->id,
             'custom_field_id' => $field->id,
             'entity_type' => 'client',
             'entity_id' => $clientPremium->id,
@@ -265,6 +268,7 @@ final class CustomFieldTest extends TestCase
 
         $clientBasic = Client::factory()->create(['organization_id' => $org->id, 'company_name' => 'Basic Corp']);
         CustomFieldValue::query()->create([
+            'organization_id' => $org->id,
             'custom_field_id' => $field->id,
             'entity_type' => 'client',
             'entity_id' => $clientBasic->id,
@@ -299,6 +303,7 @@ final class CustomFieldTest extends TestCase
 
         $clientA = Client::factory()->create(['organization_id' => $orgA->id, 'company_name' => 'Client In A']);
         CustomFieldValue::query()->create([
+            'organization_id' => $orgA->id,
             'custom_field_id' => $fieldA->id,
             'entity_type' => 'client',
             'entity_id' => $clientA->id,
@@ -319,5 +324,45 @@ final class CustomFieldTest extends TestCase
         $response->assertOk();
         $data = $response->json('props.clients.data') ?? [];
         $this->assertCount(0, $data);
+    }
+
+    public function test_client_custom_field_values_relation_scoped_to_client_organization(): void
+    {
+        $orgA = Organization::factory()->create();
+        $orgB = Organization::factory()->create();
+
+        $field = CustomField::query()->create([
+            'organization_id' => $orgA->id,
+            'entity' => 'client',
+            'label' => 'Note',
+            'slug' => 'note_' . uniqid(),
+            'type' => 'text',
+            'is_required' => false,
+        ]);
+
+        $client = Client::factory()->create(['organization_id' => $orgA->id]);
+
+        $value = CustomFieldValue::query()->create([
+            'organization_id' => $orgA->id,
+            'custom_field_id' => $field->id,
+            'entity_type' => 'client',
+            'entity_id' => $client->id,
+            'value_text' => 'Legit',
+        ]);
+
+        $this->assertCount(1, $client->customFieldValues()->get());
+
+        DB::table('custom_field_values')->where('id', $value->id)->update(['organization_id' => $orgB->id]);
+
+        $client->unsetRelation('customFieldValues');
+
+        $this->assertCount(0, $client->customFieldValues()->get());
+        $this->assertSame(
+            0,
+            CustomFieldValue::query()
+                ->where('organization_id', $orgA->id)
+                ->where('entity_id', $client->id)
+                ->count()
+        );
     }
 }

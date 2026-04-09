@@ -72,7 +72,13 @@ final class CustomField extends Model
      */
     public function values(): HasMany
     {
-        return $this->hasMany(CustomFieldValue::class);
+        $relation = $this->hasMany(CustomFieldValue::class);
+
+        if ($this->exists) {
+            $relation->where('custom_field_values.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 
     /**

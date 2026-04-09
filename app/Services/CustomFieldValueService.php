@@ -51,7 +51,10 @@ final class CustomFieldValueService
                     'entity_type' => $entityType,
                     'entity_id' => $entityId,
                 ],
-                self::valueToColumns($field, $validated)
+                array_merge(
+                    ['organization_id' => $organizationId],
+                    self::valueToColumns($field, $validated)
+                )
             );
         }
     }

@@ -100,6 +100,8 @@ class ClientsInertiaController extends Controller
                 }
             );
 
+        $organizationId = (int) $organization->id;
+
         // Apply custom field filters (tenant-scoped; only known slugs)
         foreach ($cfFilters as $slug => $rawValue) {
             if (! is_string($slug) || $slug === '') {
@@ -115,13 +117,14 @@ class ClientsInertiaController extends Controller
             }
             $fieldId = $field->id;
             $fieldType = $field->type;
-            $query->whereHas('customFieldValues', static function (Builder $q) use ($fieldId, $fieldType, $val): void {
-                $q->where('custom_field_id', $fieldId);
+            $query->whereHas('customFieldValues', static function (Builder $q) use ($fieldId, $fieldType, $val, $organizationId): void {
+                $q->where($q->qualifyColumn('organization_id'), $organizationId)
+                    ->where($q->qualifyColumn('custom_field_id'), $fieldId);
                 match ($fieldType) {
-                    CustomField::TYPE_TEXT => $q->where('value_text', 'like', '%' . addcslashes($val, '%_\\') . '%'),
-                    CustomField::TYPE_NUMBER => $q->where('value_number', (float) $val),
-                    CustomField::TYPE_DATE => $q->where('value_date', $val),
-                    CustomField::TYPE_SELECT => $q->where('value_text', $val),
+                    CustomField::TYPE_TEXT => $q->where($q->qualifyColumn('value_text'), 'like', '%' . addcslashes($val, '%_\\') . '%'),
+                    CustomField::TYPE_NUMBER => $q->where($q->qualifyColumn('value_number'), (float) $val),
+                    CustomField::TYPE_DATE => $q->where($q->qualifyColumn('value_date'), $val),
+                    CustomField::TYPE_SELECT => $q->where($q->qualifyColumn('value_text'), $val),
                     default => null,
                 };
             });

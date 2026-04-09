@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Custom field value for an entity instance.
  *
  * @property int $id
+ * @property int $organization_id
  * @property int $custom_field_id
  * @property string $entity_type
  * @property int $entity_id
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class CustomFieldValue extends Model
 {
     protected $fillable = [
+        'organization_id',
         'custom_field_id',
         'entity_type',
         'entity_id',
@@ -42,6 +44,14 @@ final class CustomFieldValue extends Model
     public function customField(): BelongsTo
     {
         return $this->belongsTo(CustomField::class);
+    }
+
+    /**
+     * @return BelongsTo<Organization, CustomFieldValue>
+     */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function getValue(): mixed

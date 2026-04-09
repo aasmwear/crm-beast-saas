@@ -21,6 +21,8 @@
 |-------|-------------|-----------------|---------|
 | clients | id, organization_id, company_name, fronter_id, closer_id, ... | FK, cascade | (org_id, assigned_account_manager_id), (org_id, status) |
 | client_contacts | id, client_id, name, email, phone | via client | client_id |
+| custom_fields | id, organization_id, entity, label, slug, type, options, is_required, sort_order | FK, cascade | (org_id, entity, slug) unique, (org_id, entity) |
+| custom_field_values | id, organization_id, custom_field_id, entity_type, entity_id, value_text/number/date/json | FK org + FK field (cascade) | unique (custom_field_id, entity_type, entity_id); **(organization_id, entity_type, entity_id)** for tenant-scoped lookups |
 
 ### Projects
 

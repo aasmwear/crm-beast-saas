@@ -92,11 +92,14 @@ final class SoftDeletedPurger
                     break;
                 }
 
-                DB::transaction(function () use ($ids): void {
-                    DB::table('custom_field_values')
+                DB::transaction(function () use ($ids, $organizationId): void {
+                    $cfv = DB::table('custom_field_values')
                         ->where('entity_type', CustomField::ENTITY_CLIENT)
-                        ->whereIn('entity_id', $ids)
-                        ->delete();
+                        ->whereIn('entity_id', $ids);
+                    if ($organizationId !== null) {
+                        $cfv->where('organization_id', $organizationId);
+                    }
+                    $cfv->delete();
 
                     DB::table('clients')->whereIn('id', $ids)->delete();
                 });

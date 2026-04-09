@@ -140,6 +140,7 @@ final class LifecyclePurgeSoftDeletedTest extends TestCase
         ]);
 
         DB::table('custom_field_values')->insert([
+            'organization_id' => $org->id,
             'custom_field_id' => $field->id,
             'entity_type' => CustomField::ENTITY_CLIENT,
             'entity_id' => $client->id,

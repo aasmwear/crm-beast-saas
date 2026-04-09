@@ -135,8 +135,16 @@ final class Client extends Model
      */
     public function customFieldValues(): HasMany
     {
-        return $this->hasMany(CustomFieldValue::class, 'entity_id')
+        $relation = $this->hasMany(CustomFieldValue::class, 'entity_id')
             ->where('entity_type', 'client');
+
+        // Only constrain by org when this client is a persisted model; query stubs used for
+        // whereHas() would otherwise bind NULL and exclude all rows (controller adds org scope).
+        if ($this->exists) {
+            $relation->where('custom_field_values.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 
     /**

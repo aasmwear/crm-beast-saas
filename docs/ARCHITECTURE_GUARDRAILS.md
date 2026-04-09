@@ -39,7 +39,7 @@
   - **Role cloning:** Team-scoped roles only; creates copy with `-copy` suffix (or `-copy-2`, etc. if exists); copies all permissions. Global roles cannot be cloned.
   - **Global roles are immutable:** Roles with `team_id = null` (Owner, Manager, Employee, Client, Super Admin) cannot have their permissions modified by tenants. API returns 403. UI disables matrix and Save for these roles.
 - **Authorization:** Policies/Gates for server-side enforcement; UI hiding is not security
-- **Custom Fields module:** custom-fields.manage (create/edit/delete field definitions). Field definitions are org-scoped; values link to entities (entity_type, entity_id). v1 supports Client entity only. **Phase 2:** Select/multiselect values MUST be within configured options (ValidationException); client index supports `cf[slug]=value` filtering (text: contains, number/date/select: exact); filters tenant-scoped, only known slugs applied.
+- **Custom Fields module:** custom-fields.manage (create/edit/delete field definitions). Field definitions are org-scoped; **`custom_field_values` rows carry `organization_id` directly** (denormalized from the parent field, backfilled on migrate) so hot queries and future lifecycle/read-model work can filter by tenant without joining `custom_fields`. Values still link to entities via (entity_type, entity_id). v1 supports Client entity only. **Phase 2:** Select/multiselect values MUST be within configured options (ValidationException); client index supports `cf[slug]=value` filtering (text: contains, number/date/select: exact); filters tenant-scoped, only known slugs applied; `whereHas` on values includes `organization_id` for defense in depth.
 
 ---
 

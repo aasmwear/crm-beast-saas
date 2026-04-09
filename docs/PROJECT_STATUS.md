@@ -40,6 +40,14 @@
 
 ## Last PR Notes
 
+- **Custom field values — direct `organization_id` (rescue-mission):**
+  - **Goal:** Scale-safe tenant scoping on `custom_field_values` before row volume grows; no feature redesign, Client entity only.
+  - **Schema:** `organization_id` NOT NULL, FK to `organizations` (cascade on delete), backfilled from `custom_fields.organization_id`; index **`(organization_id, entity_type, entity_id)`**; dropped redundant `(entity_type, entity_id)` index.
+  - **App:** `CustomFieldValue` fillable + `organization()`; `CustomFieldValueService::syncForEntity` always sets `organization_id`; `Client::customFieldValues()` and `CustomField::values()` constrain by org; clients index CF filter `whereHas` adds `organization_id`; soft-delete purger deletes CFV with optional org match when `--organization=` is used.
+  - **Tests:** `CustomFieldTest` — assert org on synced value; relation ignores cross-org orphan rows; lifecycle purge insert includes `organization_id`.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** `sail artisan migrate`; create/edit client with custom values; clients index `cf[slug]=` filter; `./vendor/bin/sail artisan test`; `npm run build`.
+
 - **Lifecycle: notification + notification_events prune (rescue-mission):**
   - **Goal:** Bound growth on Laravel `notifications` and org `notification_events` using the same dry-run / `--execute` pattern as other lifecycle prunes.
   - **Commands:** `lifecycle:prune-notifications` — deletes only rows with **`read_at` set** and **`created_at`** older than **180 days** (config); **unread never deleted**; optional `--organization=`. `lifecycle:prune-notification-events` — deletes rows with **`created_at`** older than **60 days**; optional `--organization=`.
