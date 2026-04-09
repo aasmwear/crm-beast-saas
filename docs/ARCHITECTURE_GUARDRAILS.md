@@ -97,6 +97,18 @@
 
 ---
 
+## Webhook event summaries (read model)
+
+- **Table:** `webhook_event_summaries` — denormalized aggregates over `stripe_webhook_events` (Stripe only in v1: `provider = stripe`).
+- **Grain:** One row per `(provider, organization_scope, event_type)`. `organization_scope` is `unscoped` when the source events have `organization_id` null, otherwise the string form of the org id (matches FK when set).
+- **Columns:** `total_count`, `success_count` (status `processed`), `failure_count` (status `failed`), `last_received_at`, `last_processed_at`, `last_error_at`, `last_error_message` (notes from the latest failure in that bucket).
+- **Service:** `App\Services\Webhooks\WebhookSummaryService` — `rebuildAll()` replaces all rows for a provider; `rebuildForOrganizationScope(?int $organizationId)` replaces one tenant bucket. Idempotent full recompute from the raw table (no change to webhook ingestion or handler semantics).
+- **Command:** `php artisan webhooks:rebuild-summaries` — optional `--provider=` (default `stripe`), optional `--organization=` (existing org id only).
+- **Schedule:** Daily **02:30** app timezone in `routes/console.php`, after `lifecycle:prune-webhooks` (02:00), so post-prune aggregates stay aligned with retained rows.
+- **Dashboard usage:** Platform System Performance `webhook_health` uses summarized **lifetime** totals when any summary row exists for `provider = stripe`; **failed_last_24h**, **failed_last_7d**, **orgs_with_failures_7d**, and **recent_failures** remain live queries on `stripe_webhook_events`.
+
+---
+
 ## Data Lifecycle & Retention
 
 - **Policy doc:** `docs/DATA_LIFECYCLE.md` defines retention categories (hot/warm/cold), windows, and operator rules

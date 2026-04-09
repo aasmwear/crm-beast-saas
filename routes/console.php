@@ -78,6 +78,11 @@ Artisan::command('user:super-admin {email} {--name=} {--password=} {--attach-all
 |
 */
 Schedule::command('lifecycle:prune-webhooks', ['--execute'])->dailyAt('02:00');
+/*
+| Stripe webhook read-model: rebuild denormalized summaries after webhook row prune so aggregates
+| match retained stripe_webhook_events. Idempotent; safe to re-run manually.
+*/
+Schedule::command('webhooks:rebuild-summaries')->dailyAt('02:30');
 Schedule::command('lifecycle:prune-failed', ['--execute'])->dailyAt('02:05');
 Schedule::command('lifecycle:prune-batches', ['--execute'])->dailyAt('02:10');
 /*

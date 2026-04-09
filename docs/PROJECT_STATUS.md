@@ -40,6 +40,16 @@
 
 ## Last PR Notes
 
+- **Webhook event summaries read model (rescue-mission):**
+  - **Goal:** Denormalized, query-efficient aggregates over `stripe_webhook_events` for observability and cheaper lifetime totals; no ingestion or Stripe handler changes.
+  - **Schema:** `webhook_event_summaries` — unique `(provider, organization_scope, event_type)`; nullable `organization_id` FK; counts + last timestamps + `last_error_message` from latest failure per bucket.
+  - **Service:** `App\Services\Webhooks\WebhookSummaryService` — idempotent rebuild from raw events; optional single-org scope.
+  - **Command:** `webhooks:rebuild-summaries` (`--provider=`, `--organization=`). **Schedule:** daily 02:30 after webhook prune.
+  - **Reads:** `SystemPerformanceDashboardController` uses summaries for lifetime `total_events` / `processed_count` / `failed_count` when summaries exist; time-bounded failure metrics still from raw table.
+  - **Tests:** `WebhookSummaryServiceTest`, `SystemPerformanceDashboardTest::test_webhook_health_matches_summaries_when_read_model_is_populated`.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** `sail artisan migrate`; `sail artisan webhooks:rebuild-summaries`; Platform → System Performance → webhook totals match expectations; `schedule:list` shows 02:30 rebuild; `./vendor/bin/sail artisan test`; `npm run build`.
+
 - **Comments archive — warm lifecycle Phase 3 (rescue-mission):**
   - **Goal:** Bound hot `comments` growth; mirror `audit_logs` / `activities` archive pattern (dry-run default, `--execute`, batched, tenant-safe, idempotent).
   - **Schema:** `comments_archive` — same logical columns as hot + `archived_at`; indexes on `(organization_id, created_at)`, `(commentable_type, commentable_id)`, `archived_at`; no FKs on archive.

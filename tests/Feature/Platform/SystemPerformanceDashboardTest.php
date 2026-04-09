@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\OrganizationSubscription;
 use App\Models\Platform\PlatformAdmin;
 use App\Models\StripeWebhookEvent;
+use App\Services\Webhooks\WebhookSummaryService;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -156,6 +157,43 @@ class SystemPerformanceDashboardTest extends TestCase
             ->where('webhook_health.failed_last_7d', 2)
             ->where('webhook_health.orgs_with_failures_7d', 1)
             ->has('webhook_health.recent_failures', 2)
+        );
+    }
+
+    public function test_webhook_health_matches_summaries_when_read_model_is_populated(): void
+    {
+        $org = Organization::factory()->create(['slug' => 'webhook-org-sum', 'stripe_id' => 'cus_test_sum']);
+
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_sum_ok',
+            'type' => 'customer.subscription.updated',
+            'status' => 'processed',
+            'organization_id' => $org->id,
+            'processed_at' => now()->subHour(),
+        ]);
+
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_sum_fail',
+            'type' => 'invoice.payment_failed',
+            'status' => 'failed',
+            'notes' => 'Test failure',
+            'organization_id' => $org->id,
+            'created_at' => now()->subHours(2),
+        ]);
+
+        app(WebhookSummaryService::class)->rebuildAll();
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.system-performance'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('webhook_health.total_events', 2)
+            ->where('webhook_health.processed_count', 1)
+            ->where('webhook_health.failed_count', 1)
+            ->where('webhook_health.failed_last_7d', 1)
+            ->where('webhook_health.orgs_with_failures_7d', 1)
+            ->has('webhook_health.recent_failures', 1)
         );
     }
 

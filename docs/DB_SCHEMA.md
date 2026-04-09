@@ -64,6 +64,9 @@
 | organization_subscriptions | id, organization_id, plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit | FK, unique org | plan_key, status |
 | organization_addons | id, organization_id, addon_key, quantity, value_int, mode (augment\|set), active, starts_at, ends_at | FK, cascade | (org_id, addon_key) |
 | stripe_webhook_events | id, organization_id, stripe_event_id, type, status | FK, nullOnDelete | stripe_event_id unique, organization_id |
+| webhook_event_summaries | id, organization_scope, organization_id, provider, event_type, total_count, success_count, failure_count, last_received_at, last_processed_at, last_error_at, last_error_message | FK org nullable | unique (provider, organization_scope, event_type); index (provider, organization_id) |
+
+**Webhook summaries:** `organization_scope` is `unscoped` when source events have `organization_id` null (portable unique key). Rows are rebuilt from `stripe_webhook_events` via `webhooks:rebuild-summaries` (non-authoritative read model).
 
 ### Settings
 

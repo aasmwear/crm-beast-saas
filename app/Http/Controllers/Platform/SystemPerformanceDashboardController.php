@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationSubscription;
 use App\Models\StripeWebhookEvent;
+use App\Models\WebhookEventSummary;
 use App\Services\Billing\EntitlementsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -162,22 +163,35 @@ final class SystemPerformanceDashboardController extends Controller
     }
 
     /**
-     * Aggregate webhook health metrics from stripe_webhook_events.
+     * Aggregate webhook health metrics. Lifetime totals prefer webhook_event_summaries
+     * when populated (cheap SUM); time-windowed counts and recent failures stay on raw events.
      *
      * @return array{total_events: int, processed_count: int, failed_count: int, failed_last_24h: int, failed_last_7d: int, orgs_with_failures_7d: int, recent_failures: array<int, array{id: int, stripe_event_id: string, type: string, status: string, organization_id: int|null, created_at: string}>}
      */
     private function loadWebhookHealth(): array
     {
-        $totalEvents = (int) StripeWebhookEvent::count();
+        $useSummary = WebhookEventSummary::query()->where('provider', 'stripe')->exists();
 
-        $statusCounts = StripeWebhookEvent::query()
-            ->selectRaw("status, count(*) as cnt")
-            ->groupBy('status')
-            ->pluck('cnt', 'status')
-            ->all();
+        if ($useSummary) {
+            $totals = WebhookEventSummary::query()
+                ->where('provider', 'stripe')
+                ->selectRaw('coalesce(sum(total_count), 0) as t, coalesce(sum(success_count), 0) as s, coalesce(sum(failure_count), 0) as f')
+                ->first();
+            $totalEvents = (int) ($totals->t ?? 0);
+            $processedCount = (int) ($totals->s ?? 0);
+            $failedCount = (int) ($totals->f ?? 0);
+        } else {
+            $totalEvents = (int) StripeWebhookEvent::count();
 
-        $processedCount = (int) ($statusCounts['processed'] ?? 0);
-        $failedCount = (int) ($statusCounts['failed'] ?? 0);
+            $statusCounts = StripeWebhookEvent::query()
+                ->selectRaw("status, count(*) as cnt")
+                ->groupBy('status')
+                ->pluck('cnt', 'status')
+                ->all();
+
+            $processedCount = (int) ($statusCounts['processed'] ?? 0);
+            $failedCount = (int) ($statusCounts['failed'] ?? 0);
+        }
 
         $failed24h = (int) StripeWebhookEvent::query()
             ->where('status', 'failed')
