@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\ProjectTaskProgressService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -95,6 +96,24 @@ class Task extends Model
         'submission' => 'array',
         'submission_files' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (Task $task): void {
+            if ($task->wasChanged('project_id') && $task->getOriginal('project_id')) {
+                ProjectTaskProgressService::recalculateForProjectId((int) $task->getOriginal('project_id'));
+            }
+            ProjectTaskProgressService::recalculateForProjectId((int) $task->project_id);
+        });
+
+        static::deleted(function (Task $task): void {
+            ProjectTaskProgressService::recalculateForProjectId((int) $task->project_id);
+        });
+
+        static::restored(function (Task $task): void {
+            ProjectTaskProgressService::recalculateForProjectId((int) $task->project_id);
+        });
+    }
 
     /*
      |--------------------------------------------------------------------------

@@ -7,6 +7,7 @@ namespace App\Services\Lifecycle;
 use App\Models\Client;
 use App\Models\CustomField;
 use App\Models\Task;
+use App\Services\ProjectTaskProgressService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -157,6 +158,13 @@ final class SoftDeletedPurger
                 }
 
                 DB::transaction(function () use ($ids, $morphClass, $organizationId): void {
+                    $projectIds = Task::onlyTrashed()
+                        ->whereIn('id', $ids)
+                        ->pluck('project_id')
+                        ->unique()
+                        ->map(fn ($id) => (int) $id)
+                        ->all();
+
                     $comments = DB::table('comments')
                         ->where('commentable_type', $morphClass)
                         ->whereIn('commentable_id', $ids);
@@ -171,6 +179,10 @@ final class SoftDeletedPurger
                         ->delete();
 
                     DB::table('tasks')->whereIn('id', $ids)->delete();
+
+                    foreach ($projectIds as $projectId) {
+                        ProjectTaskProgressService::recalculateForProjectId($projectId);
+                    }
                 });
 
                 $deleted += count($ids);

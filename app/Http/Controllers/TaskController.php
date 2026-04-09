@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\TaskAssigned;
 use App\Services\ActivityLogger;
 use App\Services\AuditLogger;
+use App\Services\ProjectTaskProgressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -330,8 +331,7 @@ final class TaskController extends Controller
             if ($statusChanged) {
                 $newStatus = (string) ($after['status'] ?? '');
                 $oldStatus = (string) ($before['status'] ?? '');
-                $completedStatuses = ['completed', 'done', 'closed', 'finished'];
-                if (in_array(strtolower($newStatus), $completedStatuses, true)) {
+                if (ProjectTaskProgressService::isTaskStatusCompleted($newStatus)) {
                     $task->load('project');
                     ActivityLogger::log(
                         $request->user(),

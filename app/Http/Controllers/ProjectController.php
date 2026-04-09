@@ -38,9 +38,6 @@ final class ProjectController extends Controller
             'client:id,company_name',
             'manager:id,name',
             'users:id,name',
-            'tasks' => static function ($q): void {
-                $q->select('id', 'project_id', 'status');
-            },
         ])
             ->where('organization_id', $organization->id)
             ->visibleTo($user)
@@ -50,14 +47,7 @@ final class ProjectController extends Controller
             ->paginate(25)
             ->withQueryString()
             ->through(function (Project $project): array {
-                $tasks = $project->tasks;
-                $total = $tasks->count();
-                $completed = $tasks->filter(static function ($t): bool {
-                    $s = strtolower(trim((string) ($t->status ?? '')));
-
-                    return in_array($s, ['done', 'completed', 'closed', 'finished'], true);
-                })->count();
-                $progress = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
+                $progress = (int) ($project->progress_percent ?? 0);
 
                 $teamUsers = $project->users->isNotEmpty()
                     ? $project->users

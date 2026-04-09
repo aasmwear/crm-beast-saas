@@ -28,7 +28,7 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| projects | id, organization_id, client_id, title, project_manager_id | FK, cascade | (org_id, client_id), (org_id, project_code) unique, (org_id, status), (org_id, project_manager_id) |
+| projects | id, organization_id, client_id, title, project_manager_id, **tasks_count**, **open_tasks_count**, **completed_tasks_count**, **progress_percent** (0–100, denormalized from non-trashed tasks) | FK, cascade | (org_id, client_id), (org_id, project_code) unique, (org_id, status), (org_id, project_manager_id) |
 | project_messages | id, organization_id, project_id, author_id | FK, cascade | (org_id, project_id) |
 | project_files | id, organization_id, project_id, user_id | FK, cascade | organization_id, (org_id, project_id) |
 | project_user | id, project_id, user_id | via project | — |

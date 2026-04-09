@@ -40,6 +40,17 @@
 
 ## Last PR Notes
 
+- **Project task progress denormalization (rescue-mission):**
+  - **Goal:** Avoid recomputing per-project task completion on every projects index request; keep logic aligned with existing UX (done/completed/closed/finished).
+  - **Schema:** `projects` — `tasks_count`, `open_tasks_count`, `completed_tasks_count`, `progress_percent` (defaults 0); backfilled in migration via `ProjectTaskProgressService`.
+  - **Service:** `App\Services\ProjectTaskProgressService` — single source for “completed” status list and recalculation from live (non-trashed) `tasks`.
+  - **Writes:** `Task` `saved` / `deleted` / `restored` hooks recalc affected `project_id` (and former `project_id` on move). `SoftDeletedPurger` task hard-delete batch recalculates affected projects.
+  - **Reads:** `ProjectController::index` uses `progress_percent` and drops eager load of all task rows for that computation.
+  - **Tests:** `ProjectTaskProgressDenormTest`; lifecycle purge test asserts project counters after hard delete.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** Projects index progress bar matches task board completion semantics; create/update/delete task updates counts; optional `lifecycle:purge-soft-deleted --table=tasks --execute` on staging trashed tasks → parent project `tasks_count` stays accurate.
+  - **Note:** v1 is explicit recompute, not an event bus; submit/review flows do not change `status` to a completed value, so they do not affect progress unless `status` is updated elsewhere.
+
 - **Comments — tenant safety + lifecycle alignment (rescue-mission):**
   - **Context:** `comments` already had `organization_id` from an earlier migration; this work completes **defense-in-depth** and **route binding** for scale/lifecycle readiness.
   - **Schema:** New index **`(organization_id, commentable_type, commentable_id)`** for tenant + polymorphic lookups.

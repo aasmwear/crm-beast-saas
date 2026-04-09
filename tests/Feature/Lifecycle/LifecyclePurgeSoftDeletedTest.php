@@ -244,6 +244,10 @@ final class LifecyclePurgeSoftDeletedTest extends TestCase
 
         $this->assertNull(Task::withTrashed()->find($task->id));
         $this->assertNull(Comment::query()->find($comment->id));
+
+        $project->refresh();
+        $this->assertSame(0, $project->tasks_count);
+        $this->assertSame(0, $project->progress_percent);
     }
 
     public function test_purge_tasks_preserves_active_task(): void

@@ -39,6 +39,10 @@ use Illuminate\Support\Facades\Schema;
  * @property string|null $notes_tech
  * @property array|null $attachments
  * @property array|null $custom_fields
+ * @property int $tasks_count Denormalized: non-trashed tasks for this project.
+ * @property int $open_tasks_count Denormalized: tasks not in completed status set.
+ * @property int $completed_tasks_count Denormalized: tasks whose status counts as done/completed/closed/finished.
+ * @property int $progress_percent Denormalized: 0–100 from completed vs total tasks.
  *
  * @method static Builder<Project> query()
  *
