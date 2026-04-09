@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationSubscription;
 use App\Models\StripeWebhookEvent;
+use App\Models\WebhookEventDailyRollup;
 use App\Models\WebhookEventSummary;
 use App\Services\Billing\EntitlementsService;
 use Illuminate\Http\Request;
@@ -164,7 +165,12 @@ final class SystemPerformanceDashboardController extends Controller
 
     /**
      * Aggregate webhook health metrics. Lifetime totals prefer webhook_event_summaries
-     * when populated (cheap SUM); time-windowed counts and recent failures stay on raw events.
+     * when populated (cheap SUM). Time-window failure counts prefer webhook_event_daily_rollups
+     * when populated; otherwise raw stripe_webhook_events. Recent failure rows always from raw events.
+     *
+     * Rollup windows use calendar days in app timezone (see docs): "24h" sums failures on the 1–2
+     * calendar days that intersect the rolling last-24-hours interval; "7d" sums seven calendar
+     * days ending today — not identical to strict created_at >= now()->subDays(n) when rollups are used.
      *
      * @return array{total_events: int, processed_count: int, failed_count: int, failed_last_24h: int, failed_last_7d: int, orgs_with_failures_7d: int, recent_failures: array<int, array{id: int, stripe_event_id: string, type: string, status: string, organization_id: int|null, created_at: string}>}
      */
@@ -193,22 +199,40 @@ final class SystemPerformanceDashboardController extends Controller
             $failedCount = (int) ($statusCounts['failed'] ?? 0);
         }
 
-        $failed24h = (int) StripeWebhookEvent::query()
-            ->where('status', 'failed')
-            ->where('created_at', '>=', now()->subDay())
-            ->count();
+        $useRollups = WebhookEventDailyRollup::query()->where('provider', 'stripe')->exists();
 
-        $failed7d = (int) StripeWebhookEvent::query()
-            ->where('status', 'failed')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
+        if ($useRollups) {
+            $failed24h = $this->webhookFailedLast24hFromDailyRollups();
+            [$f7Start, $f7End] = $this->webhookFailureSevenCalendarDayBounds();
+            $failed7d = (int) WebhookEventDailyRollup::query()
+                ->where('provider', 'stripe')
+                ->whereBetween('event_date', [$f7Start, $f7End])
+                ->sum('failure_count');
+            $orgsWithFailures7d = (int) (WebhookEventDailyRollup::query()
+                ->where('provider', 'stripe')
+                ->whereBetween('event_date', [$f7Start, $f7End])
+                ->where('failure_count', '>', 0)
+                ->whereNotNull('organization_id')
+                ->selectRaw('count(distinct organization_id) as rollup_distinct_orgs')
+                ->value('rollup_distinct_orgs') ?? 0);
+        } else {
+            $failed24h = (int) StripeWebhookEvent::query()
+                ->where('status', 'failed')
+                ->where('created_at', '>=', now()->subDay())
+                ->count();
 
-        $orgsWithFailures7d = (int) StripeWebhookEvent::query()
-            ->where('status', 'failed')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->whereNotNull('organization_id')
-            ->distinct('organization_id')
-            ->count('organization_id');
+            $failed7d = (int) StripeWebhookEvent::query()
+                ->where('status', 'failed')
+                ->where('created_at', '>=', now()->subDays(7))
+                ->count();
+
+            $orgsWithFailures7d = (int) StripeWebhookEvent::query()
+                ->where('status', 'failed')
+                ->where('created_at', '>=', now()->subDays(7))
+                ->whereNotNull('organization_id')
+                ->distinct('organization_id')
+                ->count('organization_id');
+        }
 
         $recentFailures = StripeWebhookEvent::query()
             ->where('status', 'failed')
@@ -365,5 +389,44 @@ final class SystemPerformanceDashboardController extends Controller
                 ->where('stripe_id', '!=', '')
                 ->count(),
         ];
+    }
+
+    /**
+     * Seven calendar days ending today (app timezone), inclusive — used with daily rollups.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function webhookFailureSevenCalendarDayBounds(): array
+    {
+        $tz = (string) config('app.timezone');
+        $end = now()->timezone($tz)->toDateString();
+        $start = now()->timezone($tz)->subDays(6)->toDateString();
+
+        return [$start, $end];
+    }
+
+    /**
+     * Sums failure_count on calendar days that intersect the rolling [now - 24h, now] interval (app TZ).
+     */
+    private function webhookFailedLast24hFromDailyRollups(): int
+    {
+        $tz = (string) config('app.timezone');
+        $a = now()->timezone($tz)->subDay();
+        $b = now()->timezone($tz);
+        $dates = [];
+        $current = $a->copy()->timezone($tz)->startOfDay();
+        $end = $b->copy()->timezone($tz)->startOfDay();
+        while ($current->lte($end)) {
+            $dates[] = $current->toDateString();
+            $current->addDay();
+        }
+        if ($dates === []) {
+            return 0;
+        }
+
+        return (int) WebhookEventDailyRollup::query()
+            ->where('provider', 'stripe')
+            ->whereIn('event_date', $dates)
+            ->sum('failure_count');
     }
 }

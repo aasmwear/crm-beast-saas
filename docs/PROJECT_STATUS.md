@@ -40,6 +40,16 @@
 
 ## Last PR Notes
 
+- **Webhook daily rollups (time-window read model, rescue-mission):**
+  - **Goal:** Fast **24h / 7d** style webhook failure metrics without scanning all of `stripe_webhook_events`; no ingestion changes; lifetime `webhook_event_summaries` unchanged.
+  - **Schema:** `webhook_event_daily_rollups` — unique `(provider, organization_scope, event_type, event_date)`; `event_date` = calendar date in app timezone; counts + last timestamps.
+  - **Service:** `App\Services\Webhooks\WebhookDailyRollupService` — idempotent delete + reinsert; full rebuild or `--days=` window; org-scoped rebuild; **PostgreSQL required** for `AT TIME ZONE` aggregation.
+  - **Command:** `webhooks:rebuild-daily-rollups` (`--provider=`, `--organization=`, `--days=`). **Schedule:** daily **02:40 UTC** after summary rebuild.
+  - **Dashboard:** `SystemPerformanceDashboardController` uses rollups for `failed_last_24h`, `failed_last_7d`, `orgs_with_failures_7d` when rollups exist; **calendar-day semantics** (documented in guardrails); **recent_failures** still raw; fallback to raw if no rollup rows.
+  - **Tests:** `WebhookDailyRollupServiceTest`, dashboard rollup integration test.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** `sail artisan migrate`; `sail artisan webhooks:rebuild-daily-rollups`; optional `--days=30`; Platform → System Performance; `schedule:list` → 02:40 UTC; `./vendor/bin/sail artisan test`; `npm run build`.
+
 - **Webhook event summaries read model (rescue-mission):**
   - **Goal:** Denormalized, query-efficient aggregates over `stripe_webhook_events` for observability and cheaper lifetime totals; no ingestion or Stripe handler changes.
   - **Schema:** `webhook_event_summaries` — unique `(provider, organization_scope, event_type)`; nullable `organization_id` FK; counts + last timestamps + `last_error_message` from latest failure per bucket.

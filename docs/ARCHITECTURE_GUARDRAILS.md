@@ -105,7 +105,18 @@
 - **Service:** `App\Services\Webhooks\WebhookSummaryService` — `rebuildAll()` replaces all rows for a provider; `rebuildForOrganizationScope(?int $organizationId)` replaces one tenant bucket. Idempotent full recompute from the raw table (no change to webhook ingestion or handler semantics).
 - **Command:** `php artisan webhooks:rebuild-summaries` — optional `--provider=` (default `stripe`), optional `--organization=` (existing org id only).
 - **Schedule:** Daily **02:30** app timezone in `routes/console.php`, after `lifecycle:prune-webhooks` (02:00), so post-prune aggregates stay aligned with retained rows.
-- **Dashboard usage:** Platform System Performance `webhook_health` uses summarized **lifetime** totals when any summary row exists for `provider = stripe`; **failed_last_24h**, **failed_last_7d**, **orgs_with_failures_7d**, and **recent_failures** remain live queries on `stripe_webhook_events`.
+- **Dashboard usage:** Platform System Performance `webhook_health` uses summarized **lifetime** totals when any summary row exists for `provider = stripe`; **recent_failures** always come from `stripe_webhook_events`.
+
+---
+
+## Webhook daily rollups (time-window read model)
+
+- **Table:** `webhook_event_daily_rollups` — per **calendar day** (app timezone), same grain keys as summaries plus `event_date`.
+- **Columns:** `total_count`, `success_count` (processed), `failure_count` (failed), `last_received_at`, `last_processed_at`.
+- **Service:** `App\Services\Webhooks\WebhookDailyRollupService` — `rebuildAll(?daysWindow)` deletes either all rows for the provider or only rows whose `event_date` falls in the last *N* calendar days (inclusive of today), then reinserts from `stripe_webhook_events` (PostgreSQL-only grouping). `rebuildForOrganizationScope($organizationId, ?daysWindow)` does the same for one `organization_scope`.
+- **Command:** `php artisan webhooks:rebuild-daily-rollups` — `--provider=` (default `stripe`), `--organization=`, optional `--days=` (rolling calendar-day span from today).
+- **Schedule:** Daily **02:40 UTC** in `routes/console.php`, after `webhooks:rebuild-summaries` (02:30 app timezone) and `lifecycle:prune-webhooks` (02:00 app timezone); operators should confirm wall-clock ordering for their deployment.
+- **Dashboard usage:** When any rollup row exists for `provider = stripe`, System Performance uses rollups for **failed_last_24h** (sum of `failure_count` on the 1–2 calendar days that intersect `[now - 24h, now]` in app TZ), **failed_last_7d** (sum over **seven calendar days** ending today in app TZ), and **orgs_with_failures_7d** (`count(distinct organization_id)` with `failure_count > 0` in that same 7-day window). These definitions **differ slightly** from strict `created_at >= now()->subDays(n)` rolling windows at day boundaries; if rollups are empty, the controller falls back to raw-event queries.
 
 ---
 

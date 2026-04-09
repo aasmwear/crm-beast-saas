@@ -65,8 +65,11 @@
 | organization_addons | id, organization_id, addon_key, quantity, value_int, mode (augment\|set), active, starts_at, ends_at | FK, cascade | (org_id, addon_key) |
 | stripe_webhook_events | id, organization_id, stripe_event_id, type, status | FK, nullOnDelete | stripe_event_id unique, organization_id |
 | webhook_event_summaries | id, organization_scope, organization_id, provider, event_type, total_count, success_count, failure_count, last_received_at, last_processed_at, last_error_at, last_error_message | FK org nullable | unique (provider, organization_scope, event_type); index (provider, organization_id) |
+| webhook_event_daily_rollups | id, organization_scope, organization_id, provider, event_type, **event_date** (DATE), total_count, success_count, failure_count, last_received_at, last_processed_at | FK org nullable | unique (provider, organization_scope, event_type, event_date); index (provider, event_date) |
 
 **Webhook summaries:** `organization_scope` is `unscoped` when source events have `organization_id` null (portable unique key). Rows are rebuilt from `stripe_webhook_events` via `webhooks:rebuild-summaries` (non-authoritative read model).
+
+**Webhook daily rollups:** `event_date` is the calendar date in **app timezone** (PostgreSQL `AT TIME ZONE`). Rebuilt via `webhooks:rebuild-daily-rollups` for time-window metrics; optional `--days` limits which calendar dates are replaced.
 
 ### Settings
 
