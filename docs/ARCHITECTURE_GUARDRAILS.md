@@ -13,6 +13,7 @@
 - **Tenant-owned attachments:** `project_files` MUST always carry `organization_id`; read/write paths must scope by `organization_id` plus parent id (`project_id`) for defense-in-depth
 - **Validation hardening:** Foreign-key inputs (e.g. `client_id`, `department_id`, assignee user IDs) MUST use org-scoped validation rules (`Rule::exists(...)->where('organization_id', $org->id)` or organization membership pivot checks)
 - **Team ID = Organization ID:** Spatie permission/role scoping uses `team_id` = `organization_id`
+- **Tenant tier (read-only):** `organizations.tier` is `small` \| `medium` \| `large` \| `enterprise` (default `small`). **Not** a billing plan; v1 does not gate features or quotas on it. Classification uses `TenantTierService` from live `clients` / `projects` / `tasks` counts (aligned with snapshot soft-delete rules) plus optional Stripe webhook summary volume (`webhook_event_summaries.total_count` per org). **Highest tier implied by any dimension wins.** Thresholds live in `config/tenant_tiers.php`. Tiers refresh automatically after `metrics:snapshot-orgs` (when `organizations.tier` column exists) and via `php artisan tenant-tiers:recalculate` (`--org=` optional).
 
 ---
 

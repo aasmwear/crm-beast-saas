@@ -24,6 +24,7 @@ class OrganizationFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name.'-'.Str::random(5)),
             'plan' => 'trial',
+            'tier' => 'small',
             'settings' => [],
         ];
     }

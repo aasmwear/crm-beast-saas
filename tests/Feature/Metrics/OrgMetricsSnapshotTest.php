@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\OrgMetricsSnapshotService;
+use App\Services\Tenancy\TenantTierService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -177,7 +178,8 @@ final class OrgMetricsSnapshotTest extends TestCase
 
         $this->artisan('metrics:snapshot-orgs', ['--date' => '2026-03-18'])
             ->assertSuccessful()
-            ->expectsOutputToContain('Snapshot created for 1 organization');
+            ->expectsOutputToContain('Snapshot created for 1 organization')
+            ->expectsOutputToContain('Tenant tiers recalculated');
 
         $this->assertDatabaseCount('org_daily_metrics', 1);
     }
@@ -192,7 +194,8 @@ final class OrgMetricsSnapshotTest extends TestCase
             '--org' => $org->id,
         ])
             ->assertSuccessful()
-            ->expectsOutputToContain('Snapshot created for org #' . $org->id);
+            ->expectsOutputToContain('Snapshot created for org #' . $org->id)
+            ->expectsOutputToContain('Tenant tier refreshed');
 
         $this->assertDatabaseCount('org_daily_metrics', 1);
         $this->assertDatabaseHas('org_daily_metrics', ['organization_id' => $org->id]);
@@ -204,7 +207,8 @@ final class OrgMetricsSnapshotTest extends TestCase
 
         $this->artisan('metrics:snapshot-orgs')
             ->assertSuccessful()
-            ->expectsOutputToContain(CarbonImmutable::yesterday()->toDateString());
+            ->expectsOutputToContain(CarbonImmutable::yesterday()->toDateString())
+            ->expectsOutputToContain('Tenant tiers recalculated');
 
         $this->assertDatabaseHas('org_daily_metrics', [
             'organization_id' => $org->id,
@@ -217,5 +221,17 @@ final class OrgMetricsSnapshotTest extends TestCase
         $this->artisan('metrics:snapshot-orgs', ['--org' => 99999])
             ->assertFailed()
             ->expectsOutputToContain('not found');
+    }
+
+    public function test_metrics_snapshot_recalculates_tenant_tier_after_snapshot(): void
+    {
+        $org = Organization::factory()->create();
+        Client::factory()->count(25)->create(['organization_id' => $org->id]);
+
+        $this->artisan('metrics:snapshot-orgs', ['--date' => '2026-03-18'])
+            ->assertSuccessful();
+
+        $org->refresh();
+        $this->assertSame(TenantTierService::TIER_MEDIUM, $org->tier);
     }
 }

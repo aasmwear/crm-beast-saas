@@ -22,6 +22,7 @@ use Laravel\Cashier\Billable;
  * @property string|null $stripe_id
  * @property string|null $pm_type
  * @property string|null $pm_last_four
+ * @property string $tier
  * @property \Illuminate\Support\Carbon|null $trial_ends_at
  * @property array<string, mixed>|null $settings
  * @property string $timezone
@@ -46,6 +47,7 @@ class Organization extends Model
         'name',
         'slug',
         'plan', // Legacy/display-only. Canonical plan_key is organization_subscriptions.plan_key; org.plan used as fallback when no subscription.
+        'tier',
         'settings',
         'logo_path',
         'timezone',

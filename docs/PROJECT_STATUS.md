@@ -40,6 +40,15 @@
 
 ## Last PR Notes
 
+- **Tenant tier detection (read-only, rescue-mission):**
+  - **Goal:** Lightweight `organizations.tier` (small / medium / large / enterprise) from usage + optional webhook volume; **no billing changes**, no enforcement, no UI work.
+  - **Storage:** `organizations.tier` string, default `small`, indexed.
+  - **Service:** `App\Services\Tenancy\TenantTierService` — `determineTier`, `recalculateTier`, `recalculateAllOrganizations`; thresholds in `config/tenant_tiers.php` (extensible).
+  - **Trigger:** After `metrics:snapshot-orgs` (all orgs or `--org=`); guarded if `tier` column missing. **CLI:** `tenant-tiers:recalculate` with optional `--org=`.
+  - **Tests:** `TenantTierServiceTest`, `OrgMetricsSnapshotTest` tier hook assertion.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** `sail artisan migrate`; create org with usage → `sail artisan metrics:snapshot-orgs --date=…` → `organizations.tier` updates; `sail artisan tenant-tiers:recalculate`; `./vendor/bin/sail artisan test`; `npm run build`.
+
 - **Webhook daily rollups (time-window read model, rescue-mission):**
   - **Goal:** Fast **24h / 7d** style webhook failure metrics without scanning all of `stripe_webhook_events`; no ingestion changes; lifetime `webhook_event_summaries` unchanged.
   - **Schema:** `webhook_event_daily_rollups` — unique `(provider, organization_scope, event_type, event_date)`; `event_date` = calendar date in app timezone; counts + last timestamps.

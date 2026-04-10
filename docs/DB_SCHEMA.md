@@ -11,7 +11,7 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| organizations | id, name, slug | — | slug unique |
+| organizations | id, name, slug, plan, **tier** (small\|medium\|large\|enterprise, default small), timezone, week_start, … | — | slug unique; index tier |
 | organization_domains | id, organization_id, domain | FK | domain unique |
 | organization_user | id, organization_id, user_id | FK | (org, user) unique |
 
