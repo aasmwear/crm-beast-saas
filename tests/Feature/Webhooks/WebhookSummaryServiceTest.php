@@ -215,4 +215,40 @@ final class WebhookSummaryServiceTest extends TestCase
         $this->artisan('webhooks:rebuild-summaries', ['--organization' => '999999'])
             ->assertFailed();
     }
+
+    public function test_rebuild_scoped_uses_newest_failure_note_per_event_type(): void
+    {
+        $org = Organization::factory()->create();
+        $older = now()->subHours(3);
+        $newer = now()->subHour();
+
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_fail_old',
+            'type' => 'invoice.payment_failed',
+            'status' => 'failed',
+            'notes' => 'older error',
+            'organization_id' => $org->id,
+            'created_at' => $older,
+            'updated_at' => $older,
+        ]);
+        StripeWebhookEvent::create([
+            'stripe_event_id' => 'evt_fail_new',
+            'type' => 'invoice.payment_failed',
+            'status' => 'failed',
+            'notes' => 'newer error',
+            'organization_id' => $org->id,
+            'created_at' => $newer,
+            'updated_at' => $newer,
+        ]);
+
+        $n = app(WebhookSummaryService::class)->rebuildForOrganizationScope($org->id);
+        $this->assertGreaterThanOrEqual(1, $n);
+
+        $row = WebhookEventSummary::query()
+            ->where('organization_scope', (string) $org->id)
+            ->where('event_type', 'invoice.payment_failed')
+            ->first();
+        $this->assertNotNull($row);
+        $this->assertSame('newer error', $row->last_error_message);
+    }
 }

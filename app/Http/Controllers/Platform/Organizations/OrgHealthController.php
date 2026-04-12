@@ -11,9 +11,11 @@ use App\Models\StripeWebhookEvent;
 use App\Services\Billing\EntitlementsService;
 use App\Services\Billing\SeatCounter;
 use App\Services\Billing\StorageUsageService;
+use App\Support\OrgSnapshotReadMode;
 use App\Support\PlanCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,9 +24,11 @@ use Inertia\Response;
  * Read-only Org Health Dashboard for platform operators.
  * Surfaces billing, seat, storage, and webhook health indicators per tenant.
  *
- * Hybrid read-model: `seats_active` uses `org_daily_metrics.users_count` for yesterday
- * when a row exists for that org (same query semantics as live seat counting in
- * OrgMetricsSnapshotService). Otherwise live counts. Billing, webhooks, and storage stay live.
+ * Hybrid read-model: `seats_active` uses `org_daily_metrics.users_count` when a row exists
+ * (same definition as OrgMetricsSnapshotService). **Small/medium** tenants use **yesterday’s**
+ * snapshot row when present; **large/enterprise** (or `ORG_SNAPSHOT_READ_ALL_TENANTS`) use the
+ * **latest** metric row per org to avoid extra live aggregation when nightly jobs lag. Missing
+ * snapshot → live `organization_user` counts. Billing, webhooks, and storage stay live.
  */
 final class OrgHealthController extends Controller
 {
@@ -76,7 +80,7 @@ final class OrgHealthController extends Controller
 
         $orgIds = $paginator->getCollection()->pluck('id')->all();
         $webhookStats = $this->loadWebhookStats($orgIds);
-        $seatCounts = $this->loadSeatCountsWithSnapshotFallback($orgIds);
+        $seatCounts = $this->loadSeatCountsWithSnapshotFallback($paginator->getCollection());
         $storageSummaries = $this->loadStorageSummaries($paginator->getCollection());
 
         $organizations = $paginator->getCollection()->map(function (Organization $org) use ($webhookStats, $seatCounts, $storageSummaries) {
@@ -124,7 +128,7 @@ final class OrgHealthController extends Controller
         $recentFailedCutoff = now()->subDays(7);
 
         $lastPerOrg = StripeWebhookEvent::query()
-            ->whereIn('organization_id', $orgIds)
+            ->forOrganizations($orgIds)
             ->whereNotNull('organization_id')
             ->orderByDesc('processed_at')
             ->orderByDesc('created_at')
@@ -134,7 +138,7 @@ final class OrgHealthController extends Controller
             ->all();
 
         $failedCounts = StripeWebhookEvent::query()
-            ->whereIn('organization_id', $orgIds)
+            ->forOrganizations($orgIds)
             ->whereNotNull('organization_id')
             ->where('status', 'failed')
             ->where('created_at', '>=', $recentFailedCutoff)
@@ -182,37 +186,74 @@ final class OrgHealthController extends Controller
     }
 
     /**
-     * Prefer `users_count` from yesterday's org_daily_metrics per org when present; else live.
+     * Prefer `users_count` from org_daily_metrics when present; strategy depends on
+     * {@see OrgSnapshotReadMode::shouldUseSnapshot}: large/enterprise (or global config)
+     * use the latest row per org; others use yesterday only. Always falls back to live counts.
      *
-     * @param  array<int>  $orgIds
+     * @param  Collection<int, Organization>  $orgs
      * @return array<int, int>
      */
-    private function loadSeatCountsWithSnapshotFallback(array $orgIds): array
+    private function loadSeatCountsWithSnapshotFallback(Collection $orgs): array
     {
-        if (count($orgIds) === 0) {
+        $orgIds = $orgs->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if ($orgIds === []) {
             return [];
         }
 
         $live = $this->loadSeatCountsLive($orgIds);
-        $dateStr = $this->orgHealthSnapshotReferenceDate()->toDateString();
 
-        $snapshotRows = OrgDailyMetric::query()
-            ->where('metric_date', $dateStr)
-            ->whereIn('organization_id', $orgIds)
-            ->get(['organization_id', 'users_count']);
+        $snapshotModeOrgIds = [];
+        $standardOrgIds = [];
+        foreach ($orgs as $org) {
+            if (OrgSnapshotReadMode::shouldUseSnapshot($org)) {
+                $snapshotModeOrgIds[] = (int) $org->id;
+            } else {
+                $standardOrgIds[] = (int) $org->id;
+            }
+        }
 
-        $fromSnapshot = [];
-        foreach ($snapshotRows as $row) {
-            $fromSnapshot[(int) $row->organization_id] = (int) $row->users_count;
+        $fromYesterday = [];
+        if ($standardOrgIds !== []) {
+            $dateStr = $this->orgHealthSnapshotReferenceDate()->toDateString();
+            $rows = OrgDailyMetric::query()
+                ->where('metric_date', $dateStr)
+                ->whereIn('organization_id', $standardOrgIds)
+                ->get(['organization_id', 'users_count']);
+            foreach ($rows as $row) {
+                $fromYesterday[(int) $row->organization_id] = (int) $row->users_count;
+            }
+        }
+
+        $fromLatest = [];
+        if ($snapshotModeOrgIds !== []) {
+            $latestDates = DB::table('org_daily_metrics')
+                ->selectRaw('organization_id, max(metric_date) as max_date')
+                ->whereIn('organization_id', $snapshotModeOrgIds)
+                ->groupBy('organization_id');
+
+            $rows = DB::table('org_daily_metrics as m')
+                ->joinSub($latestDates, 't', function ($join): void {
+                    $join->on('m.organization_id', '=', 't.organization_id')
+                        ->on('m.metric_date', '=', 't.max_date');
+                })
+                ->get(['m.organization_id', 'm.users_count']);
+
+            foreach ($rows as $row) {
+                $fromLatest[(int) $row->organization_id] = (int) $row->users_count;
+            }
         }
 
         $result = [];
-        foreach ($orgIds as $orgId) {
-            $orgId = (int) $orgId;
-            if (array_key_exists($orgId, $fromSnapshot)) {
-                $result[$orgId] = $fromSnapshot[$orgId];
+        foreach ($orgs as $org) {
+            $orgId = (int) $org->id;
+            if (OrgSnapshotReadMode::shouldUseSnapshot($org)) {
+                $result[$orgId] = array_key_exists($orgId, $fromLatest)
+                    ? $fromLatest[$orgId]
+                    : (int) ($live[$orgId] ?? 0);
             } else {
-                $result[$orgId] = (int) ($live[$orgId] ?? 0);
+                $result[$orgId] = array_key_exists($orgId, $fromYesterday)
+                    ? $fromYesterday[$orgId]
+                    : (int) ($live[$orgId] ?? 0);
             }
         }
 

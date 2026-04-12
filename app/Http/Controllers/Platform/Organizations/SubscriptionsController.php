@@ -116,7 +116,7 @@ final class SubscriptionsController extends Controller
         $recentFailedCutoff = now()->subDays(7);
 
         $lastPerOrg = StripeWebhookEvent::query()
-            ->whereIn('organization_id', $orgIds)
+            ->forOrganizations($orgIds)
             ->whereNotNull('organization_id')
             ->orderByDesc('processed_at')
             ->orderByDesc('created_at')
@@ -126,7 +126,7 @@ final class SubscriptionsController extends Controller
             ->all();
 
         $failedCounts = StripeWebhookEvent::query()
-            ->whereIn('organization_id', $orgIds)
+            ->forOrganizations($orgIds)
             ->whereNotNull('organization_id')
             ->where('status', 'failed')
             ->where('created_at', '>=', $recentFailedCutoff)

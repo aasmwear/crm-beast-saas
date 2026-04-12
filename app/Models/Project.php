@@ -197,7 +197,12 @@ final class Project extends Model
      */
     public function activities(): MorphMany
     {
-        return $this->morphMany(\App\Models\Activity::class, 'subject');
+        $relation = $this->morphMany(\App\Models\Activity::class, 'subject');
+        if ($this->exists && $this->organization_id !== null) {
+            $relation->where('activities.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 
     /**

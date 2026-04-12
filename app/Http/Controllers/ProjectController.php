@@ -139,7 +139,12 @@ final class ProjectController extends Controller
                     ->orderByDesc('created_at')
                     ->limit(100);
             },
-            'activities' => static fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(100),
+            'activities' => static function ($q) use ($organization): void {
+                $q->where($q->qualifyColumn('organization_id'), $organization->id)
+                    ->with('user:id,name')
+                    ->orderByDesc('created_at')
+                    ->limit(100);
+            },
         ]);
 
         // Get all users in this organization for task assignment

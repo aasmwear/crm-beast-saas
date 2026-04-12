@@ -40,6 +40,26 @@
 
 ## Last PR Notes
 
+- **Partition readiness — query hardening & indexes (rescue-mission, no physical partitions):**
+  - **Goal:** Prepare high-growth tables (`tasks`, `activities`, `stripe_webhook_events`) for a future **partition-by-`organization_id`** strategy; tighten tenant scoping and indexes without UI or risky schema refactors beyond additive PostgreSQL indexes.
+  - **Query safety:** `Project::activities()` / `Task::activities()` and `ProjectController::show` activities eager-load now always filter **`activities.organization_id`** to the route organization (stale morph rows cannot surface on project show).
+  - **Indexes (PostgreSQL only):** New migration drops redundant `idx_stripe_webhook_events_org` and non-tenant-prefixed `idx_activities_subject`; adds webhook composites + partial failed index, `activities (organization_id, subject_type, subject_id)`, partial `tasks (organization_id, created_at)` for non-deleted rows.
+  - **Service:** `WebhookSummaryService::loadLastFailureNotesByGroup` uses **`DISTINCT ON`** on PostgreSQL so summary rebuild does not load every failed row into PHP memory.
+  - **Model helpers:** `StripeWebhookEvent::forOrganization` / `forOrganizations` scopes; Org Health + Subscriptions overview use `forOrganizations`.
+  - **Lifecycle:** Confirmed `config/lifecycle.php` already marks `activities` (warm archive), `stripe_webhook_events` (cold prune), `tasks` (soft-delete hard purge) with **`org_scoped: true`** where applicable; prune/archive commands respect optional `--organization=`.
+  - **Tests:** `PartitionReadinessActivitiesTest` (project show activity isolation); `WebhookSummaryServiceTest` extended for newest failure note per type.
+  - **Docs:** `docs/ARCHITECTURE_GUARDRAILS.md` (“Partition readiness”), `docs/DB_SCHEMA.md`, this file.
+  - **QA:** `sail artisan migrate`; project show with drifted activity row (wrong `organization_id`) must not display it; `sail artisan webhooks:rebuild-summaries` on staging with large failure volume; `./vendor/bin/sail artisan test` + `./vendor/bin/sail npm run build`.
+
+- **Snapshot-only read mode for large tenants (rescue-mission):**
+  - **Goal:** Optional snapshot-first reads for **large** / **enterprise** orgs on platform Org Health `seats_active`, using the **latest** `org_daily_metrics` row before live fallback; small/medium behavior unchanged (yesterday row only). No UI, billing, or write-path changes.
+  - **Config:** `config/org_daily_metrics.php` — `snapshot_only_all_tenants` via **`ORG_SNAPSHOT_READ_ALL_TENANTS`** (default false) treats every org like large/enterprise for that read path (staging / operator override).
+  - **Code:** `App\Support\OrgSnapshotReadMode::shouldUseSnapshot(Organization)`; `OrgHealthController` batch-loads yesterday vs latest `users_count` by tier.
+  - **System Performance:** `platform_summary.total_users` and storage aggregates have no `org_daily_metrics` mapping; documented only (still live).
+  - **Tests:** `OrgHealthDashboardTest` — large + stale-only snapshot uses snapshot count; small + stale-only uses live; config override uses latest for small tier.
+  - **Docs:** `docs/DB_SCHEMA.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, this file.
+  - **QA:** Platform → Org Health with mixed tiers; verify `seats_active` for large org matches latest snapshot when yesterday missing; small org still matches live in that case; `./vendor/bin/sail artisan test` + `./vendor/bin/sail npm run build`.
+
 - **Tenant tier detection (read-only, rescue-mission):**
   - **Goal:** Lightweight `organizations.tier` (small / medium / large / enterprise) from usage + optional webhook volume; **no billing changes**, no enforcement, no UI work.
   - **Storage:** `organizations.tier` string, default `small`, indexed.

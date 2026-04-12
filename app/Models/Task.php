@@ -158,7 +158,12 @@ class Task extends Model
      */
     public function activities(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
-        return $this->morphMany(Activity::class, 'subject');
+        $relation = $this->morphMany(Activity::class, 'subject');
+        if ($this->exists && $this->organization_id !== null) {
+            $relation->where('activities.organization_id', $this->organization_id);
+        }
+
+        return $relation;
     }
 
     /**

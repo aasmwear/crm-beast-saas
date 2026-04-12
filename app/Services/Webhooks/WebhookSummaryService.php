@@ -137,6 +137,10 @@ final class WebhookSummaryService
      */
     private function loadLastFailureNotesByGroup(?int $organizationId): array
     {
+        if (DB::getDriverName() === 'pgsql') {
+            return $this->loadLastFailureNotesByGroupPostgres($organizationId);
+        }
+
         $q = DB::table('stripe_webhook_events')
             ->where('status', 'failed')
             ->orderByDesc('created_at')
@@ -153,6 +157,40 @@ final class WebhookSummaryService
             if (! array_key_exists($key, $map)) {
                 $map[$key] = $row->notes !== null ? (string) $row->notes : null;
             }
+        }
+
+        return $map;
+    }
+
+    /**
+     * One row per (organization_id, type) without scanning all failures into PHP memory.
+     *
+     * @return array<string, string|null>
+     */
+    private function loadLastFailureNotesByGroupPostgres(?int $organizationId): array
+    {
+        if ($organizationId !== null) {
+            $rows = DB::select(
+                'SELECT DISTINCT ON (type) type, notes, organization_id '
+                .'FROM stripe_webhook_events '
+                ."WHERE status = 'failed' AND organization_id = ? "
+                .'ORDER BY type, created_at DESC, id DESC',
+                [$organizationId],
+            );
+        } else {
+            $rows = DB::select(
+                'SELECT DISTINCT ON (organization_id, type) organization_id, type, notes '
+                .'FROM stripe_webhook_events '
+                ."WHERE status = 'failed' "
+                .'ORDER BY organization_id NULLS FIRST, type, created_at DESC, id DESC',
+            );
+        }
+
+        $map = [];
+        foreach ($rows as $row) {
+            $orgId = $row->organization_id !== null ? (int) $row->organization_id : null;
+            $key = $this->groupKey($orgId, (string) $row->type);
+            $map[$key] = $row->notes !== null ? (string) $row->notes : null;
         }
 
         return $map;

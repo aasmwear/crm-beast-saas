@@ -15,6 +15,14 @@
 | organization_domains | id, organization_id, domain | FK | domain unique |
 | organization_user | id, organization_id, user_id | FK | (org, user) unique |
 
+### Metrics read-model (`org_daily_metrics`)
+
+| Table | Key Columns | organization_id | Indexes / constraints |
+|-------|-------------|-----------------|------------------------|
+| org_daily_metrics | id, **metric_date** (date), clients_count, projects_count, tasks_count, open_tasks_count, attendance_count, activities_count, invoices_count, revenue_cents, outstanding_cents, **users_count** | FK → organizations, cascade | **unique (organization_id, metric_date)** |
+
+Daily EOD snapshot per org (`OrgMetricsSnapshotService` / `metrics:snapshot-orgs`). **Reads:** tenant admin dashboard hybrid metrics; platform Feature Usage (when full coverage); Org Health `seats_active` (hybrid; large/enterprise use latest row per org — see `App\Support\OrgSnapshotReadMode`). Config: `config/org_daily_metrics.php` (`ORG_SNAPSHOT_READ_ALL_TENANTS`).
+
 ### Clients
 
 | Table | Key Columns | organization_id | Indexes |
@@ -39,7 +47,7 @@
 
 | Table | Key Columns | organization_id | Indexes |
 |-------|-------------|-----------------|---------|
-| tasks | id, organization_id, project_id, assignees (jsonb) | FK, cascade | (org_id, project_id), (org_id, status), GIN(assignees jsonb_path_ops) |
+| tasks | id, organization_id, project_id, assignees (jsonb) | FK, cascade | (org_id, project_id), (org_id, status), GIN(assignees jsonb_path_ops); **PostgreSQL:** partial `(organization_id, created_at) WHERE deleted_at IS NULL` — see `2026_04_11_000001_partition_readiness_indexes` |
 
 ### Attendance
 
@@ -63,7 +71,7 @@
 | subscription_items | (Cashier) | — | — |
 | organization_subscriptions | id, organization_id, plan_key, status, trial_ends_at, current_period_ends_at, seats_included, seat_limit | FK, unique org | plan_key, status |
 | organization_addons | id, organization_id, addon_key, quantity, value_int, mode (augment\|set), active, starts_at, ends_at | FK, cascade | (org_id, addon_key) |
-| stripe_webhook_events | id, organization_id, stripe_event_id, type, status | FK, nullOnDelete | stripe_event_id unique, organization_id |
+| stripe_webhook_events | id, organization_id, stripe_event_id, type, status, processed_at | FK, nullOnDelete | stripe_event_id unique; **PostgreSQL partition-readiness:** partial index `(organization_id, created_at) WHERE status = 'failed'`, `(organization_id, type)`, `(organization_id, processed_at DESC NULLS LAST)` — see migration `2026_04_11_000001_partition_readiness_indexes` |
 | webhook_event_summaries | id, organization_scope, organization_id, provider, event_type, total_count, success_count, failure_count, last_received_at, last_processed_at, last_error_at, last_error_message | FK org nullable | unique (provider, organization_scope, event_type); index (provider, organization_id) |
 | webhook_event_daily_rollups | id, organization_scope, organization_id, provider, event_type, **event_date** (DATE), total_count, success_count, failure_count, last_received_at, last_processed_at | FK org nullable | unique (provider, organization_scope, event_type, event_date); index (provider, event_date) |
 
@@ -90,7 +98,7 @@
 |-------|-------------|-----------------|---------|
 | audit_logs | id, organization_id, actor_id, action, entity, entity_id, changes (json) | FK, cascade | (org_id, entity, entity_id) |
 | audit_logs_archive | Same as audit_logs + archived_at | unsigned org id (no FK) | (org_id, created_at), (entity, entity_id), archived_at |
-| activities | id, organization_id, user_id, morphs(subject), description, properties (json) | FK, cascade | (org_id, created_at), (subject_type, subject_id) |
+| activities | id, organization_id, user_id, morphs(subject), description, properties (json) | FK, cascade | (org_id, created_at); **PostgreSQL:** `(organization_id, subject_type, subject_id)` replaces non-tenant `(subject_type, subject_id)` for partition alignment — see `2026_04_11_000001_partition_readiness_indexes` |
 | activities_archive | Same as activities + archived_at | unsigned org id (no FK) | (org_id, created_at), (subject_type, subject_id), archived_at |
 
 ### HRM / Users

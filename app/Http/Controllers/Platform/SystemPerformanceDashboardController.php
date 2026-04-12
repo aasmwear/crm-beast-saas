@@ -23,6 +23,10 @@ use Inertia\Response;
  * Surfaces infrastructure readiness, queue health, webhook reliability,
  * and storage pressure using signals already available in the app and database.
  * No external APM, no mutations.
+ *
+ * `org_daily_metrics` does not carry storage bytes or global unique-user counts, so
+ * `storage_pressure` and `platform_summary.total_users` remain live queries. Webhook
+ * paths already prefer summaries/rollups where populated.
  */
 final class SystemPerformanceDashboardController extends Controller
 {

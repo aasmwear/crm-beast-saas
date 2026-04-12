@@ -12,6 +12,7 @@ use App\Services\OrgMetricsSnapshotService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -35,6 +36,7 @@ class OrgHealthDashboardTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        Config::set('org_daily_metrics.snapshot_only_all_tenants', false);
         parent::tearDown();
     }
 
@@ -537,6 +539,134 @@ class OrgHealthDashboardTest extends TestCase
             ->where('organizations.data.0.health_flags.billing', 'critical')
             ->where('organizations.data.0.webhook.recent_failed_count', 1)
             ->where('organizations.data.0.health_flags.webhooks', 'warning')
+        );
+    }
+
+    public function test_large_tenant_seats_use_latest_snapshot_when_yesterday_row_missing(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-04-10 12:00:00'));
+
+        $org = Organization::factory()->create([
+            'slug' => 'large-snapshot-latest',
+            'tier' => 'large',
+        ]);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'pro',
+            'status' => 'active',
+            'seats_included' => 100,
+        ]);
+        for ($i = 0; $i < 7; $i++) {
+            $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        }
+
+        OrgDailyMetric::query()->create([
+            'organization_id' => $org->id,
+            'metric_date' => CarbonImmutable::parse('2026-04-05')->toDateString(),
+            'clients_count' => 0,
+            'projects_count' => 0,
+            'tasks_count' => 0,
+            'open_tasks_count' => 0,
+            'attendance_count' => 0,
+            'activities_count' => 0,
+            'invoices_count' => 0,
+            'revenue_cents' => 0,
+            'outstanding_cents' => 0,
+            'users_count' => 3,
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.seats_active', 3)
+        );
+    }
+
+    public function test_small_tenant_seats_ignore_stale_snapshot_without_yesterday_row(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::parse('2026-04-10 12:00:00'));
+
+        $org = Organization::factory()->create([
+            'slug' => 'small-no-yesterday-snap',
+            'tier' => 'small',
+        ]);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'starter',
+            'status' => 'active',
+            'seats_included' => 25,
+        ]);
+        for ($i = 0; $i < 4; $i++) {
+            $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        }
+
+        OrgDailyMetric::query()->create([
+            'organization_id' => $org->id,
+            'metric_date' => CarbonImmutable::parse('2026-04-05')->toDateString(),
+            'clients_count' => 0,
+            'projects_count' => 0,
+            'tasks_count' => 0,
+            'open_tasks_count' => 0,
+            'attendance_count' => 0,
+            'activities_count' => 0,
+            'invoices_count' => 0,
+            'revenue_cents' => 0,
+            'outstanding_cents' => 0,
+            'users_count' => 1,
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.seats_active', 4)
+        );
+    }
+
+    public function test_config_all_tenants_snapshot_read_uses_latest_row_for_small_tier(): void
+    {
+        Config::set('org_daily_metrics.snapshot_only_all_tenants', true);
+
+        Carbon::setTestNow(CarbonImmutable::parse('2026-04-10 12:00:00'));
+
+        $org = Organization::factory()->create([
+            'slug' => 'all-tenants-snapshot-read',
+            'tier' => 'small',
+        ]);
+        OrganizationSubscription::create([
+            'organization_id' => $org->id,
+            'plan_key' => 'starter',
+            'status' => 'active',
+            'seats_included' => 25,
+        ]);
+        for ($i = 0; $i < 6; $i++) {
+            $org->users()->attach(User::factory()->create(['client_id' => null])->id, []);
+        }
+
+        OrgDailyMetric::query()->create([
+            'organization_id' => $org->id,
+            'metric_date' => CarbonImmutable::parse('2026-04-06')->toDateString(),
+            'clients_count' => 0,
+            'projects_count' => 0,
+            'tasks_count' => 0,
+            'open_tasks_count' => 0,
+            'attendance_count' => 0,
+            'activities_count' => 0,
+            'invoices_count' => 0,
+            'revenue_cents' => 0,
+            'outstanding_cents' => 0,
+            'users_count' => 2,
+        ]);
+
+        $response = $this->actingAs($this->platformAdmin, 'platform')
+            ->get(route('platform.organizations.health'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('organizations.data.0.seats_active', 2)
         );
     }
 }
